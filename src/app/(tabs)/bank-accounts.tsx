@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { 
   View, Text, StyleSheet, ScrollView, TouchableOpacity, 
-  Modal, TextInput, Alert, SafeAreaView 
+  Modal, TextInput, Alert, SafeAreaView, Platform, RefreshControl 
 } from 'react-native';
 import { Colors } from '../../constants/theme';
 import { useAppStore } from '../../services/store';
@@ -17,6 +17,13 @@ export default function BankAccountsScreen() {
   const [detailModalVisible, setDetailModalVisible] = useState(false);
   const [selectedAcc, setSelectedAcc] = useState<BankAccount | null>(null);
   const [isEditing, setIsEditing] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await store.syncFromBackend(true);
+    setRefreshing(false);
+  };
 
   // Form State
   const [form, setForm] = useState({
@@ -132,44 +139,44 @@ export default function BankAccountsScreen() {
     {
       key: 'BankAccountId',
       title: 'ID',
-      width: 75,
-      render: (b) => <Text style={styles.idText}>{b.BankAccountId}</Text>,
+      width: 65,
+      render: (b) => <Text style={styles.idText}>#{b.BankAccountId}</Text>,
     },
     {
       key: 'AccountHolderName',
       title: 'Holder Name',
-      width: 150,
-      render: (b) => <Text style={styles.primaryCellText}>{b.AccountHolderName}</Text>,
+      width: 140,
+      render: (b) => <Text style={styles.primaryCellText} numberOfLines={1}>{b.AccountHolderName}</Text>,
     },
     {
       key: 'AccountNumber',
       title: 'Account No.',
-      width: 140,
-      render: (b) => <Text style={styles.cellText}>{b.AccountNumber}</Text>,
+      width: 130,
+      render: (b) => <Text style={styles.cellText} numberOfLines={1}>{b.AccountNumber}</Text>,
     },
     {
       key: 'BankName',
       title: 'Bank',
-      width: 140,
-      render: (b) => <Text style={[styles.cellText, { fontWeight: '600' }]}>{b.BankName}</Text>,
+      width: 120,
+      render: (b) => <Text style={[styles.cellText, { fontWeight: '600' }]} numberOfLines={1}>{b.BankName}</Text>,
     },
     {
       key: 'City',
       title: 'City',
-      width: 100,
-      render: (b) => <Text style={styles.cellText}>{b.City || '—'}</Text>,
+      width: 90,
+      render: (b) => <Text style={styles.cellText} numberOfLines={1}>{b.City || '—'}</Text>,
     },
     {
       key: 'MaxLoanAmount',
-      title: 'Max Loan (₹)',
-      width: 120,
+      title: 'Max Limit (₹)',
+      width: 115,
       align: 'right',
       render: (b) => <Text style={styles.cellText}>₹{(b.MaxLoanAmount || 0).toLocaleString()}</Text>,
     },
     {
       key: 'UtilizedLoanAmount',
       title: 'Utilized (₹)',
-      width: 120,
+      width: 115,
       align: 'right',
       render: (b) => (
         <Text style={[styles.cellText, { color: (b.UtilizedLoanAmount || 0) > 0 ? Colors.danger : Colors.textSecondary }]}>
@@ -180,7 +187,7 @@ export default function BankAccountsScreen() {
     {
       key: 'AvailableLoanAmount',
       title: 'Available (₹)',
-      width: 130,
+      width: 115,
       align: 'right',
       render: (b) => (
         <Text style={[styles.cellText, { fontWeight: '700', color: Colors.success }]}>
@@ -191,7 +198,7 @@ export default function BankAccountsScreen() {
     {
       key: 'Status',
       title: 'Status',
-      width: 90,
+      width: 85,
       align: 'center',
       render: (b) => (
         <Badge 
@@ -204,7 +211,7 @@ export default function BankAccountsScreen() {
     {
       key: 'Actions',
       title: 'Actions',
-      width: 110,
+      width: 95,
       align: 'center',
       render: (b) => (
         <View style={styles.actionRow}>
@@ -224,7 +231,11 @@ export default function BankAccountsScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <ScrollView 
+        style={styles.container} 
+        contentContainerStyle={styles.content}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[Colors.primary]} />}
+      >
         <DataTable
           title="Bank Accounts"
           subtitle="Manage lending bank credit limits and account details"
@@ -262,19 +273,27 @@ export default function BankAccountsScreen() {
               {/* Borrower Select */}
               <View style={styles.field}>
                 <Text style={styles.label}>Select Borrower *</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexDirection: 'row' }}>
-                  {store.users.map(u => (
-                    <TouchableOpacity
-                      key={u.UserId}
-                      style={[styles.userChip, form.UserId === u.UserId && styles.userChipActive]}
-                      onPress={() => setForm(p => ({ ...p, UserId: u.UserId, AccountHolderName: u.FullName }))}
-                    >
-                      <Text style={[styles.userChipText, form.UserId === u.UserId && styles.userChipTextActive]}>
-                        {u.FullName}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
+                {store.users.length === 0 ? (
+                  <View style={{ backgroundColor: Colors.warningBg, padding: 10, borderRadius: 8, marginTop: 4 }}>
+                    <Text style={{ fontSize: 13, color: Colors.warning, fontWeight: '500' }}>
+                      ⚠️ No borrowers registered yet. Please add a customer in the Users tab first.
+                    </Text>
+                  </View>
+                ) : (
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexDirection: 'row' }}>
+                    {store.users.map(u => (
+                      <TouchableOpacity
+                        key={u.UserId}
+                        style={[styles.userChip, form.UserId === u.UserId && styles.userChipActive]}
+                        onPress={() => setForm(p => ({ ...p, UserId: u.UserId, AccountHolderName: u.FullName }))}
+                      >
+                        <Text style={[styles.userChipText, form.UserId === u.UserId && styles.userChipTextActive]}>
+                          {u.FullName}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                )}
               </View>
 
               <View style={styles.field}>
@@ -348,6 +367,38 @@ export default function BankAccountsScreen() {
                     value={form.UPI_ID}
                     onChangeText={v => setForm(p => ({ ...p, UPI_ID: v }))}
                   />
+                </View>
+              </View>
+
+              <View style={styles.formRow}>
+                <View style={[styles.field, { flex: 1 }]}>
+                  <Text style={styles.label}>Account Type</Text>
+                  <View style={styles.statusToggleRow}>
+                    {(['Savings', 'Current'] as const).map(t => (
+                      <TouchableOpacity
+                        key={t}
+                        style={[styles.statusBtn, form.AccountType === t && styles.statusBtnActive]}
+                        onPress={() => setForm(p => ({ ...p, AccountType: t }))}
+                      >
+                        <Text style={[styles.statusBtnText, form.AccountType === t && styles.statusBtnTextActive]}>{t}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+
+                <View style={[styles.field, { flex: 1 }]}>
+                  <Text style={styles.label}>Status</Text>
+                  <View style={styles.statusToggleRow}>
+                    {(['Active', 'Inactive'] as const).map(s => (
+                      <TouchableOpacity
+                        key={s}
+                        style={[styles.statusBtn, form.Status === s && styles.statusBtnActive]}
+                        onPress={() => setForm(p => ({ ...p, Status: s }))}
+                      >
+                        <Text style={[styles.statusBtnText, form.Status === s && styles.statusBtnTextActive]}>{s}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
                 </View>
               </View>
 
@@ -458,7 +509,8 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background,
   },
   content: {
-    padding: 14,
+    padding: 12,
+    paddingBottom: 28,
   },
   idText: {
     fontSize: 12,
@@ -491,11 +543,14 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'rgba(15, 23, 42, 0.6)',
     justifyContent: 'center',
+    alignItems: 'center',
     padding: 16,
   },
   modalBox: {
     backgroundColor: '#ffffff',
     borderRadius: 16,
+    width: Platform.select({ web: '55%', default: '94%' }),
+    maxWidth: 650,
     maxHeight: '85%',
     overflow: 'hidden',
   },
@@ -663,5 +718,27 @@ const styles = StyleSheet.create({
   bold: {
     fontWeight: '700',
     color: Colors.textPrimary,
+  },
+  statusToggleRow: {
+    flexDirection: 'row',
+    gap: 4,
+  },
+  statusBtn: {
+    flex: 1,
+    paddingVertical: 8,
+    alignItems: 'center',
+    borderRadius: 6,
+    backgroundColor: '#f1f5f9',
+  },
+  statusBtnActive: {
+    backgroundColor: Colors.primaryDark,
+  },
+  statusBtnText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: Colors.textSecondary,
+  },
+  statusBtnTextActive: {
+    color: '#ffffff',
   },
 });

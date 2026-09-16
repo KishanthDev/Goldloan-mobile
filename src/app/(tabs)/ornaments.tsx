@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { 
   View, Text, StyleSheet, ScrollView, TouchableOpacity, 
-  Modal, TextInput, Alert, SafeAreaView 
+  Modal, TextInput, Alert, SafeAreaView, Platform, RefreshControl, Linking 
 } from 'react-native';
+import { Image } from 'expo-image';
 import { Colors } from '../../constants/theme';
 import { useAppStore } from '../../services/store';
+import { getDriveDirectImageUrl } from '../../services/api';
 import { Ornament } from '../../types';
 import { DataTable, Column } from '../../components/DataTable';
 import { Badge } from '../../components/Badge';
@@ -17,6 +19,13 @@ export default function OrnamentsScreen() {
   const [detailModalVisible, setDetailModalVisible] = useState(false);
   const [selectedOrn, setSelectedOrn] = useState<Ornament | null>(null);
   const [isEditing, setIsEditing] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await store.syncFromBackend(true);
+    setRefreshing(false);
+  };
 
   // Form State
   const [form, setForm] = useState({
@@ -33,6 +42,9 @@ export default function OrnamentsScreen() {
     HallmarkNumber: '',
     Quantity: '1',
     MakerName: '',
+    EstimatedValue: '',
+    OrnamentImages: '',
+    Description: '',
     Remarks: '',
     Status: 'Available' as 'Available' | 'Pledged' | 'Released',
   });
@@ -89,6 +101,9 @@ export default function OrnamentsScreen() {
       HallmarkNumber: '',
       Quantity: '1',
       MakerName: '',
+      EstimatedValue: '',
+      OrnamentImages: '',
+      Description: '',
       Remarks: '',
       Status: 'Available',
     });
@@ -112,6 +127,9 @@ export default function OrnamentsScreen() {
       HallmarkNumber: orn.HallmarkNumber || '',
       Quantity: String(orn.Quantity || '1'),
       MakerName: orn.MakerName || '',
+      EstimatedValue: String(orn.EstimatedValue || ''),
+      OrnamentImages: orn.OrnamentImages || '',
+      Description: orn.Description || '',
       Remarks: orn.Remarks || '',
       Status: orn.Status === 'Pledged' ? 'Pledged' : (orn.Status === 'Released' ? 'Released' : 'Available'),
     });
@@ -158,6 +176,7 @@ export default function OrnamentsScreen() {
         BuyingPricePerGram: buyingPrice,
         CurrentPricePerGram: currentPrice,
         Quantity: parseInt(form.Quantity) || 1,
+        EstimatedValue: parseFloat(form.EstimatedValue) || undefined,
       });
       Alert.alert('Success', 'Ornament updated.');
     } else {
@@ -170,6 +189,7 @@ export default function OrnamentsScreen() {
         BuyingPricePerGram: buyingPrice,
         CurrentPricePerGram: currentPrice,
         Quantity: parseInt(form.Quantity) || 1,
+        EstimatedValue: parseFloat(form.EstimatedValue) || undefined,
       });
       Alert.alert('Success', 'Ornament added to vault.');
     }
@@ -183,57 +203,57 @@ export default function OrnamentsScreen() {
     return 'default';
   };
 
-  // Table Columns exactly matching ornamentsTable in index.html:
+  // Table Columns matching index.html:
   // ID | Name | Type | Purity | Gross wt | Stone wt | Metal wt | Status | Buying price/grm | Total Price | Maker Name | Actions
   const columns: Column<Ornament>[] = [
     {
       key: 'OrnamentId',
       title: 'ID',
-      width: 75,
-      render: (o) => <Text style={styles.idText}>{o.OrnamentId}</Text>,
+      width: 65,
+      render: (o) => <Text style={styles.idText}>#{o.OrnamentId}</Text>,
     },
     {
       key: 'OrnamentName',
       title: 'Name',
-      width: 170,
+      width: 145,
       render: (o) => (
         <View>
-          <Text style={styles.primaryCellText}>{o.OrnamentName}</Text>
-          {o.HallmarkNumber ? <Text style={styles.subCellText}>HM: {o.HallmarkNumber}</Text> : null}
+          <Text style={styles.primaryCellText} numberOfLines={1}>{o.OrnamentName}</Text>
+          {o.HallmarkNumber ? <Text style={styles.subCellText} numberOfLines={1}>HM: {o.HallmarkNumber}</Text> : null}
         </View>
       ),
     },
     {
       key: 'OrnamentType',
       title: 'Type',
-      width: 110,
-      render: (o) => <Text style={styles.cellText}>{o.OrnamentType || 'Jewelry'}</Text>,
+      width: 95,
+      render: (o) => <Text style={styles.cellText} numberOfLines={1}>{o.OrnamentType || 'Jewelry'}</Text>,
     },
     {
       key: 'Purity',
       title: 'Purity',
-      width: 80,
+      width: 75,
       align: 'center',
       render: (o) => <Badge label={o.Purity || '22K'} variant="gold" size="sm" />,
     },
     {
       key: 'GrossWeight',
       title: 'Gross wt',
-      width: 90,
+      width: 85,
       align: 'right',
       render: (o) => <Text style={styles.cellText}>{Number(o.GrossWeight || 0).toFixed(2)}g</Text>,
     },
     {
       key: 'StoneWeight',
       title: 'Stone wt',
-      width: 90,
+      width: 85,
       align: 'right',
       render: (o) => <Text style={styles.cellText}>{Number(o.StoneWeight || 0).toFixed(2)}g</Text>,
     },
     {
       key: 'MetalWeight',
       title: 'Metal wt',
-      width: 100,
+      width: 90,
       align: 'right',
       render: (o) => (
         <Text style={[styles.cellText, { fontWeight: '700', color: Colors.primaryDark }]}>
@@ -244,21 +264,21 @@ export default function OrnamentsScreen() {
     {
       key: 'Status',
       title: 'Status',
-      width: 95,
+      width: 85,
       align: 'center',
       render: (o) => <Badge label={o.Status} variant={getStatusVariant(o.Status)} size="sm" />,
     },
     {
       key: 'BuyingPricePerGram',
-      title: 'Buying price/grm',
-      width: 130,
+      title: 'Buy Rate/g',
+      width: 115,
       align: 'right',
       render: (o) => <Text style={styles.cellText}>₹{(o.BuyingPricePerGram || 0).toLocaleString()}</Text>,
     },
     {
       key: 'TotalPrice',
       title: 'Total Price',
-      width: 120,
+      width: 110,
       align: 'right',
       render: (o) => (
         <Text style={[styles.cellText, { fontWeight: '700' }]}>
@@ -269,13 +289,13 @@ export default function OrnamentsScreen() {
     {
       key: 'MakerName',
       title: 'Maker Name',
-      width: 120,
-      render: (o) => <Text style={styles.cellText}>{o.MakerName || '—'}</Text>,
+      width: 100,
+      render: (o) => <Text style={styles.cellText} numberOfLines={1}>{o.MakerName || '—'}</Text>,
     },
     {
       key: 'Actions',
       title: 'Actions',
-      width: 110,
+      width: 95,
       align: 'center',
       render: (o) => (
         <View style={styles.actionRow}>
@@ -295,7 +315,11 @@ export default function OrnamentsScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <ScrollView 
+        style={styles.container} 
+        contentContainerStyle={styles.content}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[Colors.primary]} />}
+      >
         <DataTable
           title="Gold Vault (Ornaments)"
           subtitle="Inventory of pledged, available, and released gold jewelry"
@@ -333,19 +357,27 @@ export default function OrnamentsScreen() {
               {/* Borrower Select */}
               <View style={styles.field}>
                 <Text style={styles.label}>Select Borrower *</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexDirection: 'row' }}>
-                  {store.users.map(u => (
-                    <TouchableOpacity
-                      key={u.UserId}
-                      style={[styles.userChip, form.UserId === u.UserId && styles.userChipActive]}
-                      onPress={() => setForm(p => ({ ...p, UserId: u.UserId }))}
-                    >
-                      <Text style={[styles.userChipText, form.UserId === u.UserId && styles.userChipTextActive]}>
-                        {u.FullName}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
+                {store.users.length === 0 ? (
+                  <View style={{ backgroundColor: Colors.warningBg, padding: 10, borderRadius: 8, marginTop: 4 }}>
+                    <Text style={{ fontSize: 13, color: Colors.warning, fontWeight: '500' }}>
+                      ⚠️ No borrowers registered yet. Please add a customer in the Users tab first.
+                    </Text>
+                  </View>
+                ) : (
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexDirection: 'row' }}>
+                    {store.users.map(u => (
+                      <TouchableOpacity
+                        key={u.UserId}
+                        style={[styles.userChip, form.UserId === u.UserId && styles.userChipActive]}
+                        onPress={() => setForm(p => ({ ...p, UserId: u.UserId }))}
+                      >
+                        <Text style={[styles.userChipText, form.UserId === u.UserId && styles.userChipTextActive]}>
+                          {u.FullName}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                )}
               </View>
 
               <View style={styles.field}>
@@ -490,6 +522,74 @@ export default function OrnamentsScreen() {
 
               <View style={styles.formRow}>
                 <View style={[styles.field, { flex: 1 }]}>
+                  <Text style={styles.label}>Category</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="e.g. Neckwear, Bangles"
+                    value={form.OrnamentCategory}
+                    onChangeText={v => setForm(p => ({ ...p, OrnamentCategory: v }))}
+                  />
+                </View>
+
+                <View style={[styles.field, { flex: 1 }]}>
+                  <Text style={styles.label}>Quantity</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="1"
+                    keyboardType="number-pad"
+                    value={form.Quantity}
+                    onChangeText={v => setForm(p => ({ ...p, Quantity: v }))}
+                  />
+                </View>
+              </View>
+
+              <View style={styles.field}>
+                <Text style={styles.label}>Estimated Value (₹)</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Auto: defaults to Market Value"
+                  keyboardType="number-pad"
+                  value={form.EstimatedValue}
+                  onChangeText={v => setForm(p => ({ ...p, EstimatedValue: v }))}
+                />
+              </View>
+
+              <View style={styles.field}>
+                <Text style={styles.label}>Description</Text>
+                <TextInput
+                  style={[styles.input, styles.multilineInput]}
+                  placeholder="Ornament description..."
+                  multiline
+                  numberOfLines={2}
+                  value={form.Description}
+                  onChangeText={v => setForm(p => ({ ...p, Description: v }))}
+                />
+              </View>
+
+              <View style={styles.field}>
+                <Text style={styles.label}>Google Drive / Image URLs</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="e.g. https://drive.google.com/file/d/... | https://..."
+                  value={form.OrnamentImages}
+                  onChangeText={v => setForm(p => ({ ...p, OrnamentImages: v }))}
+                />
+              </View>
+
+              <View style={styles.field}>
+                <Text style={styles.label}>Remarks</Text>
+                <TextInput
+                  style={[styles.input, styles.multilineInput]}
+                  placeholder="Additional remarks..."
+                  multiline
+                  numberOfLines={2}
+                  value={form.Remarks}
+                  onChangeText={v => setForm(p => ({ ...p, Remarks: v }))}
+                />
+              </View>
+
+              <View style={styles.formRow}>
+                <View style={[styles.field, { flex: 1 }]}>
                   <Text style={styles.label}>Status</Text>
                   <View style={styles.statusToggleRow}>
                     {(['Available', 'Pledged', 'Released'] as const).map(s => (
@@ -513,14 +613,14 @@ export default function OrnamentsScreen() {
                 <Text style={styles.cancelBtnText}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
-                <Text style={styles.saveBtnText}>{isEditing ? 'Save Changes' : 'Add to Vault'}</Text>
+                <Text style={styles.saveBtnText}>{isEditing ? 'Save Changes' : 'Add Ornament'}</Text>
               </TouchableOpacity>
             </View>
           </View>
         </View>
       </Modal>
 
-      {/* DETAIL MODAL */}
+      {/* VIEW ORNAMENT DETAIL MODAL */}
       <Modal visible={detailModalVisible} animationType="fade" transparent>
         <View style={styles.modalOverlay}>
           <View style={styles.modalBox}>
@@ -536,10 +636,18 @@ export default function OrnamentsScreen() {
                 <View style={styles.detailCard}>
                   <Text style={styles.detailName}>{selectedOrn.OrnamentName}</Text>
                   <Text style={styles.detailCode}>ID: {selectedOrn.OrnamentId} • {selectedOrn.OrnamentType || 'Jewelry'}</Text>
+                  {selectedOrn.OrnamentCategory ? <Text style={styles.detailSubCode}>{selectedOrn.OrnamentCategory}</Text> : null}
                   <View style={{ flexDirection: 'row', gap: 6, marginTop: 6 }}>
                     <Badge label={selectedOrn.Purity || '22K'} variant="gold" />
                     <Badge label={selectedOrn.Status} variant={getStatusVariant(selectedOrn.Status)} />
                   </View>
+                </View>
+
+                <View style={styles.detailSection}>
+                  <Text style={styles.detailSecTitle}>Ornament Info</Text>
+                  {selectedOrn.MakerName ? <Text style={styles.detailRowText}><Text style={styles.bold}>Maker:</Text> {selectedOrn.MakerName}</Text> : null}
+                  {selectedOrn.HallmarkNumber ? <Text style={styles.detailRowText}><Text style={styles.bold}>Hallmark No.:</Text> {selectedOrn.HallmarkNumber}</Text> : null}
+                  {selectedOrn.Quantity ? <Text style={styles.detailRowText}><Text style={styles.bold}>Quantity:</Text> {selectedOrn.Quantity}</Text> : null}
                 </View>
 
                 <View style={styles.detailSection}>
@@ -555,10 +663,46 @@ export default function OrnamentsScreen() {
                   <Text style={styles.detailSecTitle}>Valuation & Financials</Text>
                   <Text style={styles.detailRowText}><Text style={styles.bold}>Buying Cost:</Text> ₹{(selectedOrn.BuyingCost || selectedOrn.TotalPrice || 0).toLocaleString()} (@ ₹{selectedOrn.BuyingPricePerGram}/g)</Text>
                   <Text style={styles.detailRowText}><Text style={styles.bold}>Current Market Value:</Text> ₹{(selectedOrn.MarketValue || 0).toLocaleString()} (@ ₹{selectedOrn.CurrentPricePerGram}/g)</Text>
+                  {selectedOrn.EstimatedValue ? <Text style={styles.detailRowText}><Text style={styles.bold}>Estimated Value:</Text> ₹{Number(selectedOrn.EstimatedValue).toLocaleString()}</Text> : null}
                   <Text style={[styles.detailRowText, { color: Colors.success, fontWeight: '700' }]}>
                     Appreciation Gains: +₹{(selectedOrn.AppreciationValue || 0).toLocaleString()} ({selectedOrn.AppreciationPercentage?.toFixed(2)}%)
                   </Text>
                 </View>
+
+                {selectedOrn.OrnamentImages ? (
+                  <View style={styles.detailSection}>
+                    <Text style={styles.detailSecTitle}>Google Drive Photos</Text>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingVertical: 4 }}>
+                      {selectedOrn.OrnamentImages.split(' | ').filter(Boolean).map((imgUrl, i) => {
+                        const directUrl = getDriveDirectImageUrl(imgUrl);
+                        return (
+                          <TouchableOpacity 
+                            key={i} 
+                            onPress={() => Linking.openURL(imgUrl)}
+                            style={{ borderRadius: 8, overflow: 'hidden', borderWidth: 1, borderColor: Colors.border }}
+                          >
+                            <Image
+                              source={{ uri: directUrl || imgUrl }}
+                              style={{ width: 140, height: 100, backgroundColor: '#f1f5f9' }}
+                              contentFit="cover"
+                            />
+                            <View style={{ backgroundColor: 'rgba(0,0,0,0.6)', paddingVertical: 2, paddingHorizontal: 4 }}>
+                              <Text style={{ color: '#fff', fontSize: 9, textAlign: 'center' }}>Tap to view</Text>
+                            </View>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </ScrollView>
+                  </View>
+                ) : null}
+
+                {(selectedOrn.Description || selectedOrn.Remarks) ? (
+                  <View style={styles.detailSection}>
+                    <Text style={styles.detailSecTitle}>Notes</Text>
+                    {selectedOrn.Description ? <Text style={styles.detailRowText}><Text style={styles.bold}>Description:</Text> {selectedOrn.Description}</Text> : null}
+                    {selectedOrn.Remarks ? <Text style={styles.detailRowText}><Text style={styles.bold}>Remarks:</Text> {selectedOrn.Remarks}</Text> : null}
+                  </View>
+                ) : null}
               </ScrollView>
             ) : null}
 
@@ -584,7 +728,8 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background,
   },
   content: {
-    padding: 14,
+    padding: 12,
+    paddingBottom: 28,
   },
   idText: {
     fontSize: 12,
@@ -622,11 +767,14 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'rgba(15, 23, 42, 0.6)',
     justifyContent: 'center',
+    alignItems: 'center',
     padding: 16,
   },
   modalBox: {
     backgroundColor: '#ffffff',
     borderRadius: 16,
+    width: Platform.select({ web: '55%', default: '94%' }),
+    maxWidth: 650,
     maxHeight: '85%',
     overflow: 'hidden',
   },
@@ -814,6 +962,17 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#a16207',
     marginTop: 2,
+  },
+  detailSubCode: {
+    fontSize: 11,
+    color: '#92400e',
+    marginTop: 1,
+    fontStyle: 'italic',
+  },
+  multilineInput: {
+    minHeight: 60,
+    textAlignVertical: 'top',
+    paddingTop: 8,
   },
   detailSection: {
     marginBottom: 14,

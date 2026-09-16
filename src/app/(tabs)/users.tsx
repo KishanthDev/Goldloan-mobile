@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { 
   View, Text, StyleSheet, ScrollView, TouchableOpacity, 
-  Modal, TextInput, Alert, SafeAreaView 
+  Modal, TextInput, Alert, SafeAreaView, Platform, RefreshControl 
 } from 'react-native';
 import { Colors } from '../../constants/theme';
 import { useAppStore } from '../../services/store';
@@ -18,6 +18,13 @@ export default function UsersScreen() {
   const [detailModalVisible, setDetailModalVisible] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [isEditing, setIsEditing] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await store.syncFromBackend(true);
+    setRefreshing(false);
+  };
 
   // Form State
   const [form, setForm] = useState({
@@ -130,35 +137,35 @@ export default function UsersScreen() {
     setModalVisible(false);
   };
 
-  // Table Columns exactly matching usersTable in index.html: ID | Name | Mobile | Status | Actions
+  // Table Columns: ID | Name | Mobile | Status | Actions
   const columns: Column<User>[] = [
     {
       key: 'UserId',
       title: 'ID',
-      width: 75,
-      render: (u) => <Text style={styles.idText}>{u.UserId}</Text>,
+      width: 65,
+      render: (u) => <Text style={styles.idText}>#{u.UserId}</Text>,
     },
     {
       key: 'FullName',
       title: 'Name',
-      width: 170,
+      width: 150,
       render: (u) => (
         <View>
-          <Text style={styles.primaryCellText}>{u.FullName}</Text>
-          {u.CustomerCode ? <Text style={styles.subCellText}>{u.CustomerCode}</Text> : null}
+          <Text style={styles.primaryCellText} numberOfLines={1}>{u.FullName}</Text>
+          {u.CustomerCode ? <Text style={styles.subCellText} numberOfLines={1}>{u.CustomerCode}</Text> : null}
         </View>
       ),
     },
     {
       key: 'MobileNumber',
       title: 'Mobile',
-      width: 120,
-      render: (u) => <Text style={styles.cellText}>{u.MobileNumber}</Text>,
+      width: 115,
+      render: (u) => <Text style={styles.cellText} numberOfLines={1}>{u.MobileNumber}</Text>,
     },
     {
       key: 'Status',
       title: 'Status',
-      width: 90,
+      width: 85,
       align: 'center',
       render: (u) => (
         <Badge 
@@ -171,7 +178,7 @@ export default function UsersScreen() {
     {
       key: 'Actions',
       title: 'Actions',
-      width: 110,
+      width: 95,
       align: 'center',
       render: (u) => (
         <View style={styles.actionRow}>
@@ -191,7 +198,11 @@ export default function UsersScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <ScrollView 
+        style={styles.container} 
+        contentContainerStyle={styles.content}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[Colors.primary]} />}
+      >
         <DataTable
           title="Users / Customers"
           subtitle="Manage borrower registrations and KYC profiles"
@@ -225,6 +236,9 @@ export default function UsersScreen() {
             </View>
 
             <ScrollView style={styles.modalBody}>
+              {/* --- Personal Info --- */}
+              <Text style={styles.sectionDivider}>Personal Information</Text>
+
               <View style={styles.field}>
                 <Text style={styles.label}>Full Name *</Text>
                 <TextInput
@@ -256,6 +270,33 @@ export default function UsersScreen() {
                 </View>
 
                 <View style={[styles.field, { flex: 1 }]}>
+                  <Text style={styles.label}>Date of Birth</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="YYYY-MM-DD"
+                    value={form.DateOfBirth}
+                    onChangeText={v => setForm(p => ({ ...p, DateOfBirth: v }))}
+                  />
+                </View>
+              </View>
+
+              <View style={styles.field}>
+                <Text style={styles.label}>Gender</Text>
+                <View style={styles.statusToggleRow}>
+                  {(['Male', 'Female', 'Other'] as const).map(g => (
+                    <TouchableOpacity
+                      key={g}
+                      style={[styles.statusBtn, form.Gender === g && styles.statusBtnActive]}
+                      onPress={() => setForm(p => ({ ...p, Gender: g }))}
+                    >
+                      <Text style={[styles.statusBtnText, form.Gender === g && styles.statusBtnTextActive]}>{g}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              <View style={styles.formRow}>
+                <View style={[styles.field, { flex: 1 }]}>
                   <Text style={styles.label}>Mobile Number *</Text>
                   <TextInput
                     style={styles.input}
@@ -266,7 +307,46 @@ export default function UsersScreen() {
                     onChangeText={v => setForm(p => ({ ...p, MobileNumber: v }))}
                   />
                 </View>
+
+                <View style={[styles.field, { flex: 1 }]}>
+                  <Text style={styles.label}>Alternate Mobile</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="10-digit number"
+                    keyboardType="phone-pad"
+                    maxLength={10}
+                    value={form.AlternateMobileNumber}
+                    onChangeText={v => setForm(p => ({ ...p, AlternateMobileNumber: v }))}
+                  />
+                </View>
               </View>
+
+              <View style={styles.formRow}>
+                <View style={[styles.field, { flex: 1 }]}>
+                  <Text style={styles.label}>Email</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="name@example.com"
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    value={form.Email}
+                    onChangeText={v => setForm(p => ({ ...p, Email: v }))}
+                  />
+                </View>
+
+                <View style={[styles.field, { flex: 1 }]}>
+                  <Text style={styles.label}>Occupation</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="e.g. Business"
+                    value={form.Occupation}
+                    onChangeText={v => setForm(p => ({ ...p, Occupation: v }))}
+                  />
+                </View>
+              </View>
+
+              {/* --- KYC --- */}
+              <Text style={styles.sectionDivider}>KYC & Identity</Text>
 
               <View style={styles.formRow}>
                 <View style={[styles.field, { flex: 1 }]}>
@@ -292,25 +372,26 @@ export default function UsersScreen() {
                 </View>
               </View>
 
+              {/* --- Address --- */}
+              <Text style={styles.sectionDivider}>Address</Text>
+
               <View style={styles.field}>
-                <Text style={styles.label}>Email</Text>
+                <Text style={styles.label}>Address Line 1</Text>
                 <TextInput
                   style={styles.input}
-                  placeholder="name@example.com"
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  value={form.Email}
-                  onChangeText={v => setForm(p => ({ ...p, Email: v }))}
+                  placeholder="Street / Area / Door No."
+                  value={form.AddressLine1}
+                  onChangeText={v => setForm(p => ({ ...p, AddressLine1: v }))}
                 />
               </View>
 
               <View style={styles.field}>
-                <Text style={styles.label}>Address</Text>
+                <Text style={styles.label}>Address Line 2</Text>
                 <TextInput
                   style={styles.input}
-                  placeholder="Street / Area"
-                  value={form.AddressLine1}
-                  onChangeText={v => setForm(p => ({ ...p, AddressLine1: v }))}
+                  placeholder="Landmark / Colony"
+                  value={form.AddressLine2}
+                  onChangeText={v => setForm(p => ({ ...p, AddressLine2: v }))}
                 />
               </View>
 
@@ -325,6 +406,29 @@ export default function UsersScreen() {
                 </View>
 
                 <View style={[styles.field, { flex: 1 }]}>
+                  <Text style={styles.label}>State</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={form.State}
+                    onChangeText={v => setForm(p => ({ ...p, State: v }))}
+                  />
+                </View>
+              </View>
+
+              <View style={styles.formRow}>
+                <View style={[styles.field, { flex: 1 }]}>
+                  <Text style={styles.label}>Pincode</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="560001"
+                    keyboardType="number-pad"
+                    maxLength={6}
+                    value={form.Pincode}
+                    onChangeText={v => setForm(p => ({ ...p, Pincode: v }))}
+                  />
+                </View>
+
+                <View style={[styles.field, { flex: 1 }]}>
                   <Text style={styles.label}>Status</Text>
                   <View style={styles.statusToggleRow}>
                     {(['Active', 'Inactive'] as const).map(s => (
@@ -333,9 +437,7 @@ export default function UsersScreen() {
                         style={[styles.statusBtn, form.Status === s && styles.statusBtnActive]}
                         onPress={() => setForm(p => ({ ...p, Status: s }))}
                       >
-                        <Text style={[styles.statusBtnText, form.Status === s && styles.statusBtnTextActive]}>
-                          {s}
-                        </Text>
+                        <Text style={[styles.statusBtnText, form.Status === s && styles.statusBtnTextActive]}>{s}</Text>
                       </TouchableOpacity>
                     ))}
                   </View>
@@ -371,6 +473,7 @@ export default function UsersScreen() {
                 <View style={styles.detailCard}>
                   <Text style={styles.detailName}>{selectedUser.FullName}</Text>
                   <Text style={styles.detailCode}>ID: {selectedUser.UserId} • {selectedUser.CustomerCode}</Text>
+                  {selectedUser.FatherHusbandName ? <Text style={styles.detailSubCode}>S/O, W/O: {selectedUser.FatherHusbandName}</Text> : null}
                   <View style={{ marginTop: 6 }}>
                     <Badge label={selectedUser.Status} variant={selectedUser.Status === 'Active' ? 'success' : 'default'} />
                   </View>
@@ -379,15 +482,30 @@ export default function UsersScreen() {
                 <View style={styles.detailSection}>
                   <Text style={styles.detailSecTitle}>Contact Information</Text>
                   <Text style={styles.detailRowText}><Text style={styles.bold}>Mobile:</Text> {selectedUser.MobileNumber}</Text>
+                  {selectedUser.AlternateMobileNumber ? <Text style={styles.detailRowText}><Text style={styles.bold}>Alt. Mobile:</Text> {selectedUser.AlternateMobileNumber}</Text> : null}
                   {selectedUser.Email ? <Text style={styles.detailRowText}><Text style={styles.bold}>Email:</Text> {selectedUser.Email}</Text> : null}
-                  {selectedUser.AddressLine1 ? <Text style={styles.detailRowText}><Text style={styles.bold}>Address:</Text> {selectedUser.AddressLine1}, {selectedUser.City}</Text> : null}
+                  {selectedUser.Occupation ? <Text style={styles.detailRowText}><Text style={styles.bold}>Occupation:</Text> {selectedUser.Occupation}</Text> : null}
+                </View>
+
+                <View style={styles.detailSection}>
+                  <Text style={styles.detailSecTitle}>Personal Details</Text>
+                  {selectedUser.DateOfBirth ? <Text style={styles.detailRowText}><Text style={styles.bold}>Date of Birth:</Text> {selectedUser.DateOfBirth}</Text> : null}
+                  {selectedUser.Gender ? <Text style={styles.detailRowText}><Text style={styles.bold}>Gender:</Text> {selectedUser.Gender}</Text> : null}
                 </View>
 
                 <View style={styles.detailSection}>
                   <Text style={styles.detailSecTitle}>KYC & Identity</Text>
                   <Text style={styles.detailRowText}><Text style={styles.bold}>Aadhaar:</Text> {selectedUser.AadhaarNumber || 'Not provided'}</Text>
                   <Text style={styles.detailRowText}><Text style={styles.bold}>PAN:</Text> {selectedUser.PANNumber || 'Not provided'}</Text>
-                  <Text style={styles.detailRowText}><Text style={styles.bold}>Occupation:</Text> {selectedUser.Occupation || 'N/A'}</Text>
+                </View>
+
+                <View style={styles.detailSection}>
+                  <Text style={styles.detailSecTitle}>Address</Text>
+                  {selectedUser.AddressLine1 ? <Text style={styles.detailRowText}>{selectedUser.AddressLine1}</Text> : null}
+                  {selectedUser.AddressLine2 ? <Text style={styles.detailRowText}>{selectedUser.AddressLine2}</Text> : null}
+                  <Text style={styles.detailRowText}>
+                    {[selectedUser.City, selectedUser.State, selectedUser.Pincode].filter(Boolean).join(', ') || 'N/A'}
+                  </Text>
                 </View>
               </ScrollView>
             ) : null}
@@ -414,7 +532,8 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background,
   },
   content: {
-    padding: 14,
+    padding: 12,
+    paddingBottom: 28,
   },
   idText: {
     fontSize: 12,
@@ -452,11 +571,14 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'rgba(15, 23, 42, 0.6)',
     justifyContent: 'center',
+    alignItems: 'center',
     padding: 16,
   },
   modalBox: {
     backgroundColor: '#ffffff',
     borderRadius: 16,
+    width: Platform.select({ web: '55%', default: '94%' }),
+    maxWidth: 650,
     maxHeight: '85%',
     overflow: 'hidden',
   },
@@ -570,6 +692,24 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#a16207',
     marginTop: 2,
+  },
+  detailSubCode: {
+    fontSize: 11,
+    color: '#92400e',
+    marginTop: 1,
+    fontStyle: 'italic',
+  },
+  sectionDivider: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: Colors.primary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    marginTop: 8,
+    marginBottom: 4,
+    paddingBottom: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
   },
   detailSection: {
     marginBottom: 14,

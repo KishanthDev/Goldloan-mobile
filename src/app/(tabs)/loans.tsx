@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { 
   View, Text, StyleSheet, ScrollView, TouchableOpacity, 
-  Modal, TextInput, Alert, SafeAreaView 
+  Modal, TextInput, Alert, SafeAreaView, Platform, RefreshControl 
 } from 'react-native';
 import { Colors } from '../../constants/theme';
 import { useAppStore } from '../../services/store';
@@ -17,6 +17,13 @@ export default function LoansScreen() {
   const [detailModalVisible, setDetailModalVisible] = useState(false);
   const [payModalVisible, setPayModalVisible] = useState(false);
   const [selectedLoan, setSelectedLoan] = useState<Loan | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await store.syncFromBackend(true);
+    setRefreshing(false);
+  };
 
   // Form State
   const [form, setForm] = useState({
@@ -32,6 +39,8 @@ export default function LoansScreen() {
     ProcessingFee: '750',
     DocumentCharge: '250',
     InsuranceCharge: '500',
+    GrossWeight: '',
+    NetWeight: '',
     Remarks: '',
   });
 
@@ -40,6 +49,7 @@ export default function LoansScreen() {
   // Repayment form state
   const [payForm, setPayForm] = useState({
     Amount: '',
+    PaymentDate: new Date().toISOString().split('T')[0],
     Type: 'Interest' as 'Interest' | 'Principal' | 'Part_Payment',
     Method: 'UPI' as 'UPI' | 'Net Banking' | 'Cash',
     Reference: '',
@@ -109,6 +119,8 @@ export default function LoansScreen() {
       ProcessingFee: '750',
       DocumentCharge: '250',
       InsuranceCharge: '500',
+      GrossWeight: '',
+      NetWeight: '',
       Remarks: '',
     });
     setSelectedOrnIds(availableOrns.slice(0, 1).map(o => o.OrnamentId));
@@ -124,6 +136,7 @@ export default function LoansScreen() {
     setSelectedLoan(l);
     setPayForm({
       Amount: '',
+      PaymentDate: new Date().toISOString().split('T')[0],
       Type: 'Interest',
       Method: 'UPI',
       Reference: '',
@@ -157,13 +170,16 @@ export default function LoansScreen() {
       return;
     }
 
+    const finalGross = parseFloat(form.GrossWeight) > 0 ? parseFloat(form.GrossWeight) : totalGrossWeight;
+    const finalNet = parseFloat(form.NetWeight) > 0 ? parseFloat(form.NetWeight) : totalNetWeight;
+
     store.addLoan({
       ...form,
       LoanAmount: amount,
       InterestRate: rate,
       BankName: selectedBank?.BankName || 'Bank',
-      GrossWeight: totalGrossWeight,
-      NetWeight: totalNetWeight,
+      GrossWeight: finalGross,
+      NetWeight: finalNet,
       ProcessingFee: procFee,
       DocumentCharge: docCharge,
       InsuranceCharge: insCharge,
@@ -186,7 +202,7 @@ export default function LoansScreen() {
 
     store.addPayment({
       LoanId: selectedLoan.LoanId,
-      PaymentDate: new Date().toISOString().split('T')[0],
+      PaymentDate: payForm.PaymentDate || new Date().toISOString().split('T')[0],
       PaymentType: payForm.Type,
       PrincipalAmount: payForm.Type === 'Principal' ? payAmt : 0,
       InterestAmount: payForm.Type === 'Interest' ? payAmt : 0,
@@ -204,42 +220,42 @@ export default function LoansScreen() {
     return store.users.find(u => u.UserId === userId)?.FullName || userId;
   };
 
-  // Table Columns exactly matching loansTable in index.html:
+  // Table Columns matching index.html:
   // ID | User | Bank Name | Loan Date | Amount (₹) | Gross Weight | Net Weight | Due Date | Status | Actions
   const columns: Column<Loan>[] = [
     {
       key: 'LoanNumber',
       title: 'ID / Number',
-      width: 120,
+      width: 115,
       render: (l) => (
         <View>
-          <Text style={styles.primaryCellText}>{l.LoanNumber}</Text>
-          <Text style={styles.idText}>{l.LoanId}</Text>
+          <Text style={styles.primaryCellText} numberOfLines={1}>{l.LoanNumber}</Text>
+          <Text style={styles.idText} numberOfLines={1}>{l.LoanId}</Text>
         </View>
       ),
     },
     {
       key: 'UserId',
-      title: 'User',
-      width: 150,
-      render: (l) => <Text style={styles.cellText}>{getUserName(l.UserId)}</Text>,
+      title: 'Borrower',
+      width: 135,
+      render: (l) => <Text style={styles.cellText} numberOfLines={1}>{getUserName(l.UserId)}</Text>,
     },
     {
       key: 'BankName',
-      title: 'Bank Name',
-      width: 140,
-      render: (l) => <Text style={[styles.cellText, { fontWeight: '600' }]}>{l.BankName}</Text>,
+      title: 'Bank',
+      width: 120,
+      render: (l) => <Text style={[styles.cellText, { fontWeight: '600' }]} numberOfLines={1}>{l.BankName}</Text>,
     },
     {
       key: 'LoanDate',
-      title: 'Loan Date',
-      width: 105,
-      render: (l) => <Text style={styles.cellText}>{l.LoanDate}</Text>,
+      title: 'Date',
+      width: 95,
+      render: (l) => <Text style={styles.cellText} numberOfLines={1}>{l.LoanDate}</Text>,
     },
     {
       key: 'LoanAmount',
       title: 'Amount (₹)',
-      width: 125,
+      width: 115,
       align: 'right',
       render: (l) => (
         <Text style={[styles.cellText, { fontWeight: '700', color: Colors.primaryDark }]}>
@@ -249,15 +265,15 @@ export default function LoansScreen() {
     },
     {
       key: 'GrossWeight',
-      title: 'Gross Weight',
-      width: 100,
+      title: 'Gross Wt',
+      width: 90,
       align: 'right',
       render: (l) => <Text style={styles.cellText}>{Number(l.GrossWeight || 0).toFixed(2)}g</Text>,
     },
     {
       key: 'NetWeight',
-      title: 'Net Weight',
-      width: 100,
+      title: 'Net Wt',
+      width: 90,
       align: 'right',
       render: (l) => (
         <Text style={[styles.cellText, { fontWeight: '700', color: '#854d0e' }]}>
@@ -268,13 +284,13 @@ export default function LoansScreen() {
     {
       key: 'DueDate',
       title: 'Due Date',
-      width: 105,
-      render: (l) => <Text style={styles.cellText}>{l.DueDate || '—'}</Text>,
+      width: 95,
+      render: (l) => <Text style={styles.cellText} numberOfLines={1}>{l.DueDate || '—'}</Text>,
     },
     {
       key: 'LoanStatus',
       title: 'Status',
-      width: 90,
+      width: 85,
       align: 'center',
       render: (l) => (
         <Badge 
@@ -287,7 +303,7 @@ export default function LoansScreen() {
     {
       key: 'Actions',
       title: 'Actions',
-      width: 115,
+      width: 95,
       align: 'center',
       render: (l) => (
         <View style={styles.actionRow}>
@@ -306,7 +322,11 @@ export default function LoansScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <ScrollView 
+        style={styles.container} 
+        contentContainerStyle={styles.content}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[Colors.primary]} />}
+      >
         <DataTable
           title="Gold Loans"
           subtitle="Originate and track active, closed, and overdue gold contracts"
@@ -340,22 +360,30 @@ export default function LoansScreen() {
               {/* Step 1: Select User */}
               <View style={styles.field}>
                 <Text style={styles.label}>1. Select Borrower *</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexDirection: 'row' }}>
-                  {store.users.map(u => (
-                    <TouchableOpacity
-                      key={u.UserId}
-                      style={[styles.userChip, form.UserId === u.UserId && styles.userChipActive]}
-                      onPress={() => {
-                        const bank = store.bankAccounts.find(b => b.UserId === u.UserId)?.BankAccountId || '';
-                        setForm(p => ({ ...p, UserId: u.UserId, BankAccountId: bank }));
-                      }}
-                    >
-                      <Text style={[styles.userChipText, form.UserId === u.UserId && styles.userChipTextActive]}>
-                        {u.FullName}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
+                {store.users.length === 0 ? (
+                  <View style={{ backgroundColor: Colors.warningBg, padding: 10, borderRadius: 8, marginTop: 4 }}>
+                    <Text style={{ fontSize: 13, color: Colors.warning, fontWeight: '500' }}>
+                      ⚠️ No borrowers registered yet. Please add a customer in the Users tab first.
+                    </Text>
+                  </View>
+                ) : (
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexDirection: 'row' }}>
+                    {store.users.map(u => (
+                      <TouchableOpacity
+                        key={u.UserId}
+                        style={[styles.userChip, form.UserId === u.UserId && styles.userChipActive]}
+                        onPress={() => {
+                          const bank = store.bankAccounts.find(b => b.UserId === u.UserId)?.BankAccountId || '';
+                          setForm(p => ({ ...p, UserId: u.UserId, BankAccountId: bank }));
+                        }}
+                      >
+                        <Text style={[styles.userChipText, form.UserId === u.UserId && styles.userChipTextActive]}>
+                          {u.FullName}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                )}
               </View>
 
               {/* Step 2: Select Bank Account with available limit check */}
@@ -471,22 +499,61 @@ export default function LoansScreen() {
                 </View>
               </View>
 
+              <View style={styles.formRow}>
+                <View style={[styles.field, { flex: 1 }]}>
+                  <Text style={styles.label}>Loan Date *</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="YYYY-MM-DD"
+                    value={form.LoanDate}
+                    onChangeText={v => setForm(p => ({ ...p, LoanDate: v }))}
+                  />
+                </View>
+
+                <View style={[styles.field, { flex: 1 }]}>
+                  <Text style={styles.label}>Due Date *</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="YYYY-MM-DD"
+                    value={form.DueDate}
+                    onChangeText={v => setForm(p => ({ ...p, DueDate: v }))}
+                  />
+                </View>
+              </View>
+
               {/* Charges & Net Disbursement Box (calculateLoanCharges from index.html) */}
               <View style={styles.calcBox}>
                 <Text style={styles.calcBoxTitle}>Deductions & Net Disbursement</Text>
-                <View style={styles.calcRow}>
-                  <Text style={styles.calcLabel}>Processing Fee (0.5%):</Text>
-                  <Text style={styles.calcVal}>₹{procFee.toLocaleString()}</Text>
+                <View style={styles.formRow}>
+                  <View style={[styles.field, { flex: 1 }]}>
+                    <Text style={styles.label}>Processing Fee (₹)</Text>
+                    <TextInput
+                      style={styles.input}
+                      keyboardType="number-pad"
+                      value={form.ProcessingFee}
+                      onChangeText={v => setForm(p => ({ ...p, ProcessingFee: v }))}
+                    />
+                  </View>
+                  <View style={[styles.field, { flex: 1 }]}>
+                    <Text style={styles.label}>Document Charge (₹)</Text>
+                    <TextInput
+                      style={styles.input}
+                      keyboardType="number-pad"
+                      value={form.DocumentCharge}
+                      onChangeText={v => setForm(p => ({ ...p, DocumentCharge: v }))}
+                    />
+                  </View>
+                  <View style={[styles.field, { flex: 1 }]}>
+                    <Text style={styles.label}>Insurance Charge (₹)</Text>
+                    <TextInput
+                      style={styles.input}
+                      keyboardType="number-pad"
+                      value={form.InsuranceCharge}
+                      onChangeText={v => setForm(p => ({ ...p, InsuranceCharge: v }))}
+                    />
+                  </View>
                 </View>
                 <View style={styles.calcRow}>
-                  <Text style={styles.calcLabel}>Documentation Charge:</Text>
-                  <Text style={styles.calcVal}>₹{docCharge}</Text>
-                </View>
-                <View style={styles.calcRow}>
-                  <Text style={styles.calcLabel}>Insurance Charge:</Text>
-                  <Text style={styles.calcVal}>₹{insCharge}</Text>
-                </View>
-                <View style={[styles.calcRow, { borderTopWidth: 1, borderTopColor: '#fef08a', paddingTop: 6, marginTop: 4 }]}>
                   <Text style={[styles.calcLabel, { fontWeight: '700' }]}>Net Disbursement to Borrower:</Text>
                   <Text style={[styles.calcVal, { color: Colors.primaryDark, fontSize: 16 }]}>
                     ₹{netDisbursement.toLocaleString()}
@@ -496,6 +563,41 @@ export default function LoansScreen() {
                   <Text style={styles.calcLabel}>Estimated Period Interest ({months} mos):</Text>
                   <Text style={styles.calcVal}>₹{interest.toLocaleString()}</Text>
                 </View>
+              </View>
+
+              <View style={styles.formRow}>
+                <View style={[styles.field, { flex: 1 }]}>
+                  <Text style={styles.label}>Gross Weight (g)</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder={totalGrossWeight > 0 ? totalGrossWeight.toFixed(3) : '0.000'}
+                    keyboardType="decimal-pad"
+                    value={form.GrossWeight}
+                    onChangeText={v => setForm(p => ({ ...p, GrossWeight: v }))}
+                  />
+                </View>
+                <View style={[styles.field, { flex: 1 }]}>
+                  <Text style={styles.label}>Net Weight (g)</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder={totalNetWeight > 0 ? totalNetWeight.toFixed(3) : '0.000'}
+                    keyboardType="decimal-pad"
+                    value={form.NetWeight}
+                    onChangeText={v => setForm(p => ({ ...p, NetWeight: v }))}
+                  />
+                </View>
+              </View>
+
+              <View style={styles.field}>
+                <Text style={styles.label}>Remarks</Text>
+                <TextInput
+                  style={[styles.input, styles.multilineInput]}
+                  placeholder="Additional notes for this loan..."
+                  multiline
+                  numberOfLines={2}
+                  value={form.Remarks}
+                  onChangeText={v => setForm(p => ({ ...p, Remarks: v }))}
+                />
               </View>
             </ScrollView>
 
@@ -568,13 +670,37 @@ export default function LoansScreen() {
                 </View>
               </View>
 
+              <View style={styles.formRow}>
+                <View style={[styles.field, { flex: 1 }]}>
+                  <Text style={styles.label}>Payment Date</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="YYYY-MM-DD"
+                    value={payForm.PaymentDate}
+                    onChangeText={v => setPayForm(p => ({ ...p, PaymentDate: v }))}
+                  />
+                </View>
+
+                <View style={[styles.field, { flex: 1 }]}>
+                  <Text style={styles.label}>Transaction Reference / UTR</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="e.g. UPI/50291039120"
+                    value={payForm.Reference}
+                    onChangeText={v => setPayForm(p => ({ ...p, Reference: v }))}
+                  />
+                </View>
+              </View>
+
               <View style={styles.field}>
-                <Text style={styles.label}>Transaction Reference / UTR</Text>
+                <Text style={styles.label}>Remarks</Text>
                 <TextInput
-                  style={styles.input}
-                  placeholder="e.g. UPI/50291039120"
-                  value={payForm.Reference}
-                  onChangeText={v => setPayForm(p => ({ ...p, Reference: v }))}
+                  style={[styles.input, styles.multilineInput]}
+                  placeholder="Payment notes..."
+                  multiline
+                  numberOfLines={2}
+                  value={payForm.Remarks}
+                  onChangeText={v => setPayForm(p => ({ ...p, Remarks: v }))}
                 />
               </View>
             </View>
@@ -612,33 +738,52 @@ export default function LoansScreen() {
                   </View>
                 </View>
 
+
                 <View style={styles.detailSection}>
                   <Text style={styles.detailSecTitle}>Contract Financials</Text>
                   <Text style={styles.detailRowText}><Text style={styles.bold}>Principal Amount:</Text> ₹{selectedLoan.LoanAmount.toLocaleString()}</Text>
-                  <Text style={styles.detailRowText}><Text style={styles.bold}>Net Disbursed:</Text> ₹{selectedLoan.NetDisbursementAmount.toLocaleString()}</Text>
-                  <Text style={styles.detailRowText}><Text style={styles.bold}>Interest Rate:</Text> {selectedLoan.InterestRate}% ({selectedLoan.InterestType})</Text>
-                  <Text style={styles.detailRowText}><Text style={styles.bold}>Origination / Due:</Text> {selectedLoan.LoanDate} ➔ {selectedLoan.DueDate || 'N/A'}</Text>
+                  <Text style={styles.detailRowText}><Text style={styles.bold}>Net Disbursed:</Text> ₹{(selectedLoan.NetDisbursementAmount || 0).toLocaleString()}</Text>
+                  <Text style={styles.detailRowText}><Text style={styles.bold}>Interest Rate:</Text> {selectedLoan.InterestRate}% ({selectedLoan.InterestType || 'Simple'})</Text>
+                  <Text style={styles.detailRowText}><Text style={styles.bold}>Loan Period:</Text> {selectedLoan.LoanPeriod || 'N/A'}</Text>
+                  <Text style={styles.detailRowText}><Text style={styles.bold}>Loan Date → Due Date:</Text> {selectedLoan.LoanDate} ➔ {selectedLoan.DueDate || 'N/A'}</Text>
                   <Text style={styles.detailRowText}><Text style={styles.bold}>Pledged Gold Net:</Text> {Number(selectedLoan.NetWeight || 0).toFixed(2)} g (Gross: {Number(selectedLoan.GrossWeight || 0).toFixed(2)} g)</Text>
+                  {selectedLoan.ProcessingFee ? <Text style={styles.detailRowText}><Text style={styles.bold}>Processing Fee:</Text> ₹{Number(selectedLoan.ProcessingFee).toLocaleString()}</Text> : null}
+                  {selectedLoan.TotalCharges ? <Text style={styles.detailRowText}><Text style={styles.bold}>Total Charges:</Text> ₹{Number(selectedLoan.TotalCharges).toLocaleString()}</Text> : null}
+                  {selectedLoan.Remarks ? <Text style={styles.detailRowText}><Text style={styles.bold}>Remarks:</Text> {selectedLoan.Remarks}</Text> : null}
                 </View>
 
                 {/* Payments Table (paymentsDetailTable from index.html: Date | Type | Method | Principal | Interest | Total Paid) */}
                 <View style={styles.detailSection}>
                   <Text style={styles.detailSecTitle}>Repayment History</Text>
-                  {store.payments.filter(p => p.LoanId === selectedLoan.LoanId).length === 0 ? (
-                    <Text style={styles.emptyNotice}>No repayments logged for this loan.</Text>
-                  ) : (
-                    store.payments
-                      .filter(p => p.LoanId === selectedLoan.LoanId)
-                      .map((p, idx) => (
-                        <View key={p.PaymentId || idx} style={styles.payHistRow}>
-                          <View style={{ flex: 1 }}>
-                            <Text style={styles.payHistTitle}>{p.PaymentDate} • {p.PaymentType}</Text>
-                            <Text style={styles.payHistSub}>{p.PaymentMethod} {p.TransactionReference ? `(Ref: ${p.TransactionReference})` : ''}</Text>
+                  {(() => {
+                    const loanPayments = store.payments.filter(p => p.LoanId === selectedLoan.LoanId);
+                    const totalPaid = loanPayments.reduce((s, p) => s + (p.TotalPaidAmount || 0), 0);
+                    if (loanPayments.length === 0) return <Text style={styles.emptyNotice}>No repayments logged for this loan.</Text>;
+                    return (
+                      <>
+                        {loanPayments.map((p, idx) => (
+                          <View key={p.PaymentId || idx} style={styles.payHistRow}>
+                            <View style={{ flex: 1 }}>
+                              <Text style={styles.payHistTitle}>{p.PaymentDate} • {p.PaymentType}</Text>
+                              <Text style={styles.payHistSub}>{p.PaymentMethod}{p.TransactionReference ? ` (Ref: ${p.TransactionReference})` : ''}</Text>
+                              {(p.PrincipalAmount > 0 || p.InterestAmount > 0) ? (
+                                <Text style={styles.payHistSub}>
+                                  {p.PrincipalAmount > 0 ? `Principal: ₹${p.PrincipalAmount.toLocaleString()} ` : ''}
+                                  {p.InterestAmount > 0 ? `Interest: ₹${p.InterestAmount.toLocaleString()}` : ''}
+                                </Text>
+                              ) : null}
+                              {p.Remarks ? <Text style={styles.payHistSub}>📝 {p.Remarks}</Text> : null}
+                            </View>
+                            <Text style={styles.payHistAmt}>+₹{p.TotalPaidAmount.toLocaleString()}</Text>
                           </View>
-                          <Text style={styles.payHistAmt}>+₹{p.TotalPaidAmount.toLocaleString()}</Text>
+                        ))}
+                        <View style={[styles.payHistRow, { borderTopWidth: 1, borderTopColor: Colors.border, paddingTop: 8, marginTop: 4 }]}>
+                          <Text style={[styles.payHistTitle, { color: Colors.success }]}>Total Paid So Far</Text>
+                          <Text style={[styles.payHistAmt, { color: Colors.success }]}>₹{totalPaid.toLocaleString()}</Text>
                         </View>
-                      ))
-                  )}
+                      </>
+                    );
+                  })()}
                 </View>
               </ScrollView>
             ) : null}
@@ -665,7 +810,8 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background,
   },
   content: {
-    padding: 14,
+    padding: 12,
+    paddingBottom: 28,
   },
   idText: {
     fontSize: 11,
@@ -697,11 +843,14 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'rgba(15, 23, 42, 0.6)',
     justifyContent: 'center',
+    alignItems: 'center',
     padding: 16,
   },
   modalBox: {
     backgroundColor: '#ffffff',
     borderRadius: 16,
+    width: Platform.select({ web: '55%', default: '94%' }),
+    maxWidth: 650,
     maxHeight: '88%',
     overflow: 'hidden',
   },
@@ -752,6 +901,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
     color: Colors.textPrimary,
+  },
+  multilineInput: {
+    minHeight: 60,
+    textAlignVertical: 'top',
+    paddingTop: 8,
   },
   userChip: {
     paddingHorizontal: 12,

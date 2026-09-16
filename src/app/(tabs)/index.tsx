@@ -6,6 +6,7 @@ import {
 import { useRouter } from 'expo-router';
 import { Colors } from '../../constants/theme';
 import { useAppStore } from '../../services/store';
+import { ApiConfig } from '../../config/api';
 import { Ionicons } from '@expo/vector-icons';
 
 export default function DashboardScreen() {
@@ -24,10 +25,13 @@ export default function DashboardScreen() {
   const appreciationGains = currentGoldValue - buyingGoldValue;
   const appreciationPct = buyingGoldValue > 0 ? ((appreciationGains / buyingGoldValue) * 100) : 0;
 
-  const onRefresh = () => {
+  const onRefresh = async () => {
     setRefreshing(true);
-    setTimeout(() => setRefreshing(false), 500);
+    await store.syncFromBackend(true);
+    setRefreshing(false);
   };
+
+  const isLive = !ApiConfig.isMockMode();
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -42,8 +46,10 @@ export default function DashboardScreen() {
             <Text style={styles.brandSubtitle}>Bangalore Gold Valuation System</Text>
           </View>
         </View>
-        <View style={styles.demoBadge}>
-          <Text style={styles.demoBadgeText}>Demo Active</Text>
+        <View style={[styles.demoBadge, isLive && styles.liveBadge]}>
+          <Text style={[styles.demoBadgeText, isLive && styles.liveBadgeText]}>
+            {isLive ? 'Live Sheets' : 'Demo Active'}
+          </Text>
         </View>
       </View>
 
@@ -293,6 +299,13 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '700',
     color: '#92400e',
+  },
+  liveBadge: {
+    backgroundColor: '#dcfce7',
+    borderColor: '#86efac',
+  },
+  liveBadgeText: {
+    color: '#166534',
   },
   container: {
     flex: 1,

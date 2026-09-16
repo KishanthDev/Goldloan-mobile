@@ -11,9 +11,10 @@ const CACHE_PREFIX = '@gl_cache:';
 export const CacheTTL = {
   GOLD_RATES: 30 * 60 * 1000,    // 30 minutes
   DASHBOARD: 5 * 60 * 1000,       // 5 minutes
-  LISTS: 10 * 60 * 1000,          // 10 minutes (users, ornaments, loans)
+  LISTS: 10 * 60 * 1000,          // 10 minutes (users, ornaments, loans, payments)
   DETAILS: 10 * 60 * 1000,        // 10 minutes
   SHORT: 60 * 1000,               // 1 minute
+  SYNC_DATA: 5 * 60 * 1000,       // 5 minutes
 };
 
 class CacheService {
@@ -101,6 +102,15 @@ class CacheService {
     } catch (e) {
       console.warn('[Cache] Error invalidating disk cache:', e);
     }
+  }
+
+  /**
+   * Invalidate an entity and any dependent caches (sync data, dashboard)
+   */
+  async invalidateEntity(entity: string): Promise<void> {
+    await this.invalidate(entity);
+    await this.invalidate('initial_sync_data');
+    await this.invalidate('dashboard');
   }
 
   /**

@@ -161,3 +161,14 @@ export interface ApiResponse<T = any> {
   isCached?: boolean;
   isFallback?: boolean;
 }
+
+export interface InitialSyncData {
+  users: User[];
+  bankAccounts: BankAccount[];
+  ornaments: Ornament[];
+  loans: Loan[];
+  payments: Payment[];
+  goldRates: GoldRateData | null;
+  timestamp?: string;
+}
+

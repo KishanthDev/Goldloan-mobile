@@ -2,69 +2,138 @@ import { ApiConfig } from '../config/api';
 import { cache, CacheTTL } from './cache';
 import { 
   User, BankAccount, Ornament, Loan, Payment, 
-  DashboardData, GoldRateData, ApiResponse 
+  DashboardData, GoldRateData, ApiResponse, InitialSyncData 
 } from '../types';
 import { 
   mockDashboardData, mockGoldRates, mockUsers, 
   mockBankAccounts, mockOrnaments, mockLoans, mockPayments 
 } from './mockData';
 
+/**
+ * Helper to convert Google Drive sharing links to direct image thumbnail URLs
+ * for rendering inside React Native Image and expo-image components.
+ */
+export function getDriveDirectImageUrl(driveUrl?: string | null): string | null {
+  if (!driveUrl) return null;
+  const match = driveUrl.match(/\/d\/([a-zA-Z0-9_-]+)/) || driveUrl.match(/id=([a-zA-Z0-9_-]+)/);
+  if (match && match[1]) {
+    return `https://drive.google.com/thumbnail?id=${match[1]}&sz=w1000`;
+  }
+  return driveUrl;
+}
+
 class ApiService {
   /**
-   * Universal HTTP POST request to Google Apps Script Web App
-   * Uses text/plain to prevent CORS preflight blocks on mobile/web with GAS redirects
+   * Universal HTTP request to Google Apps Script Web App
+   * Tries POST (with text/plain to avoid preflight issues) then falls back to GET (or vice-versa).
+   * Robust against non-JSON error pages and network drops.
    */
-  private async postToGas<T>(action: string, payload: any = {}): Promise<ApiResponse<T>> {
-    const url = ApiConfig.getApiUrl();
-    if (!url) {
-      return { success: false, error: "Google Apps Script Web App URL not configured." };
-    }
-
-    try {
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'text/plain;charset=utf-8',
-        },
-        body: JSON.stringify({ action, ...payload }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error ${response.status}`);
-      }
-
-      const result = await response.json();
-      return result;
-    } catch (error: any) {
-      console.error(`[API] Error calling action "${action}":`, error);
-      return { success: false, error: error.message || "Network request failed" };
-    }
-  }
-
-  /**
-   * Universal HTTP GET request to Google Apps Script Web App
-   */
-  private async getFromGas<T>(action: string, params: Record<string, string> = {}): Promise<ApiResponse<T>> {
+  async callGas<T>(action: string, payload: any = {}, preferredMethod: 'POST' | 'GET' = 'POST'): Promise<ApiResponse<T>> {
     const baseUrl = ApiConfig.getApiUrl();
     if (!baseUrl) {
       return { success: false, error: "Google Apps Script Web App URL not configured." };
     }
 
-    try {
-      const query = new URLSearchParams({ action, ...params }).toString();
-      const url = `${baseUrl}?${query}`;
+    const methods: ('POST' | 'GET')[] = preferredMethod === 'POST' ? ['POST', 'GET'] : ['GET', 'POST'];
 
-      const response = await fetch(url);
-      if (!response.ok) {
-        throw new Error(`HTTP error ${response.status}`);
+    for (const method of methods) {
+      try {
+        let response: Response;
+        if (method === 'POST') {
+          response = await fetch(baseUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'text/plain;charset=utf-8',
+            },
+            body: JSON.stringify({ action, ...payload }),
+          });
+        } else {
+          const query = new URLSearchParams({ action, ...payload }).toString();
+          response = await fetch(`${baseUrl}?${query}`);
+        }
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+
+        const text = await response.text();
+        try {
+          const parsed = JSON.parse(text);
+          if (parsed && typeof parsed === 'object') {
+            return parsed;
+          }
+        } catch {
+          if (text.includes('Script function not found: doPost')) {
+            console.warn('[API] Google Apps Script requires redeployment with updated Code.js (doPost not yet active in cloud).');
+            continue;
+          }
+          if (text.includes('<!DOCTYPE') || text.includes('<html')) {
+            continue;
+          }
+          return { success: false, error: "Server returned non-JSON: " + text.slice(0, 100) };
+        }
+      } catch (error: any) {
+        console.warn(`[API] ${method} attempt failed for "${action}": ${error.message || 'Network error'}`);
       }
-
-      const result = await response.json();
-      return result;
-    } catch (error: any) {
-      console.error(`[API] Error GET "${action}":`, error);
-      return { success: false, error: error.message || "Network request failed" };
     }
+
+    return { success: false, error: `Network request failed for "${action}". Check connection or Web App deployment.` };
+  }
+
+  private async postToGas<T>(action: string, payload: any = {}): Promise<ApiResponse<T>> {
+    return this.callGas<T>(action, payload, 'POST');
+  }
+
+  private async getFromGas<T>(action: string, params: Record<string, string> = {}): Promise<ApiResponse<T>> {
+    return this.callGas<T>(action, params, 'POST');
+  }
+
+  /**
+   * Fetch all app data in a single unified round-trip with intelligent caching
+   */
+  async getInitialSyncData(forceRefresh: boolean = false): Promise<ApiResponse<InitialSyncData>> {
+    const CACHE_KEY = 'initial_sync_data';
+
+    if (!forceRefresh) {
+      const cached = await cache.get<InitialSyncData>(CACHE_KEY);
+      if (cached.data) {
+        return { success: true, data: cached.data, isCached: true };
+      }
+    }
+
+    if (ApiConfig.isMockMode()) {
+      const mockData: InitialSyncData = {
+        users: mockUsers,
+        bankAccounts: mockBankAccounts,
+        ornaments: mockOrnaments,
+        loans: mockLoans,
+        payments: mockPayments,
+        goldRates: mockGoldRates,
+      };
+      await cache.set(CACHE_KEY, mockData, CacheTTL.SYNC_DATA);
+      return { success: true, data: mockData, isCached: false };
+    }
+
+    const res = await this.callGas<InitialSyncData>('getInitialSyncData', {}, 'POST');
+    if (res.success && res.data) {
+      await cache.set(CACHE_KEY, res.data, CacheTTL.SYNC_DATA);
+      // Pre-populate individual entity caches
+      if (res.data.users) await cache.set('users_list', res.data.users, CacheTTL.LISTS);
+      if (res.data.bankAccounts) await cache.set('bank_accounts_all', res.data.bankAccounts, CacheTTL.LISTS);
+      if (res.data.ornaments) await cache.set('ornaments_all', res.data.ornaments, CacheTTL.LISTS);
+      if (res.data.loans) await cache.set('loans_all', res.data.loans, CacheTTL.LISTS);
+      if (res.data.payments) await cache.set('payments_all', res.data.payments, CacheTTL.LISTS);
+      if (res.data.goldRates) await cache.set('gold_rates_bangalore', res.data.goldRates, CacheTTL.GOLD_RATES);
+      return { success: true, data: res.data, isCached: false };
+    }
+
+    // Network request failed - fall back to stale cache
+    const stale = await cache.get<InitialSyncData>(CACHE_KEY, true);
+    if (stale.data) {
+      return { success: true, data: stale.data, isCached: true, isFallback: true };
+    }
+
+    return res;
   }
 
   // ─── DASHBOARD & RATES ───
@@ -153,30 +222,70 @@ class ApiService {
     return stale.data || mockUsers;
   }
 
-  async addUser(userData: Partial<User>): Promise<ApiResponse<User>> {
+  async addUser(userData: Partial<User> & { files?: any[] }): Promise<ApiResponse<User>> {
     if (ApiConfig.isMockMode()) {
       const newUser: User = {
         UserId: `U${String(mockUsers.length + 1).padStart(3, '0')}`,
-        CustomerCode: `CUST-${100 + mockUsers.length + 1}`,
+        CustomerCode: userData.CustomerCode || `CUST-${100 + mockUsers.length + 1}`,
         FullName: userData.FullName || 'New Customer',
+        FatherHusbandName: userData.FatherHusbandName || '',
         MobileNumber: userData.MobileNumber || '',
-        Email: userData.Email,
-        AadhaarNumber: userData.AadhaarNumber,
-        PANNumber: userData.PANNumber,
+        AlternateMobileNumber: userData.AlternateMobileNumber || '',
+        Email: userData.Email || '',
+        DateOfBirth: userData.DateOfBirth || '',
+        Gender: userData.Gender || 'Male',
+        AadhaarNumber: userData.AadhaarNumber || '',
+        PANNumber: userData.PANNumber || '',
+        AddressLine1: userData.AddressLine1 || '',
+        AddressLine2: userData.AddressLine2 || '',
         City: userData.City || 'Bengaluru',
+        State: userData.State || 'Karnataka',
+        Pincode: userData.Pincode || '560001',
+        Occupation: userData.Occupation || '',
+        CustomerPhoto: '',
         Status: 'Active',
         CreatedDate: new Date().toISOString(),
       };
       mockUsers.unshift(newUser);
-      await cache.invalidate('users');
-      await cache.invalidate('dashboard');
+      await cache.invalidateEntity('users');
       return { success: true, data: newUser };
     }
 
     const res = await this.postToGas<User>('addUser', { userData });
     if (res.success) {
-      await cache.invalidate('users');
-      await cache.invalidate('dashboard');
+      await cache.invalidateEntity('users');
+    }
+    return res;
+  }
+
+  async updateUser(userId: string, userData: Partial<User> & { files?: any[] }): Promise<ApiResponse<any>> {
+    if (ApiConfig.isMockMode()) {
+      const idx = mockUsers.findIndex(u => u.UserId === userId);
+      if (idx !== -1) {
+        mockUsers[idx] = { ...mockUsers[idx], ...userData, UpdatedDate: new Date().toISOString() };
+      }
+      await cache.invalidateEntity('users');
+      return { success: true, data: 'User updated' };
+    }
+
+    const res = await this.postToGas('updateUser', { userId, userData });
+    if (res.success) {
+      await cache.invalidateEntity('users');
+    }
+    return res;
+  }
+
+  async deleteUser(userId: string): Promise<ApiResponse<any>> {
+    if (ApiConfig.isMockMode()) {
+      const idx = mockUsers.findIndex(u => u.UserId === userId);
+      if (idx !== -1) mockUsers.splice(idx, 1);
+      await cache.invalidateEntity('users');
+      return { success: true, data: 'User deleted' };
+    }
+
+    const res = await this.postToGas('deleteUser', { userId });
+    if (res.success) {
+      await cache.invalidateEntity('users');
     }
     return res;
   }
@@ -198,7 +307,7 @@ class ApiService {
     }
 
     const res = await this.getFromGas<BankAccount[]>('getBankAccounts', userId ? { userId } : {});
-    if (res.success && res.data) {
+    if (res.success && Array.isArray(res.data)) {
       await cache.set(CACHE_KEY, res.data, CacheTTL.LISTS);
       return res.data;
     }
@@ -207,7 +316,7 @@ class ApiService {
     return stale.data || mockBankAccounts;
   }
 
-  async addBankAccount(accountData: Partial<BankAccount>): Promise<ApiResponse<BankAccount>> {
+  async addBankAccount(accountData: Partial<BankAccount> & { files?: any[] }): Promise<ApiResponse<BankAccount>> {
     if (ApiConfig.isMockMode()) {
       const newAcc: BankAccount = {
         BankAccountId: `BA${String(mockBankAccounts.length + 1).padStart(3, '0')}`,
@@ -215,23 +324,57 @@ class ApiService {
         AccountHolderName: accountData.AccountHolderName || '',
         AccountNumber: accountData.AccountNumber || '',
         BankName: accountData.BankName || '',
+        BranchName: accountData.BranchName || '',
+        City: accountData.City || 'Bengaluru',
         IFSCCode: accountData.IFSCCode || '',
+        AccountType: accountData.AccountType || 'Savings',
+        UPI_ID: accountData.UPI_ID || '',
         MaxLoanAmount: Number(accountData.MaxLoanAmount) || 500000,
         UtilizedLoanAmount: 0,
         AvailableLoanAmount: Number(accountData.MaxLoanAmount) || 500000,
         Status: 'Active',
         CreatedDate: new Date().toISOString(),
       };
-      mockBankAccounts.push(newAcc);
-      await cache.invalidate('bank_accounts');
-      await cache.invalidate('dashboard');
+      mockBankAccounts.unshift(newAcc);
+      await cache.invalidateEntity('bank_accounts');
       return { success: true, data: newAcc };
     }
 
     const res = await this.postToGas<BankAccount>('addBankAccount', { accountData });
     if (res.success) {
-      await cache.invalidate('bank_accounts');
-      await cache.invalidate('dashboard');
+      await cache.invalidateEntity('bank_accounts');
+    }
+    return res;
+  }
+
+  async updateBankAccount(accountId: string, accountData: Partial<BankAccount> & { files?: any[] }): Promise<ApiResponse<any>> {
+    if (ApiConfig.isMockMode()) {
+      const idx = mockBankAccounts.findIndex(b => b.BankAccountId === accountId);
+      if (idx !== -1) {
+        mockBankAccounts[idx] = { ...mockBankAccounts[idx], ...accountData, UpdatedDate: new Date().toISOString() };
+      }
+      await cache.invalidateEntity('bank_accounts');
+      return { success: true, data: 'Bank account updated' };
+    }
+
+    const res = await this.postToGas('updateBankAccount', { accountId, accountData });
+    if (res.success) {
+      await cache.invalidateEntity('bank_accounts');
+    }
+    return res;
+  }
+
+  async deleteBankAccount(accountId: string): Promise<ApiResponse<any>> {
+    if (ApiConfig.isMockMode()) {
+      const idx = mockBankAccounts.findIndex(b => b.BankAccountId === accountId);
+      if (idx !== -1) mockBankAccounts.splice(idx, 1);
+      await cache.invalidateEntity('bank_accounts');
+      return { success: true, data: 'Bank account deleted' };
+    }
+
+    const res = await this.postToGas('deleteBankAccount', { accountId });
+    if (res.success) {
+      await cache.invalidateEntity('bank_accounts');
     }
     return res;
   }
@@ -253,7 +396,7 @@ class ApiService {
     }
 
     const res = await this.getFromGas<Ornament[]>('getOrnaments', userId ? { userId } : {});
-    if (res.success && res.data) {
+    if (res.success && Array.isArray(res.data)) {
       await cache.set(CACHE_KEY, res.data, CacheTTL.LISTS);
       return res.data;
     }
@@ -262,7 +405,19 @@ class ApiService {
     return stale.data || mockOrnaments;
   }
 
-  async addOrnament(ornamentData: Partial<Ornament>): Promise<ApiResponse<Ornament>> {
+  async getAvailableOrnaments(): Promise<Ornament[]> {
+    if (ApiConfig.isMockMode()) {
+      return mockOrnaments.filter(o => o.Status === 'Available' || o.Status === 'Released');
+    }
+
+    const res = await this.getFromGas<Ornament[]>('getAvailableOrnaments');
+    if (res.success && Array.isArray(res.data)) {
+      return res.data;
+    }
+    return [];
+  }
+
+  async addOrnament(ornamentData: Partial<Ornament> & { files?: any[] }): Promise<ApiResponse<Ornament>> {
     if (ApiConfig.isMockMode()) {
       const gross = Number(ornamentData.GrossWeight) || 0;
       const stone = Number(ornamentData.StoneWeight) || 0;
@@ -277,6 +432,8 @@ class ApiService {
         UserId: ornamentData.UserId,
         OrnamentName: ornamentData.OrnamentName || 'Gold Jewelry',
         OrnamentType: ornamentData.OrnamentType || 'Necklace',
+        OrnamentCategory: ornamentData.OrnamentCategory || 'Neckwear',
+        Description: ornamentData.Description || '',
         GrossWeight: gross,
         StoneWeight: stone,
         NetWeight: net,
@@ -291,20 +448,60 @@ class ApiService {
         MarketValue: market,
         AppreciationValue: market - cost,
         AppreciationPercentage: cost > 0 ? ((market - cost) / cost) * 100 : 0,
+        MakerName: ornamentData.MakerName || '',
+        EstimatedValue: ornamentData.EstimatedValue || market,
         Status: 'Available',
         Remarks: ornamentData.Remarks,
       };
 
       mockOrnaments.unshift(newOrnament);
-      await cache.invalidate('ornaments');
-      await cache.invalidate('dashboard');
+      await cache.invalidateEntity('ornaments');
       return { success: true, data: newOrnament };
     }
 
     const res = await this.postToGas<Ornament>('addOrnament', { ornamentData });
     if (res.success) {
-      await cache.invalidate('ornaments');
-      await cache.invalidate('dashboard');
+      await cache.invalidateEntity('ornaments');
+    }
+    return res;
+  }
+
+  async updateOrnament(ornamentId: string, ornamentData: Partial<Ornament> & { files?: any[] }): Promise<ApiResponse<any>> {
+    if (ApiConfig.isMockMode()) {
+      const idx = mockOrnaments.findIndex(o => o.OrnamentId === ornamentId);
+      if (idx !== -1) {
+        mockOrnaments[idx] = { ...mockOrnaments[idx], ...ornamentData };
+      }
+      await cache.invalidateEntity('ornaments');
+      return { success: true, data: 'Ornament updated' };
+    }
+
+    const res = await this.postToGas('updateOrnament', { ornamentId, ornamentData });
+    if (res.success) {
+      await cache.invalidateEntity('ornaments');
+    }
+    return res;
+  }
+
+  async deleteOrnament(ornamentId: string): Promise<ApiResponse<any>> {
+    if (ApiConfig.isMockMode()) {
+      const idx = mockOrnaments.findIndex(o => o.OrnamentId === ornamentId);
+      if (idx !== -1) mockOrnaments.splice(idx, 1);
+      await cache.invalidateEntity('ornaments');
+      return { success: true, data: 'Ornament deleted' };
+    }
+
+    const res = await this.postToGas('deleteOrnament', { ornamentId });
+    if (res.success) {
+      await cache.invalidateEntity('ornaments');
+    }
+    return res;
+  }
+
+  async deleteOrnamentImage(ornamentId: string, imageUrl: string): Promise<ApiResponse<any>> {
+    const res = await this.postToGas('deleteOrnamentImage', { ornamentId, imageUrl });
+    if (res.success) {
+      await cache.invalidateEntity('ornaments');
     }
     return res;
   }
@@ -332,7 +529,7 @@ class ApiService {
     if (status) params.status = status;
 
     const res = await this.getFromGas<Loan[]>('getLoans', params);
-    if (res.success && res.data) {
+    if (res.success && Array.isArray(res.data)) {
       await cache.set(CACHE_KEY, res.data, CacheTTL.LISTS);
       return res.data;
     }
@@ -368,7 +565,6 @@ class ApiService {
         ornamentIds: loanData.ornamentIds || [],
       };
 
-      // Mark ornaments as pledged
       if (loanData.ornamentIds) {
         mockOrnaments.forEach(o => {
           if (loanData.ornamentIds.includes(o.OrnamentId)) {
@@ -377,7 +573,6 @@ class ApiService {
         });
       }
 
-      // Update bank account utilization
       const bank = mockBankAccounts.find(b => b.BankAccountId === loanData.BankAccountId);
       if (bank) {
         bank.UtilizedLoanAmount += amount;
@@ -385,22 +580,81 @@ class ApiService {
       }
 
       mockLoans.unshift(newLoan);
-      await cache.invalidate('loans');
+      await cache.invalidateEntity('loans');
       await cache.invalidate('ornaments');
       await cache.invalidate('bank_accounts');
-      await cache.invalidate('dashboard');
 
       return { success: true, data: newLoan };
     }
 
     const res = await this.postToGas<Loan>('addLoan', { loanData });
     if (res.success) {
-      await cache.invalidate('loans');
+      await cache.invalidateEntity('loans');
       await cache.invalidate('ornaments');
       await cache.invalidate('bank_accounts');
-      await cache.invalidate('dashboard');
     }
     return res;
+  }
+
+  async updateLoan(loanId: string, loanData: Partial<Loan>): Promise<ApiResponse<any>> {
+    const res = await this.postToGas('updateLoan', { loanId, loanData });
+    if (res.success) {
+      await cache.invalidateEntity('loans');
+    }
+    return res;
+  }
+
+  async closeAndReleaseLoan(loanId: string, closureRemarks: string): Promise<ApiResponse<any>> {
+    if (ApiConfig.isMockMode()) {
+      const l = mockLoans.find(loan => loan.LoanId === loanId);
+      if (l) {
+        l.LoanStatus = 'Closed';
+        l.ClosedDate = new Date().toISOString();
+        l.ClosureRemarks = closureRemarks;
+      }
+      await cache.invalidateEntity('loans');
+      await cache.invalidate('ornaments');
+      await cache.invalidate('bank_accounts');
+      return { success: true, data: 'Loan closed' };
+    }
+
+    const res = await this.postToGas('closeAndReleaseLoan', { loanId, closureRemarks });
+    if (res.success) {
+      await cache.invalidateEntity('loans');
+      await cache.invalidate('ornaments');
+      await cache.invalidate('bank_accounts');
+    }
+    return res;
+  }
+
+  // ─── PAYMENTS ───
+
+  async getPayments(loanId?: string, forceRefresh: boolean = false): Promise<Payment[]> {
+    const CACHE_KEY = loanId ? `payments_loan_${loanId}` : 'payments_all';
+
+    if (!forceRefresh) {
+      const cached = await cache.get<Payment[]>(CACHE_KEY);
+      if (cached.data && Array.isArray(cached.data)) return cached.data;
+    }
+
+    if (ApiConfig.isMockMode()) {
+      const data = loanId ? mockPayments.filter(p => p.LoanId === loanId) : mockPayments;
+      await cache.set(CACHE_KEY, data, CacheTTL.LISTS);
+      return data;
+    }
+
+    const res = await this.getFromGas<Payment[]>('getPayments', loanId ? { loanId } : {});
+    if (res.success && Array.isArray(res.data)) {
+      await cache.set(CACHE_KEY, res.data, CacheTTL.LISTS);
+      return res.data;
+    }
+
+    const stale = await cache.get<Payment[]>(CACHE_KEY, true);
+    if (stale.data && Array.isArray(stale.data)) {
+      return stale.data;
+    }
+
+    return loanId ? mockPayments.filter(p => p.LoanId === loanId) : mockPayments;
   }
 
   async addPayment(paymentData: Partial<Payment>): Promise<ApiResponse<Payment>> {
@@ -420,12 +674,16 @@ class ApiService {
         CreatedDate: new Date().toISOString(),
       };
       mockPayments.unshift(newPay);
+      await cache.invalidate('payments');
+      await cache.invalidate('initial_sync_data');
       await cache.invalidate('dashboard');
       return { success: true, data: newPay };
     }
 
     const res = await this.postToGas<Payment>('addPayment', { paymentData });
     if (res.success) {
+      await cache.invalidate('payments');
+      await cache.invalidate('initial_sync_data');
       await cache.invalidate('dashboard');
     }
     return res;
@@ -438,10 +696,19 @@ class ApiService {
       if (!url) {
         return { ok: false, message: 'URL is empty', latencyMs: 0 };
       }
-      const res = await fetch(`${url}?action=getDashboardData`);
+      const res = await fetch(`${url}?action=testConnection`);
       const latencyMs = Date.now() - start;
       if (res.ok) {
-        return { ok: true, message: 'Connection successful', latencyMs };
+        const text = await res.text();
+        try {
+          const json = JSON.parse(text);
+          if (json.success) {
+            return { ok: true, message: 'Connected to Google Apps Script Web App', latencyMs };
+          }
+          return { ok: false, message: json.error || 'Server error', latencyMs };
+        } catch {
+          return { ok: false, message: 'Invalid response from server', latencyMs };
+        }
       }
       return { ok: false, message: `Server returned status ${res.status}`, latencyMs };
     } catch (e: any) {
@@ -451,3 +718,4 @@ class ApiService {
 }
 
 export const api = new ApiService();
+

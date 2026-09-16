@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { 
   View, Text, StyleSheet, ScrollView, TouchableOpacity, 
-  Modal, TextInput, Alert, SafeAreaView 
+  Modal, TextInput, Alert, SafeAreaView, Platform, RefreshControl 
 } from 'react-native';
 import { Colors } from '../../constants/theme';
 import { useAppStore } from '../../services/store';
@@ -15,6 +15,13 @@ export default function ClosureScreen() {
   const [confirmModalVisible, setConfirmModalVisible] = useState(false);
   const [selectedLoan, setSelectedLoan] = useState<Loan | null>(null);
   const [remarks, setRemarks] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await store.syncFromBackend(true);
+    setRefreshing(false);
+  };
 
   // Active loans eligible for closure
   const activeLoans = store.loans.filter(l => l.LoanStatus === 'Active');
@@ -57,14 +64,14 @@ export default function ClosureScreen() {
     {
       title: 'Loan Number',
       key: 'LoanNumber',
-      width: 140,
+      width: 125,
       render: (loan) => {
         const dueDate = loan.DueDate ? new Date(loan.DueDate) : null;
         const isOverdue = dueDate ? dueDate < today : false;
 
         return (
           <View style={styles.loanNumberCell}>
-            <Text style={styles.loanNumberText}>{loan.LoanNumber}</Text>
+            <Text style={styles.loanNumberText} numberOfLines={1}>{loan.LoanNumber}</Text>
             {isOverdue && (
               <View style={styles.overdueBadge}>
                 <Text style={styles.overdueText}>OVERDUE</Text>
@@ -76,26 +83,27 @@ export default function ClosureScreen() {
     },
     {
       title: 'Customer',
-      key: 'UserId',
+      key: 'CustomerName',
       width: 130,
       render: (loan) => {
         const u = store.users.find(user => user.UserId === loan.UserId);
-        return <Text style={styles.customerText}>{u ? u.FullName : 'Unknown'}</Text>;
+        return <Text style={styles.customerText} numberOfLines={1}>{u ? u.FullName : 'Unknown'}</Text>;
       },
     },
     {
       title: 'Mobile',
-      key: 'UserId',
-      width: 110,
+      key: 'CustomerMobile',
+      width: 105,
       render: (loan) => {
         const u = store.users.find(user => user.UserId === loan.UserId);
-        return <Text style={styles.cellText}>{u ? u.MobileNumber : 'N/A'}</Text>;
+        return <Text style={styles.cellText} numberOfLines={1}>{u ? u.MobileNumber : 'N/A'}</Text>;
       },
     },
     {
       title: 'Amount',
       key: 'LoanAmount',
       width: 110,
+      align: 'right',
       render: (loan) => (
         <Text style={styles.amountText}>₹{loan.LoanAmount.toLocaleString('en-IN')}</Text>
       ),
@@ -103,9 +111,9 @@ export default function ClosureScreen() {
     {
       title: 'Date',
       key: 'LoanDate',
-      width: 100,
+      width: 95,
       render: (loan) => (
-        <Text style={styles.cellText}>
+        <Text style={styles.cellText} numberOfLines={1}>
           {loan.LoanDate ? new Date(loan.LoanDate).toLocaleDateString('en-GB') : '-'}
         </Text>
       ),
@@ -113,12 +121,12 @@ export default function ClosureScreen() {
     {
       title: 'Due Date',
       key: 'DueDate',
-      width: 100,
+      width: 95,
       render: (loan) => {
         const dueDate = loan.DueDate ? new Date(loan.DueDate) : null;
         const isOverdue = dueDate ? dueDate < today : false;
         return (
-          <Text style={[styles.cellText, isOverdue && styles.overdueDueText]}>
+          <Text style={[styles.cellText, isOverdue && styles.overdueDueText]} numberOfLines={1}>
             {loan.DueDate ? new Date(loan.DueDate).toLocaleDateString('en-GB') : '-'}
           </Text>
         );
@@ -127,7 +135,8 @@ export default function ClosureScreen() {
     {
       title: 'Ornaments',
       key: 'ornamentIds',
-      width: 100,
+      width: 90,
+      align: 'center',
       render: (loan) => {
         const count = loan.ornamentIds ? loan.ornamentIds.length : 0;
         return (
@@ -139,8 +148,8 @@ export default function ClosureScreen() {
     },
     {
       title: 'Action',
-      key: 'LoanId',
-      width: 140,
+      key: 'Actions',
+      width: 125,
       align: 'center',
       render: (loan) => (
         <TouchableOpacity 
@@ -155,32 +164,24 @@ export default function ClosureScreen() {
   ];
 
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContainer}>
-        {/* Header Title Section */}
-        <View style={styles.header}>
-          <View>
-            <Text style={styles.headerTitle}>Loan Closure & Release</Text>
-            <Text style={styles.headerSubtitle}>
-              Settle outstanding loans and release pledged gold ornaments back to the vault
-            </Text>
-          </View>
-          <View style={styles.pendingBadge}>
-            <Ionicons name="shield-checkmark" size={16} color={Colors.brand[700]} />
-            <Text style={styles.pendingBadgeText}>{activeLoans.length} Active Loan(s)</Text>
-          </View>
-        </View>
-
+    <SafeAreaView style={styles.safeArea}>
+      <ScrollView 
+        style={styles.container} 
+        contentContainerStyle={styles.content}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[Colors.primary]} />}
+      >
         {/* Informational Banner */}
         <View style={styles.infoBanner}>
           <Ionicons name="information-circle-outline" size={20} color={Colors.brand[700]} style={styles.infoIcon} />
           <Text style={styles.infoText}>
-            Closing a loan updates its status to <Text style={{fontWeight: '700'}}>Closed</Text>, automatically releases all attached gold ornaments back to <Text style={{fontWeight: '700'}}>Available</Text> in the vault, and restores the linked bank limit.
+            Closing a loan updates its status to <Text style={{fontWeight: '700'}}>Closed</Text>, automatically releases attached gold ornaments back to <Text style={{fontWeight: '700'}}>Available</Text> in vault, and restores the bank limit.
           </Text>
         </View>
 
         {/* DataTable */}
         <DataTable
+          title="Loan Closure & Release"
+          subtitle={`Settle active loans and release pledged ornaments (${activeLoans.length} active)`}
           columns={columns}
           data={activeLoans}
           searchPlaceholder="Search by Loan No, Customer, Mobile..."
@@ -325,47 +326,17 @@ export default function ClosureScreen() {
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: Colors.surface,
+  },
   container: {
     flex: 1,
-    backgroundColor: Colors.bgLight,
+    backgroundColor: Colors.background,
   },
-  scrollContainer: {
-    padding: 16,
-    paddingBottom: 40,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 16,
-    flexWrap: 'wrap',
-    gap: 12,
-  },
-  headerTitle: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: Colors.textDark,
-  },
-  headerSubtitle: {
-    fontSize: 13,
-    color: Colors.textSecondary,
-    marginTop: 2,
-  },
-  pendingBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: Colors.brand[100],
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: Colors.brand[300],
-  },
-  pendingBadgeText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: Colors.brand[800],
+  content: {
+    padding: 12,
+    paddingBottom: 28,
   },
   infoBanner: {
     flexDirection: 'row',
@@ -468,8 +439,8 @@ const styles = StyleSheet.create({
   modalContent: {
     backgroundColor: '#fff',
     borderRadius: 18,
-    width: '100%',
-    maxWidth: 520,
+    width: Platform.select({ web: '55%', default: '94%' }),
+    maxWidth: 650,
     maxHeight: '90%',
     overflow: 'hidden',
     shadowColor: '#000',

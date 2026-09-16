@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
   View, Text, StyleSheet, TextInput, TouchableOpacity, 
-  ScrollView 
+  ScrollView, LayoutChangeEvent 
 } from 'react-native';
 import { Colors } from '../constants/theme';
 import { Ionicons } from '@expo/vector-icons';
@@ -40,6 +40,7 @@ export function DataTable<T>({
   const [search, setSearch] = useState('');
   const [pageSize, setPageSize] = useState(10);
   const [page, setPage] = useState(1);
+  const [wrapperWidth, setWrapperWidth] = useState(0);
 
   const filteredData = data.filter(item => {
     if (!search.trim() || !searchFilter) return true;
@@ -51,22 +52,61 @@ export function DataTable<T>({
   const startIdx = (currentPage - 1) * pageSize;
   const pageData = filteredData.slice(startIdx, startIdx + pageSize);
 
+  // Measure container layout to guarantee full width
+  const handleWrapperLayout = (e: LayoutChangeEvent) => {
+    const w = Math.round(e.nativeEvent.layout.width);
+    if (w > 0 && Math.abs(w - wrapperWidth) > 1) {
+      setWrapperWidth(w);
+    }
+  };
+
+  // Base sum of column widths
+  const totalBaseWidth = useMemo(() => {
+    return columns.reduce((acc, col) => acc + (col.width || 120), 0);
+  }, [columns]);
+
+  // Scaled column widths: if container is wider than totalBaseWidth, stretch columns to 100% full width
+  const effectiveColWidths = useMemo(() => {
+    if (!wrapperWidth || wrapperWidth <= totalBaseWidth) {
+      return columns.map(col => col.width || 120);
+    }
+    const scale = wrapperWidth / totalBaseWidth;
+    let accumulated = 0;
+    return columns.map((col, idx) => {
+      if (idx === columns.length - 1) {
+        return Math.max(col.width || 120, wrapperWidth - accumulated);
+      }
+      const scaled = Math.floor((col.width || 120) * scale);
+      accumulated += scaled;
+      return scaled;
+    });
+  }, [columns, wrapperWidth, totalBaseWidth]);
+
+  // Effective table total width
+  const tableContentWidth = useMemo(() => {
+    return Math.max(wrapperWidth, totalBaseWidth);
+  }, [wrapperWidth, totalBaseWidth]);
+
+  const isScrollable = wrapperWidth > 0 && totalBaseWidth > wrapperWidth;
+
   return (
     <View style={styles.container}>
       {/* Top Header Row (Title & Add Button) */}
-      <View style={styles.topHeader}>
-        <View>
-          {title ? <Text style={styles.sectionTitle}>{title}</Text> : null}
-          {subtitle ? <Text style={styles.sectionSub}>{subtitle}</Text> : null}
-        </View>
+      {(title || onAddPress) ? (
+        <View style={styles.topHeader}>
+          <View style={styles.titleWrapper}>
+            {title ? <Text style={styles.sectionTitle}>{title}</Text> : null}
+            {subtitle ? <Text style={styles.sectionSub}>{subtitle}</Text> : null}
+          </View>
 
-        {onAddPress ? (
-          <TouchableOpacity style={styles.addBtn} onPress={onAddPress} activeOpacity={0.8}>
-            <Ionicons name="add" size={18} color="#ffffff" />
-            <Text style={styles.addBtnText}>{addButtonLabel}</Text>
-          </TouchableOpacity>
-        ) : null}
-      </View>
+          {onAddPress ? (
+            <TouchableOpacity style={styles.addBtn} onPress={onAddPress} activeOpacity={0.8}>
+              <Ionicons name="add" size={18} color="#ffffff" />
+              <Text style={styles.addBtnText}>{addButtonLabel}</Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
+      ) : null}
 
       {/* Toolbar: Search + Page size */}
       <View style={styles.toolbar}>
@@ -103,18 +143,33 @@ export function DataTable<T>({
         </View>
       </View>
 
+      {/* Mobile Horizontal Scroll Hint */}
+      {isScrollable && (
+        <View style={styles.scrollHintBar}>
+          <Ionicons name="swap-horizontal" size={13} color={Colors.primaryDark} />
+          <Text style={styles.scrollHintText}>
+            Scroll sideways to view all {columns.length} columns
+          </Text>
+        </View>
+      )}
+
       {/* Responsive Horizontal Scroll Table */}
-      <View style={styles.tableWrapper}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={true} nestedScrollEnabled={true}>
-          <View>
+      <View style={styles.tableWrapper} onLayout={handleWrapperLayout}>
+        <ScrollView 
+          horizontal 
+          showsHorizontalScrollIndicator={true} 
+          nestedScrollEnabled={true}
+          contentContainerStyle={{ minWidth: '100%', flexGrow: 1 }}
+        >
+          <View style={{ width: tableContentWidth, minWidth: '100%' }}>
             {/* Header Row */}
-            <View style={styles.headerRow}>
-              {columns.map(col => (
+            <View style={[styles.headerRow, { width: tableContentWidth, minWidth: '100%' }]}>
+              {columns.map((col, idx) => (
                 <View 
-                  key={col.key} 
+                  key={`${col.key}_${idx}`} 
                   style={[
                     styles.th, 
-                    { width: col.width || 120 },
+                    { width: effectiveColWidths[idx] },
                     col.align === 'center' && { alignItems: 'center' },
                     col.align === 'right' && { alignItems: 'flex-end' },
                   ]}
@@ -126,7 +181,7 @@ export function DataTable<T>({
 
             {/* Table Rows */}
             {pageData.length === 0 ? (
-              <View style={styles.emptyRow}>
+              <View style={[styles.emptyRow, { width: tableContentWidth, minWidth: '100%' }]}>
                 <Text style={styles.emptyText}>No records found.</Text>
               </View>
             ) : (
@@ -135,14 +190,18 @@ export function DataTable<T>({
                 return (
                   <View 
                     key={keyExtractor(item)} 
-                    style={[styles.tr, !isEven && styles.trAlt]}
+                    style={[
+                      styles.tr, 
+                      !isEven && styles.trAlt,
+                      { width: tableContentWidth, minWidth: '100%' }
+                    ]}
                   >
-                    {columns.map(col => (
+                    {columns.map((col, idx) => (
                       <View 
-                        key={col.key} 
+                        key={`${col.key}_${idx}`} 
                         style={[
                           styles.td, 
-                          { width: col.width || 120 },
+                          { width: effectiveColWidths[idx] },
                           col.align === 'center' && { alignItems: 'center', justifyContent: 'center' },
                           col.align === 'right' && { alignItems: 'flex-end', justifyContent: 'center' },
                         ]}
@@ -198,6 +257,8 @@ export function DataTable<T>({
 
 const styles = StyleSheet.create({
   container: {
+    width: '100%',
+    alignSelf: 'stretch',
     backgroundColor: Colors.surface,
     borderRadius: 14,
     borderWidth: 1,
@@ -209,9 +270,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingTop: 16,
+    paddingHorizontal: 14,
+    paddingTop: 14,
     paddingBottom: 12,
+  },
+  titleWrapper: {
+    flex: 1,
+    marginRight: 10,
   },
   sectionTitle: {
     fontSize: 16,
@@ -227,10 +292,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: Colors.primaryDark,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 10,
-    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 9,
+    gap: 5,
+    flexShrink: 0,
   },
   addBtnText: {
     color: '#ffffff',
@@ -241,7 +307,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 14,
+    paddingHorizontal: 12,
     paddingVertical: 10,
     backgroundColor: '#f8fafc',
     borderTopWidth: 1,
@@ -253,7 +319,7 @@ const styles = StyleSheet.create({
   pageSizeBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 5,
   },
   toolLabel: {
     fontSize: 12,
@@ -288,8 +354,8 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
     paddingHorizontal: 10,
     paddingVertical: 6,
-    minWidth: 180,
-    maxWidth: 260,
+    flex: 1,
+    minWidth: 160,
   },
   searchInput: {
     fontSize: 12,
@@ -297,7 +363,24 @@ const styles = StyleSheet.create({
     padding: 0,
     flex: 1,
   },
+  scrollHintBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#eff6ff',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: '#dbeafe',
+  },
+  scrollHintText: {
+    fontSize: 11,
+    color: Colors.primaryDark,
+    fontWeight: '600',
+  },
   tableWrapper: {
+    width: '100%',
+    alignSelf: 'stretch',
     minHeight: 120,
   },
   headerRow: {
@@ -307,8 +390,8 @@ const styles = StyleSheet.create({
     borderBottomColor: Colors.border,
   },
   th: {
-    paddingHorizontal: 12,
-    paddingVertical: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 11,
     justifyContent: 'center',
   },
   thText: {
@@ -328,12 +411,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#fafbfc',
   },
   td: {
-    paddingHorizontal: 12,
-    paddingVertical: 11,
+    paddingHorizontal: 10,
+    paddingVertical: 10,
     justifyContent: 'center',
   },
   tdText: {
-    fontSize: 13,
+    fontSize: 12.5,
     color: Colors.textPrimary,
   },
   emptyRow: {
@@ -349,7 +432,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 14,
+    paddingHorizontal: 12,
     paddingVertical: 10,
     backgroundColor: '#f8fafc',
     borderTopWidth: 1,

@@ -4,19 +4,155 @@ import {
   mockUsers, mockBankAccounts, mockOrnaments, 
   mockLoans, mockPayments, mockGoldRates, mockDashboardData 
 } from './mockData';
+import { api } from './api';
+import { ApiConfig } from '../config/api';
+import { cache, CacheTTL } from './cache';
 
-// Global in-memory state so changes persist across screen transitions
-let usersState: User[] = [...mockUsers];
-let bankAccountsState: BankAccount[] = [...mockBankAccounts];
-let ornamentsState: Ornament[] = [...mockOrnaments];
-let loansState: Loan[] = [...mockLoans];
-let paymentsState: Payment[] = [...mockPayments];
+// Global in-memory state so changes persist across screen transitions (clean empty start - no mock data)
+let usersState: User[] = [];
+let bankAccountsState: BankAccount[] = [];
+let ornamentsState: Ornament[] = [];
+let loansState: Loan[] = [];
+let paymentsState: Payment[] = [];
 let goldRatesState: GoldRateData = { ...mockGoldRates };
+
+let isSyncing = false;
+let lastSyncedAt: string | null = null;
+let lastSyncTimestamp = 0;
+let hasInitialized = false;
+let isCacheHydrated = false;
+let syncError: string | null = null;
 
 const listeners = new Set<() => void>();
 
 function notify() {
   listeners.forEach(fn => fn());
+}
+
+/**
+ * Hydrate in-memory state from L2 persistent storage (AsyncStorage) immediately on boot.
+ * Delivers instant offline UI before any network requests complete.
+ */
+export async function hydrateFromCache() {
+  if (isCacheHydrated) return;
+  try {
+    const [cachedUsers, cachedBanks, cachedOrns, cachedLoans, cachedPayments, cachedRates] = await Promise.all([
+      cache.get<User[]>('users_list', true),
+      cache.get<BankAccount[]>('bank_accounts_all', true),
+      cache.get<Ornament[]>('ornaments_all', true),
+      cache.get<Loan[]>('loans_all', true),
+      cache.get<Payment[]>('payments_all', true),
+      cache.get<GoldRateData>('gold_rates_bangalore', true),
+    ]);
+
+    // If cache has remnants of old mock data (Rajesh Sharma), wipe it so user has clean slate
+    if (cachedUsers.data && cachedUsers.data.some(u => u.FullName === 'Rajesh Sharma' || u.UserId === 'U001')) {
+      await cache.clearAll();
+      usersState = [];
+      bankAccountsState = [];
+      ornamentsState = [];
+      loansState = [];
+      paymentsState = [];
+      isCacheHydrated = true;
+      notify();
+      return;
+    }
+
+    let updated = false;
+    if (cachedUsers.data && cachedUsers.data.length > 0) {
+      usersState = cachedUsers.data;
+      updated = true;
+    }
+    if (cachedBanks.data && cachedBanks.data.length > 0) {
+      bankAccountsState = cachedBanks.data;
+      updated = true;
+    }
+    if (cachedOrns.data && cachedOrns.data.length > 0) {
+      ornamentsState = cachedOrns.data;
+      updated = true;
+    }
+    if (cachedLoans.data && cachedLoans.data.length > 0) {
+      loansState = cachedLoans.data;
+      updated = true;
+    }
+    if (cachedPayments.data && cachedPayments.data.length > 0) {
+      paymentsState = cachedPayments.data;
+      updated = true;
+    }
+    if (cachedRates.data) {
+      goldRatesState = cachedRates.data;
+      updated = true;
+    }
+
+    isCacheHydrated = true;
+    if (updated) notify();
+  } catch (e) {
+    console.warn('[Store] hydrateFromCache warning:', e);
+  }
+}
+
+export async function syncFromBackend(force: boolean = false) {
+  if (isSyncing && !force) return;
+  if (ApiConfig.isMockMode()) return;
+
+  const now = Date.now();
+  // Prevent spamming requests within 10 seconds unless user explicitly requested (e.g. pull-to-refresh)
+  if (!force && now - lastSyncTimestamp < 10000) return;
+
+  if (!isCacheHydrated) {
+    await hydrateFromCache();
+  }
+
+  isSyncing = true;
+  syncError = null;
+  notify();
+
+  try {
+    // 1. First attempt fast unified sync (1 round trip)
+    const syncRes = await api.getInitialSyncData(force);
+    if (syncRes.success && syncRes.data) {
+      const data = syncRes.data;
+      if (Array.isArray(data.users)) usersState = data.users;
+      if (Array.isArray(data.bankAccounts)) bankAccountsState = data.bankAccounts;
+      if (Array.isArray(data.ornaments)) ornamentsState = data.ornaments;
+      if (Array.isArray(data.loans)) loansState = data.loans;
+      if (Array.isArray(data.payments)) paymentsState = data.payments;
+      if (data.goldRates) goldRatesState = data.goldRates;
+
+      lastSyncedAt = new Date().toLocaleTimeString();
+      lastSyncTimestamp = Date.now();
+      syncError = null;
+      return;
+    }
+
+    // 2. Resilient fallback using Promise.allSettled so individual failures don't fail the whole sync
+    const results = await Promise.allSettled([
+      api.getUsers(force),
+      api.getBankAccounts(undefined, force),
+      api.getOrnaments(undefined, force),
+      api.getLoans(undefined, undefined, force),
+      api.getPayments(undefined, force),
+      api.getGoldRates(force),
+    ]);
+
+    const [usersRes, banksRes, ornsRes, loansRes, paymentsRes, ratesRes] = results;
+
+    if (usersRes.status === 'fulfilled' && Array.isArray(usersRes.value)) usersState = usersRes.value;
+    if (banksRes.status === 'fulfilled' && Array.isArray(banksRes.value)) bankAccountsState = banksRes.value;
+    if (ornsRes.status === 'fulfilled' && Array.isArray(ornsRes.value)) ornamentsState = ornsRes.value;
+    if (loansRes.status === 'fulfilled' && Array.isArray(loansRes.value)) loansState = loansRes.value;
+    if (paymentsRes.status === 'fulfilled' && Array.isArray(paymentsRes.value)) paymentsState = paymentsRes.value;
+    if (ratesRes.status === 'fulfilled' && ratesRes.value?.data) goldRatesState = ratesRes.value.data;
+
+    lastSyncedAt = new Date().toLocaleTimeString();
+    lastSyncTimestamp = Date.now();
+  } catch (err: any) {
+    console.warn('[Store] syncFromBackend warning:', err?.message || err);
+    syncError = 'Live sync offline - using cached data';
+  } finally {
+    isSyncing = false;
+    notify();
+  }
 }
 
 function nextId<T>(prefix: string, values: T[], key: keyof T) {
@@ -53,6 +189,12 @@ export function useAppStore() {
   useEffect(() => {
     const listener = () => setTick(t => t + 1);
     listeners.add(listener);
+
+    if (!hasInitialized) {
+      hasInitialized = true;
+      hydrateFromCache().then(() => syncFromBackend());
+    }
+
     return () => {
       listeners.delete(listener);
     };
@@ -114,10 +256,10 @@ export function useAppStore() {
 
   // --- CRUD: Users ---
 
-  const addUser = (userData: Partial<User>) => {
-    const id = nextId('U', usersState, 'UserId');
+  const addUser = (userData: Partial<User> & { files?: any[] }) => {
+    const tempId = nextId('U', usersState, 'UserId');
     const newUser: User = {
-      UserId: id,
+      UserId: tempId,
       CustomerCode: userData.CustomerCode || `CUST-${100 + usersState.length + 1}`,
       FullName: userData.FullName || 'New User',
       FatherHusbandName: userData.FatherHusbandName || '',
@@ -139,28 +281,50 @@ export function useAppStore() {
       CreatedDate: new Date().toISOString(),
     };
     usersState = [newUser, ...usersState];
+    cache.set('users_list', usersState, CacheTTL.LISTS);
     notify();
+
+    if (!ApiConfig.isMockMode()) {
+      api.addUser(userData).then(res => {
+        if (res.success && res.data) {
+          usersState = usersState.map(u => u.UserId === tempId ? { ...u, ...res.data } : u);
+          cache.set('users_list', usersState, CacheTTL.LISTS);
+          notify();
+        }
+      }).catch(err => console.warn('[Store] addUser error:', err));
+    }
+
     return newUser;
   };
 
-  const updateUser = (userId: string, updated: Partial<User>) => {
+  const updateUser = (userId: string, updated: Partial<User> & { files?: any[] }) => {
     usersState = usersState.map(u => u.UserId === userId ? { ...u, ...updated, UpdatedDate: new Date().toISOString() } : u);
+    cache.set('users_list', usersState, CacheTTL.LISTS);
     notify();
+
+    if (!ApiConfig.isMockMode()) {
+      api.updateUser(userId, updated).catch(err => console.warn('[Store] updateUser error:', err));
+    }
   };
 
   const deleteUser = (userId: string) => {
     usersState = usersState.filter(u => u.UserId !== userId);
+    cache.set('users_list', usersState, CacheTTL.LISTS);
     notify();
+
+    if (!ApiConfig.isMockMode()) {
+      api.deleteUser(userId).catch(err => console.warn('[Store] deleteUser error:', err));
+    }
   };
 
   // --- CRUD: Bank Accounts ---
 
-  const addBankAccount = (accData: Partial<BankAccount>) => {
-    const id = nextId('BA', bankAccountsState, 'BankAccountId');
+  const addBankAccount = (accData: Partial<BankAccount> & { files?: any[] }) => {
+    const tempId = nextId('BA', bankAccountsState, 'BankAccountId');
     const max = Number(accData.MaxLoanAmount) || 0;
     const util = Number(accData.UtilizedLoanAmount) || 0;
     const newAcc: BankAccount = {
-      BankAccountId: id,
+      BankAccountId: tempId,
       UserId: accData.UserId || usersState[0]?.UserId || 'U001',
       AccountHolderName: accData.AccountHolderName || '',
       AccountNumber: accData.AccountNumber || '',
@@ -178,11 +342,23 @@ export function useAppStore() {
       AvailableLoanAmount: Math.max(0, max - util),
     };
     bankAccountsState = [newAcc, ...bankAccountsState];
+    cache.set('bank_accounts_all', bankAccountsState, CacheTTL.LISTS);
     notify();
+
+    if (!ApiConfig.isMockMode()) {
+      api.addBankAccount(accData).then(res => {
+        if (res.success && res.data) {
+          bankAccountsState = bankAccountsState.map(b => b.BankAccountId === tempId ? { ...b, ...res.data } : b);
+          cache.set('bank_accounts_all', bankAccountsState, CacheTTL.LISTS);
+          notify();
+        }
+      }).catch(err => console.warn('[Store] addBankAccount error:', err));
+    }
+
     return newAcc;
   };
 
-  const updateBankAccount = (accId: string, updated: Partial<BankAccount>) => {
+  const updateBankAccount = (accId: string, updated: Partial<BankAccount> & { files?: any[] }) => {
     bankAccountsState = bankAccountsState.map(b => {
       if (b.BankAccountId === accId) {
         const merged = { ...b, ...updated, UpdatedDate: new Date().toISOString() };
@@ -193,18 +369,28 @@ export function useAppStore() {
       }
       return b;
     });
+    cache.set('bank_accounts_all', bankAccountsState, CacheTTL.LISTS);
     notify();
+
+    if (!ApiConfig.isMockMode()) {
+      api.updateBankAccount(accId, updated).catch(err => console.warn('[Store] updateBankAccount error:', err));
+    }
   };
 
   const deleteBankAccount = (accId: string) => {
     bankAccountsState = bankAccountsState.filter(b => b.BankAccountId !== accId);
+    cache.set('bank_accounts_all', bankAccountsState, CacheTTL.LISTS);
     notify();
+
+    if (!ApiConfig.isMockMode()) {
+      api.deleteBankAccount(accId).catch(err => console.warn('[Store] deleteBankAccount error:', err));
+    }
   };
 
   // --- CRUD: Ornaments ---
 
-  const addOrnament = (ornData: Partial<Ornament>) => {
-    const id = nextId('ORN', ornamentsState, 'OrnamentId');
+  const addOrnament = (ornData: Partial<Ornament> & { files?: any[] }) => {
+    const tempId = nextId('ORN', ornamentsState, 'OrnamentId');
     const gross = Number(ornData.GrossWeight) || 0;
     const stone = Number(ornData.StoneWeight) || 0;
     const metal = ornData.MetalWeight !== undefined && ornData.MetalWeight !== null 
@@ -219,7 +405,7 @@ export function useAppStore() {
     const apprPct = buyingCost > 0 ? Math.round(((apprVal / buyingCost) * 100) * 100) / 100 : 0;
 
     const newOrn: Ornament = {
-      OrnamentId: id,
+      OrnamentId: tempId,
       UserId: ornData.UserId || usersState[0]?.UserId || '',
       OrnamentName: ornData.OrnamentName || 'Gold Jewelry',
       OrnamentType: ornData.OrnamentType || 'Necklace',
@@ -246,11 +432,23 @@ export function useAppStore() {
       Status: (ornData.Status as any) || 'Available',
     };
     ornamentsState = [newOrn, ...ornamentsState];
+    cache.set('ornaments_all', ornamentsState, CacheTTL.LISTS);
     notify();
+
+    if (!ApiConfig.isMockMode()) {
+      api.addOrnament(ornData).then(res => {
+        if (res.success && res.data) {
+          ornamentsState = ornamentsState.map(o => o.OrnamentId === tempId ? { ...o, ...res.data } : o);
+          cache.set('ornaments_all', ornamentsState, CacheTTL.LISTS);
+          notify();
+        }
+      }).catch(err => console.warn('[Store] addOrnament error:', err));
+    }
+
     return newOrn;
   };
 
-  const updateOrnament = (ornId: string, updated: Partial<Ornament>) => {
+  const updateOrnament = (ornId: string, updated: Partial<Ornament> & { files?: any[] }) => {
     ornamentsState = ornamentsState.map(o => {
       if (o.OrnamentId === ornId) {
         const merged = { ...o, ...updated };
@@ -282,18 +480,28 @@ export function useAppStore() {
       }
       return o;
     });
+    cache.set('ornaments_all', ornamentsState, CacheTTL.LISTS);
     notify();
+
+    if (!ApiConfig.isMockMode()) {
+      api.updateOrnament(ornId, updated).catch(err => console.warn('[Store] updateOrnament error:', err));
+    }
   };
 
   const deleteOrnament = (ornId: string) => {
     ornamentsState = ornamentsState.filter(o => o.OrnamentId !== ornId);
+    cache.set('ornaments_all', ornamentsState, CacheTTL.LISTS);
     notify();
+
+    if (!ApiConfig.isMockMode()) {
+      api.deleteOrnament(ornId).catch(err => console.warn('[Store] deleteOrnament error:', err));
+    }
   };
 
   // --- CRUD: Loans ---
 
   const addLoan = (loanData: any) => {
-    const id = nextId('L', loansState, 'LoanId');
+    const tempId = nextId('L', loansState, 'LoanId');
     const amount = Number(loanData.LoanAmount) || 0;
     const procFee = Number(loanData.ProcessingFee) || 0;
     const docCharge = Number(loanData.DocumentCharge) || 0;
@@ -312,8 +520,8 @@ export function useAppStore() {
     }) + procFee;
 
     const newLoan: Loan = {
-      LoanId: id,
-      LoanNumber: loanData.LoanNumber || `LN-${new Date().getFullYear()}-${id}`,
+      LoanId: tempId,
+      LoanNumber: loanData.LoanNumber || `LN-${new Date().getFullYear()}-${tempId}`,
       UserId: loanData.UserId,
       BankAccountId: loanData.BankAccountId,
       BankName: loanData.BankName || 'Bank',
@@ -327,7 +535,6 @@ export function useAppStore() {
       ProcessingFee: procFee,
       DocumentCharge: docCharge,
       InsuranceCharge: insCharge,
-      // Kept aligned with the source UI: period interest + processing fee.
       TotalCharges: Number(loanData.TotalCharges) || totalCharges,
       NetDisbursementAmount: netDisb,
       DueDate: loanData.DueDate || '',
@@ -337,7 +544,6 @@ export function useAppStore() {
       ornamentIds: loanData.ornamentIds || [],
     };
 
-    // Mark selected ornaments as Pledged
     if (loanData.ornamentIds && loanData.ornamentIds.length > 0) {
       ornamentsState = ornamentsState.map(o => 
         loanData.ornamentIds.includes(o.OrnamentId) ? { ...o, Status: 'Pledged' } : o
@@ -345,25 +551,42 @@ export function useAppStore() {
     }
 
     loansState = [newLoan, ...loansState];
-    // Always derive utilisation from active loans rather than trusting an old value.
     bankAccountsState = bankAccountsState.map(b => {
       const utilized = calculateUserBankUtilization(b.UserId, b.BankAccountId);
       return { ...b, UtilizedLoanAmount: utilized, AvailableLoanAmount: Math.max(0, b.MaxLoanAmount - utilized) };
     });
+    cache.set('loans_all', loansState, CacheTTL.LISTS);
+    cache.set('ornaments_all', ornamentsState, CacheTTL.LISTS);
+    cache.set('bank_accounts_all', bankAccountsState, CacheTTL.LISTS);
     notify();
+
+    if (!ApiConfig.isMockMode()) {
+      api.addLoan(loanData).then(res => {
+        if (res.success && res.data) {
+          loansState = loansState.map(l => l.LoanId === tempId ? { ...l, ...res.data } : l);
+          cache.set('loans_all', loansState, CacheTTL.LISTS);
+          notify();
+        }
+      }).catch(err => console.warn('[Store] addLoan error:', err));
+    }
+
     return newLoan;
   };
 
   const updateLoan = (loanId: string, updated: Partial<Loan>) => {
     loansState = loansState.map(l => l.LoanId === loanId ? { ...l, ...updated, UpdatedDate: new Date().toISOString() } : l);
+    cache.set('loans_all', loansState, CacheTTL.LISTS);
     notify();
+
+    if (!ApiConfig.isMockMode()) {
+      api.updateLoan(loanId, updated).catch(err => console.warn('[Store] updateLoan error:', err));
+    }
   };
 
   const closeAndReleaseLoan = (loanId: string, remarks: string) => {
     const targetLoan = loansState.find(l => l.LoanId === loanId);
     if (!targetLoan) return;
 
-    // Mark loan as closed
     loansState = loansState.map(l => l.LoanId === loanId ? {
       ...l,
       LoanStatus: 'Closed',
@@ -371,7 +594,6 @@ export function useAppStore() {
       ClosureRemarks: remarks,
     } : l);
 
-    // Release all pledged ornaments back to Available
     if (targetLoan.ornamentIds && targetLoan.ornamentIds.length > 0) {
       ornamentsState = ornamentsState.map(o => 
         targetLoan.ornamentIds?.includes(o.OrnamentId) ? {
@@ -383,21 +605,27 @@ export function useAppStore() {
       );
     }
 
-    // Restore bank account availability from the remaining active loans.
     bankAccountsState = bankAccountsState.map(b => {
       const utilized = calculateUserBankUtilization(b.UserId, b.BankAccountId);
       return { ...b, UtilizedLoanAmount: utilized, AvailableLoanAmount: Math.max(0, b.MaxLoanAmount - utilized) };
     });
 
+    cache.set('loans_all', loansState, CacheTTL.LISTS);
+    cache.set('ornaments_all', ornamentsState, CacheTTL.LISTS);
+    cache.set('bank_accounts_all', bankAccountsState, CacheTTL.LISTS);
     notify();
+
+    if (!ApiConfig.isMockMode()) {
+      api.closeAndReleaseLoan(loanId, remarks).catch(err => console.warn('[Store] closeAndReleaseLoan error:', err));
+    }
   };
 
   // --- CRUD: Payments ---
 
   const addPayment = (payData: Partial<Payment>) => {
-    const id = `PAY${String(paymentsState.length + 1).padStart(3, '0')}`;
+    const tempId = `PAY${String(paymentsState.length + 1).padStart(3, '0')}`;
     const newPay: Payment = {
-      PaymentId: id,
+      PaymentId: tempId,
       LoanId: payData.LoanId || '',
       PaymentDate: payData.PaymentDate || new Date().toISOString().split('T')[0],
       PaymentType: payData.PaymentType || 'Interest',
@@ -411,7 +639,19 @@ export function useAppStore() {
       CreatedDate: new Date().toISOString(),
     };
     paymentsState = [newPay, ...paymentsState];
+    cache.set('payments_all', paymentsState, CacheTTL.LISTS);
     notify();
+
+    if (!ApiConfig.isMockMode()) {
+      api.addPayment(payData).then(res => {
+        if (res.success && res.data) {
+          paymentsState = paymentsState.map(p => p.PaymentId === tempId ? { ...p, ...res.data } : p);
+          cache.set('payments_all', paymentsState, CacheTTL.LISTS);
+          notify();
+        }
+      }).catch(err => console.warn('[Store] addPayment error:', err));
+    }
+
     return newPay;
   };
 
@@ -423,6 +663,10 @@ export function useAppStore() {
     payments: paymentsState,
     goldRates: goldRatesState,
     dashboardData: getDashboardData(),
+    isSyncing,
+    lastSyncedAt,
+    syncError,
+    syncFromBackend,
     addUser,
     updateUser,
     deleteUser,
@@ -437,5 +681,9 @@ export function useAppStore() {
     closeAndReleaseLoan,
     addPayment,
     calculateUserBankUtilization,
+    clearCache: async () => {
+      await cache.clearAll();
+      await syncFromBackend(true);
+    },
   };
 }

@@ -13,13 +13,13 @@ const STORAGE_KEY_API_URL = '@goldloan_custom_gas_url';
 const STORAGE_KEY_USE_MOCK = '@goldloan_use_mock';
 
 // If you deploy to Google Apps Script, paste your deployed Web App URL here:
-export const DEFAULT_GAS_WEB_APP_URL = 
-  process.env.EXPO_PUBLIC_GAS_API_URL || 
-  ""; // e.g. "https://script.google.com/macros/s/AKfycbx.../exec"
+export const DEFAULT_GAS_WEB_APP_URL =
+  process.env.EXPO_PUBLIC_GAS_API_URL ||
+  "https://script.google.com/macros/s/AKfycbwddMXiZSOzm8ELoiX8PUpRzQJ3bXP8xtJyyN9_BLGESYDJJD_uR__yFDvVJkiAuwsg/exec";
 
-export const SPREADSHEET_ID = 
-  process.env.EXPO_PUBLIC_SPREADSHEET_ID || 
-  "";
+export const SPREADSHEET_ID =
+  process.env.EXPO_PUBLIC_SPREADSHEET_ID ||
+  "1q8JGANWFJ2NEcbW1ZOFOsUC4W5Ppci_cGXJf8nN-1kk";
 
 class ApiConfigManager {
   private customUrl: string | null = null;
@@ -48,9 +48,10 @@ class ApiConfigManager {
   }
 
   isMockMode(): boolean {
-    // This port is intentionally a front-end prototype.  It must never read
-    // from or write to Sheets/Drive until the integration phase is approved.
-    return true;
+    if (this.forceMock !== null) {
+      return this.forceMock;
+    }
+    return !this.isConfigured();
   }
 
   async setApiUrl(url: string): Promise<void> {
