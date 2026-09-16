@@ -7,6 +7,7 @@ import { Colors } from '../../constants/theme';
 import { useAppStore } from '../../services/store';
 import { Loan } from '../../types';
 import { DataTable, Column } from '../../components/DataTable';
+import { SidebarTrigger } from '../../components/SidebarTrigger';
 import { Ionicons } from '@expo/vector-icons';
 
 export default function ClosureScreen() {
@@ -180,6 +181,7 @@ export default function ClosureScreen() {
 
         {/* DataTable */}
         <DataTable
+          headerLeft={<SidebarTrigger />}
           title="Loan Closure & Release"
           subtitle={`Settle active loans and release pledged ornaments (${activeLoans.length} active)`}
           columns={columns}
@@ -336,7 +338,7 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 12,
-    paddingBottom: 28,
+    paddingBottom: 80,
   },
   infoBanner: {
     flexDirection: 'row',

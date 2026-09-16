@@ -1,14 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
-  View, Text, StyleSheet, TouchableOpacity, useWindowDimensions, 
-  SafeAreaView, ScrollView 
+  View, Text, StyleSheet, TouchableOpacity, 
+  ScrollView, Animated, Easing, useWindowDimensions, Platform, StatusBar as RNStatusBar 
 } from 'react-native';
 import { Tabs, useRouter, usePathname } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '../../constants/theme';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppStore } from '../../services/store';
 import { ApiConfig } from '../../config/api';
 import { Env } from '../../config/env';
+import { SidebarProvider, useSidebar } from '../../context/SidebarContext';
 
 interface NavItem {
   name: string;
@@ -64,17 +66,91 @@ const NAV_ITEMS: NavItem[] = [
 ];
 
 export default function TabLayout() {
+  return (
+    <SidebarProvider>
+      <TabLayoutInner />
+    </SidebarProvider>
+  );
+}
+
+function TabLayoutInner() {
   const router = useRouter();
   const pathname = usePathname();
   const store = useAppStore();
   const { width } = useWindowDimensions();
-
-  const isDesktop = width >= 768;
-  const [collapsed, setCollapsed] = useState(false);
-  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
+  const insets = useSafeAreaInsets();
+  const { collapsed, setCollapsed, mobileDrawerOpen, setMobileDrawerOpen, isDesktop } = useSidebar();
 
   const isLive = !ApiConfig.isMockMode();
   const live22kRate = store.goldRates?.gold22k?.rate1g;
+
+  // ─── ACCURATE SAFE AREA INSETS (PREVENTS NOTIFICATION OVERLAP) ───
+  const statusBarHeight = Platform.OS === 'android'
+    ? Math.max(insets.top, RNStatusBar.currentHeight || 28)
+    : insets.top;
+  const bottomInset = insets.bottom;
+
+  // On desktop, don't pad for status bar; on mobile, pad safely
+  const appTopPadding = isDesktop ? 0 : statusBarHeight;
+
+  // ─── DESKTOP SIDEBAR SMOOTH ANIMATION ───
+  const sidebarWidthAnim = useRef(new Animated.Value(collapsed ? 68 : 240)).current;
+
+  useEffect(() => {
+    Animated.timing(sidebarWidthAnim, {
+      toValue: collapsed ? 68 : 240,
+      duration: 240,
+      easing: Easing.bezier(0.25, 0.1, 0.25, 1),
+      useNativeDriver: false,
+    }).start();
+  }, [collapsed]);
+
+  const textOpacity = sidebarWidthAnim.interpolate({
+    inputRange: [68, 140, 240],
+    outputRange: [0, 0.2, 1],
+    extrapolate: 'clamp',
+  });
+
+  // ─── MOBILE DRAWER SMOOTH ANIMATION ───
+  const drawerWidth = Math.min(300, Math.round(width * 0.84));
+  const drawerSlideAnim = useRef(new Animated.Value(-drawerWidth)).current;
+  const backdropFadeAnim = useRef(new Animated.Value(0)).current;
+  const [drawerRendered, setDrawerRendered] = useState(false);
+
+  useEffect(() => {
+    if (mobileDrawerOpen) {
+      setDrawerRendered(true);
+      Animated.parallel([
+        Animated.timing(drawerSlideAnim, {
+          toValue: 0,
+          duration: 250,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.timing(backdropFadeAnim, {
+          toValue: 1,
+          duration: 250,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } else if (drawerRendered) {
+      Animated.parallel([
+        Animated.timing(drawerSlideAnim, {
+          toValue: -drawerWidth,
+          duration: 220,
+          easing: Easing.in(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.timing(backdropFadeAnim, {
+          toValue: 0,
+          duration: 220,
+          useNativeDriver: true,
+        }),
+      ]).start(() => {
+        setDrawerRendered(false);
+      });
+    }
+  }, [mobileDrawerOpen]);
 
   const isRouteActive = (item: NavItem) => {
     if (item.name === 'index') {
@@ -95,83 +171,25 @@ export default function TabLayout() {
   };
 
   return (
-    <SafeAreaView style={styles.root}>
-      {/* ─── MOBILE TOP HEADER (when on mobile/tablet < 768) ─── */}
-      {!isDesktop && (
-        <View style={styles.mobileHeader}>
-          <TouchableOpacity 
-            onPress={() => setMobileDrawerOpen(true)} 
-            style={styles.mobileMenuBtn}
-            accessibilityLabel="Open Navigation Menu"
-          >
-            <Ionicons name="menu" size={24} color={Colors.textPrimary} />
-          </TouchableOpacity>
-
-          <View style={styles.mobileBrand}>
-            <View style={styles.brandIconMini}>
-              <Text style={{ fontSize: 16 }}>🪙</Text>
-            </View>
-            <View>
-              <Text style={styles.mobileBrandTitle}>{Env.APP_NAME}</Text>
-              <Text style={styles.mobileBrandSub}>{Env.APP_SUBTITLE}</Text>
-            </View>
-          </View>
-
-          <View style={[styles.statusPill, isLive ? styles.statusPillLive : styles.statusPillDemo]}>
-            <View style={[styles.statusDot, { backgroundColor: isLive ? '#16a34a' : '#d97706' }]} />
-            <Text style={[styles.statusPillText, { color: isLive ? '#15803d' : '#92400e' }]}>
-              {isLive ? 'Live' : 'Demo'}
-            </Text>
-          </View>
-        </View>
-      )}
-
-      {/* ─── MAIN APP CONTAINER (Sidebar + Tabs Screens) ─── */}
+    <View style={[styles.root, { paddingTop: appTopPadding, paddingBottom: bottomInset }]}>
       <View style={styles.mainContainer}>
-        {/* ─── DESKTOP COLLAPSIBLE SIDEBAR ─── */}
+        {/* ─── DESKTOP COLLAPSIBLE SIDEBAR WITH SMOOTH ANIMATION ─── */}
         {isDesktop && (
-          <View style={[styles.desktopSidebar, collapsed ? styles.sidebarCollapsed : styles.sidebarExpanded]}>
-            {/* Sidebar Header / Brand */}
+          <Animated.View style={[styles.desktopSidebar, { width: sidebarWidthAnim }]}>
+            {/* Clean Sidebar Header */}
             <View style={[styles.sidebarHeader, collapsed && styles.sidebarHeaderCollapsed]}>
-              {!collapsed ? (
-                <View style={styles.brandRow}>
-                  <View style={styles.brandIcon}>
-                    <Text style={{ fontSize: 20 }}>🪙</Text>
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.brandTitle} numberOfLines={1}>{Env.APP_NAME}</Text>
-                    <Text style={styles.brandSub} numberOfLines={1}>{Env.APP_SUBTITLE}</Text>
-                  </View>
-                </View>
-              ) : (
-                <View style={[styles.brandIcon, { alignSelf: 'center' }]}>
+              <View style={styles.brandRow}>
+                <View style={styles.brandIcon}>
                   <Text style={{ fontSize: 20 }}>🪙</Text>
                 </View>
-              )}
-
-              {/* Open / Close Toggle Button */}
-              <TouchableOpacity 
-                onPress={() => setCollapsed(!collapsed)} 
-                style={[styles.collapseToggleBtn, collapsed && styles.collapseToggleBtnCollapsed]}
-                accessibilityLabel={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-              >
-                <Ionicons 
-                  name={collapsed ? "chevron-forward" : "chevron-back"} 
-                  size={18} 
-                  color={Colors.textSecondary} 
-                />
-              </TouchableOpacity>
-            </View>
-
-            {/* Live Sheets Status Tag (Expanded mode) */}
-            {!collapsed && (
-              <View style={styles.syncBanner}>
-                <View style={[styles.statusDot, { backgroundColor: isLive ? '#16a34a' : '#d97706' }]} />
-                <Text style={styles.syncBannerText}>
-                  {isLive ? 'Connected to Google Sheets' : 'Demo Offline Mode'}
-                </Text>
+                {!collapsed && (
+                  <Animated.View style={[styles.brandTextWrapper, { opacity: textOpacity }]}>
+                    <Text style={styles.brandTitle} numberOfLines={1}>{Env.APP_NAME}</Text>
+                    <Text style={styles.brandSub} numberOfLines={1}>{Env.APP_SUBTITLE}</Text>
+                  </Animated.View>
+                )}
               </View>
-            )}
+            </View>
 
             {/* Navigation Menu Links */}
             <ScrollView style={styles.navScroll} contentContainerStyle={styles.navContent}>
@@ -195,9 +213,12 @@ export default function TabLayout() {
                       color={active ? Colors.primaryDark : Colors.textSecondary}
                     />
                     {!collapsed && (
-                      <Text style={[styles.navText, active && styles.navTextActive]}>
+                      <Animated.Text 
+                        style={[styles.navText, active && styles.navTextActive, { opacity: textOpacity }]}
+                        numberOfLines={1}
+                      >
                         {item.title}
-                      </Text>
+                      </Animated.Text>
                     )}
                   </TouchableOpacity>
                 );
@@ -206,7 +227,7 @@ export default function TabLayout() {
 
             {/* Footer / Gold Rate Ticker */}
             {!collapsed ? (
-              <View style={styles.sidebarFooter}>
+              <Animated.View style={[styles.sidebarFooter, { opacity: textOpacity }]}>
                 {live22kRate ? (
                   <View style={styles.goldTickerCard}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
@@ -220,28 +241,34 @@ export default function TabLayout() {
                   onPress={() => setCollapsed(true)} 
                   style={styles.collapseFooterBtn}
                 >
-                  <Ionicons name="chevron-back-circle-outline" size={16} color={Colors.textMuted} />
-                  <Text style={styles.collapseFooterText}>Collapse Sidebar</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <Ionicons name="chevron-back" size={14} color={Colors.textMuted} />
+                    <Ionicons name="chevron-back" size={14} color={Colors.textMuted} style={{ marginLeft: -8 }} />
+                  </View>
+                  <Text style={styles.collapseFooterText}>{"Collapse (<<)"}</Text>
                 </TouchableOpacity>
-              </View>
+              </Animated.View>
             ) : (
               <TouchableOpacity 
                 onPress={() => setCollapsed(false)} 
                 style={styles.expandRailBtn}
                 accessibilityLabel="Expand sidebar"
               >
-                <Ionicons name="chevron-forward-circle-outline" size={20} color={Colors.primaryDark} />
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Ionicons name="chevron-forward" size={16} color={Colors.primaryDark} />
+                  <Ionicons name="chevron-forward" size={16} color={Colors.primaryDark} style={{ marginLeft: -8 }} />
+                </View>
               </TouchableOpacity>
             )}
-          </View>
+          </Animated.View>
         )}
 
-        {/* ─── TAB SCREENS CONTENT (Bottom bar permanently hidden) ─── */}
+        {/* ─── TAB SCREENS CONTENT (Full height, bottom bar permanently hidden) ─── */}
         <View style={styles.screensWrapper}>
           <Tabs
             screenOptions={{
               headerShown: false,
-              tabBarStyle: { display: 'none' }, // Remove bottom tab bar
+              tabBarStyle: { display: 'none' },
             }}
           >
             <Tabs.Screen name="index" options={{ title: 'Dashboard' }} />
@@ -254,42 +281,56 @@ export default function TabLayout() {
         </View>
       </View>
 
-      {/* ─── MOBILE SLIDE-IN DRAWER OVERLAY ─── */}
-      {!isDesktop && mobileDrawerOpen && (
+      {/* ─── MOBILE SLIDE-IN DRAWER OVERLAY WITH ACCURATE INSETS ─── */}
+      {!isDesktop && drawerRendered && (
         <View style={styles.mobileOverlay}>
-          {/* Backdrop (tap to close) */}
-          <TouchableOpacity 
-            style={styles.mobileBackdrop} 
-            activeOpacity={1} 
-            onPress={() => setMobileDrawerOpen(false)} 
-          />
+          {/* Animated Backdrop */}
+          <Animated.View style={[styles.mobileBackdrop, { opacity: backdropFadeAnim }]}>
+            <TouchableOpacity 
+              style={{ flex: 1 }} 
+              activeOpacity={1} 
+              onPress={() => setMobileDrawerOpen(false)} 
+            />
+          </Animated.View>
 
-          {/* Slide-in Drawer Container */}
-          <View style={[styles.mobileDrawer, { width: Math.min(300, width * 0.8) }]}>
+          {/* Animated Drawer Container */}
+          <Animated.View 
+            style={[
+              styles.mobileDrawer, 
+              { 
+                width: drawerWidth, 
+                paddingTop: statusBarHeight,
+                paddingBottom: Math.max(bottomInset, 16),
+                transform: [{ translateX: drawerSlideAnim }] 
+              }
+            ]}
+          >
+            {/* Header (Strictly bounded, never overflows) */}
             <View style={styles.mobileDrawerHeader}>
-              <View style={styles.brandRow}>
+              <View style={styles.drawerBrandGroup}>
                 <View style={styles.brandIcon}>
                   <Text style={{ fontSize: 20 }}>🪙</Text>
                 </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.brandTitle}>{Env.APP_NAME}</Text>
-                  <Text style={styles.brandSub}>{Env.APP_SUBTITLE}</Text>
+                <View style={styles.drawerBrandTexts}>
+                  <Text style={styles.brandTitle} numberOfLines={1} ellipsizeMode="tail">
+                    {Env.APP_NAME}
+                  </Text>
+                  <Text style={styles.brandSub} numberOfLines={1} ellipsizeMode="tail">
+                    {Env.APP_SUBTITLE}
+                  </Text>
                 </View>
               </View>
               <TouchableOpacity 
                 onPress={() => setMobileDrawerOpen(false)}
                 style={styles.drawerCloseBtn}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 accessibilityLabel="Close navigation"
               >
-                <Ionicons name="close" size={22} color={Colors.textSecondary} />
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Ionicons name="chevron-back" size={16} color={Colors.textSecondary} />
+                  <Ionicons name="chevron-back" size={16} color={Colors.textSecondary} style={{ marginLeft: -8 }} />
+                </View>
               </TouchableOpacity>
-            </View>
-
-            <View style={styles.mobileDrawerSync}>
-              <View style={[styles.statusDot, { backgroundColor: isLive ? '#16a34a' : '#d97706' }]} />
-              <Text style={styles.syncBannerText}>
-                {isLive ? 'Google Sheets Sync Active' : 'Offline / Demo Mode'}
-              </Text>
             </View>
 
             <ScrollView style={styles.navScroll} contentContainerStyle={styles.navContent}>
@@ -308,7 +349,7 @@ export default function TabLayout() {
                       size={22}
                       color={active ? Colors.primaryDark : Colors.textSecondary}
                     />
-                    <Text style={[styles.navText, active && styles.navTextActive, { fontSize: 14 }]}>
+                    <Text style={[styles.navText, active && styles.navTextActive, { fontSize: 14 }]} numberOfLines={1}>
                       {item.title}
                     </Text>
                   </TouchableOpacity>
@@ -321,16 +362,16 @@ export default function TabLayout() {
                 <View style={styles.goldTickerCard}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                     <Ionicons name="trending-up" size={14} color={Colors.primaryDark} />
-                    <Text style={styles.tickerTitle}>Bangalore 22K Gold</Text>
+                    <Text style={styles.tickerTitle}>{Env.LOCATION_BENCHMARK} 22K Gold</Text>
                   </View>
                   <Text style={styles.tickerRate}>₹{live22kRate.toLocaleString()} <Text style={styles.tickerUnit}>/g</Text></Text>
                 </View>
               </View>
             ) : null}
-          </View>
+          </Animated.View>
         </View>
       )}
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -348,66 +389,6 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background,
   },
 
-  // ─── MOBILE HEADER ───
-  mobileHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    backgroundColor: Colors.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-    zIndex: 10,
-  },
-  mobileMenuBtn: {
-    padding: 6,
-    borderRadius: 8,
-    backgroundColor: '#f1f5f9',
-  },
-  mobileBrand: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  brandIconMini: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: '#fef08a',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#facc15',
-  },
-  mobileBrandTitle: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: Colors.textPrimary,
-  },
-  mobileBrandSub: {
-    fontSize: 10,
-    color: Colors.textSecondary,
-  },
-  statusPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  statusPillLive: {
-    backgroundColor: '#dcfce7',
-  },
-  statusPillDemo: {
-    backgroundColor: '#fef3c7',
-  },
-  statusPillText: {
-    fontSize: 10,
-    fontWeight: '700',
-  },
-
   // ─── DESKTOP SIDEBAR ───
   desktopSidebar: {
     backgroundColor: Colors.surface,
@@ -415,32 +396,24 @@ const styles = StyleSheet.create({
     borderRightColor: Colors.border,
     height: '100%',
     flexDirection: 'column',
-  },
-  sidebarExpanded: {
-    width: 240,
-  },
-  sidebarCollapsed: {
-    width: 68,
+    overflow: 'hidden',
   },
   sidebarHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
     paddingHorizontal: 14,
-    paddingVertical: 16,
+    paddingVertical: 18,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
+    overflow: 'hidden',
   },
   sidebarHeaderCollapsed: {
     justifyContent: 'center',
     paddingHorizontal: 8,
-    position: 'relative',
   },
   brandRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    flex: 1,
+    overflow: 'hidden',
   },
   brandIcon: {
     width: 36,
@@ -451,6 +424,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: '#facc15',
+    flexShrink: 0,
+  },
+  brandTextWrapper: {
+    flex: 1,
+    overflow: 'hidden',
   },
   brandTitle: {
     fontSize: 14,
@@ -461,57 +439,13 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: Colors.textSecondary,
   },
-  collapseToggleBtn: {
-    padding: 6,
-    borderRadius: 6,
-    backgroundColor: '#f8fafc',
-    borderWidth: 1,
-    borderColor: Colors.border,
-    marginLeft: 6,
-  },
-  collapseToggleBtnCollapsed: {
-    position: 'absolute',
-    right: -12,
-    top: 20,
-    zIndex: 20,
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    width: 24,
-    height: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  syncBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: '#f8fafc',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-  },
-  syncBannerText: {
-    fontSize: 11,
-    color: Colors.textSecondary,
-    fontWeight: '500',
-  },
-  statusDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 4,
-  },
 
   // ─── NAV ITEMS ───
   navScroll: {
     flex: 1,
   },
   navContent: {
-    paddingVertical: 10,
+    paddingVertical: 12,
     paddingHorizontal: 8,
     gap: 4,
   },
@@ -523,6 +457,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 10,
     position: 'relative',
+    minHeight: 42,
   },
   navItemCollapsed: {
     justifyContent: 'center',
@@ -545,6 +480,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     color: Colors.textSecondary,
+    flex: 1,
   },
   navTextActive: {
     color: Colors.primaryDark,
@@ -558,6 +494,7 @@ const styles = StyleSheet.create({
     borderTopColor: Colors.border,
     backgroundColor: Colors.surface,
     gap: 8,
+    overflow: 'hidden',
   },
   goldTickerCard: {
     backgroundColor: '#fffdf5',
@@ -630,6 +567,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 10,
     elevation: 10,
+    overflow: 'hidden',
   },
   mobileDrawerHeader: {
     flexDirection: 'row',
@@ -640,20 +578,26 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
   },
-  drawerCloseBtn: {
-    padding: 6,
-    borderRadius: 8,
-    backgroundColor: '#f1f5f9',
-  },
-  mobileDrawerSync: {
+  drawerBrandGroup: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    backgroundColor: '#f8fafc',
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    gap: 10,
+    marginRight: 8,
+    minWidth: 0,
+  },
+  drawerBrandTexts: {
+    flex: 1,
+    minWidth: 0,
+    overflow: 'hidden',
+  },
+  drawerCloseBtn: {
+    flexShrink: 0,
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: '#f1f5f9',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   mobileDrawerFooter: {
     padding: 14,

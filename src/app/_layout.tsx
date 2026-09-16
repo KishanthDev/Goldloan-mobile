@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ApiConfig } from '../config/api';
 
 export default function RootLayout() {
@@ -9,7 +10,7 @@ export default function RootLayout() {
   }, []);
 
   return (
-    <>
+    <SafeAreaProvider>
       <StatusBar style="dark" />
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
@@ -38,6 +39,6 @@ export default function RootLayout() {
           options={{ presentation: 'modal', headerShown: false }} 
         />
       </Stack>
-    </>
+    </SafeAreaProvider>
   );
 }

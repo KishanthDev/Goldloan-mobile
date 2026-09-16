@@ -24,6 +24,7 @@ interface DataTableProps<T> {
   addButtonLabel?: string;
   title?: string;
   subtitle?: string;
+  headerLeft?: React.ReactNode;
 }
 
 export function DataTable<T>({
@@ -36,6 +37,7 @@ export function DataTable<T>({
   addButtonLabel = 'Add New',
   title,
   subtitle,
+  headerLeft,
 }: DataTableProps<T>) {
   const [search, setSearch] = useState('');
   const [pageSize, setPageSize] = useState(10);
@@ -92,11 +94,14 @@ export function DataTable<T>({
   return (
     <View style={styles.container}>
       {/* Top Header Row (Title & Add Button) */}
-      {(title || onAddPress) ? (
+      {(title || onAddPress || headerLeft) ? (
         <View style={styles.topHeader}>
-          <View style={styles.titleWrapper}>
-            {title ? <Text style={styles.sectionTitle}>{title}</Text> : null}
-            {subtitle ? <Text style={styles.sectionSub}>{subtitle}</Text> : null}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
+            {headerLeft}
+            <View style={styles.titleWrapper}>
+              {title ? <Text style={styles.sectionTitle} numberOfLines={1}>{title}</Text> : null}
+              {subtitle ? <Text style={styles.sectionSub} numberOfLines={1} ellipsizeMode="tail">{subtitle}</Text> : null}
+            </View>
           </View>
 
           {onAddPress ? (
@@ -276,6 +281,7 @@ const styles = StyleSheet.create({
   },
   titleWrapper: {
     flex: 1,
+    minWidth: 0,
     marginRight: 10,
   },
   sectionTitle: {

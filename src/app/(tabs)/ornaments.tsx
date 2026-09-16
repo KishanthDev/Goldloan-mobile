@@ -10,6 +10,7 @@ import { getDriveImageUrl, api } from '../../services/api';
 import { Env } from '../../config/env';
 import { Ornament } from '../../types';
 import { DataTable, Column } from '../../components/DataTable';
+import { SidebarTrigger } from '../../components/SidebarTrigger';
 import { Badge } from '../../components/Badge';
 import { Ionicons } from '@expo/vector-icons';
 import { ImagePickerField, FilePayload } from '../../components/ImagePickerField';
@@ -342,6 +343,7 @@ export default function OrnamentsScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[Colors.primary]} />}
       >
         <DataTable
+          headerLeft={<SidebarTrigger />}
           title="Gold Vault (Ornaments)"
           subtitle="Inventory of pledged, available, and released gold jewelry"
           addButtonLabel="Add Ornament"
@@ -761,7 +763,7 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 12,
-    paddingBottom: 28,
+    paddingBottom: 80,
   },
   idText: {
     fontSize: 12,

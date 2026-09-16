@@ -7,6 +7,7 @@ import { Colors } from '../../constants/theme';
 import { useAppStore } from '../../services/store';
 import { Loan, Payment } from '../../types';
 import { DataTable, Column } from '../../components/DataTable';
+import { SidebarTrigger } from '../../components/SidebarTrigger';
 import { Badge } from '../../components/Badge';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -328,6 +329,7 @@ export default function LoansScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[Colors.primary]} />}
       >
         <DataTable
+          headerLeft={<SidebarTrigger />}
           title="Gold Loans"
           subtitle="Originate and track active, closed, and overdue gold contracts"
           addButtonLabel="Add Loan"
@@ -811,7 +813,7 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 12,
-    paddingBottom: 28,
+    paddingBottom: 80,
   },
   idText: {
     fontSize: 11,
