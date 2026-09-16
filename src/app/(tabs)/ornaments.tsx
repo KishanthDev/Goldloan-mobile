@@ -7,6 +7,7 @@ import { Image } from 'expo-image';
 import { Colors } from '../../constants/theme';
 import { useAppStore } from '../../services/store';
 import { getDriveImageUrl, api } from '../../services/api';
+import { Env } from '../../config/env';
 import { Ornament } from '../../types';
 import { DataTable, Column } from '../../components/DataTable';
 import { Badge } from '../../components/Badge';
@@ -72,10 +73,10 @@ export default function OrnamentsScreen() {
 
   // On Purity Change: auto-set Current Price from live rates (onOrnamentPurityChange from index.html)
   const handlePuritySelect = (purity: string) => {
-    let rate = 8115;
-    if (purity === '24K') rate = store.goldRates?.gold24k?.rate1g || 8850;
-    else if (purity === '18K') rate = store.goldRates?.gold18k?.rate1g || 6640;
-    else rate = store.goldRates?.gold22k?.rate1g || 8115;
+    let rate = Env.FALLBACK_22K_RATE;
+    if (purity === '24K') rate = store.goldRates?.gold24k?.rate1g || Env.FALLBACK_24K_RATE;
+    else if (purity === '18K') rate = store.goldRates?.gold18k?.rate1g || Env.FALLBACK_18K_RATE;
+    else rate = store.goldRates?.gold22k?.rate1g || Env.FALLBACK_22K_RATE;
 
     setForm(p => ({
       ...p,
@@ -89,9 +90,9 @@ export default function OrnamentsScreen() {
     setIsEditing(false);
     setSelectedOrn(null);
     setFilesPayload([]);
-    // Default rate from Bangalore live rates in store if available
-    const live22k = store.goldRates?.gold22k?.rate1g || 8115;
-    const live24k = store.goldRates?.gold24k?.rate1g || 8850;
+    // Default rate from live benchmark rates in store if available
+    const live22k = store.goldRates?.gold22k?.rate1g || Env.FALLBACK_22K_RATE;
+    const live24k = store.goldRates?.gold24k?.rate1g || Env.FALLBACK_24K_RATE;
 
     setForm({
       UserId: store.users[0]?.UserId || '',

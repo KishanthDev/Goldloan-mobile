@@ -7,6 +7,7 @@ import { useRouter } from 'expo-router';
 import { Colors } from '../../constants/theme';
 import { useAppStore } from '../../services/store';
 import { ApiConfig } from '../../config/api';
+import { Env } from '../../config/env';
 import { Ionicons } from '@expo/vector-icons';
 
 export default function DashboardScreen() {
@@ -24,9 +25,9 @@ export default function DashboardScreen() {
   // Gold Valuation Calculations
   const totalGoldWeight = dash.totalGoldWeight || 0;
   const buyingGoldValue = Math.round(dash.totalBuyingGoldValue || 0);
-  const live22kRate = rates?.gold22k?.rate1g || 8115;
-  const live24kRate = rates?.gold24k?.rate1g || 8850;
-  const live18kRate = rates?.gold18k?.rate1g || 6640;
+  const live22kRate = rates?.gold22k?.rate1g || Env.FALLBACK_22K_RATE;
+  const live24kRate = rates?.gold24k?.rate1g || Env.FALLBACK_24K_RATE;
+  const live18kRate = rates?.gold18k?.rate1g || Env.FALLBACK_18K_RATE;
   const currentGoldValue = Math.round(totalGoldWeight * live22kRate);
   const appreciationGains = currentGoldValue - buyingGoldValue;
   const appreciationPct = buyingGoldValue > 0 ? ((appreciationGains / buyingGoldValue) * 100) : 0;
@@ -69,7 +70,7 @@ export default function DashboardScreen() {
               <View style={styles.goldBadgeIcon}>
                 <Ionicons name="trending-up" size={16} color={Colors.primaryDark} />
               </View>
-              <Text style={styles.cardSectionTitle}>Bangalore Live Gold Benchmark</Text>
+              <Text style={styles.cardSectionTitle}>{Env.LOCATION_BENCHMARK} Live Gold Benchmark</Text>
               <View style={styles.cityPill}>
                 <Text style={styles.cityPillText}>Live 24K/22K/18K</Text>
               </View>

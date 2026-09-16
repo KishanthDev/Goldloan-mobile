@@ -1,25 +1,20 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Env } from './env';
 
 /**
- * Global API & Backend Configuration
+ * Global API & Backend Configuration Manager
  * 
- * You can set your deployed Google Apps Script Web App URL in three ways:
- * 1. Directly in this file (GAS_WEB_APP_URL)
- * 2. In an .env file as: EXPO_PUBLIC_GAS_API_URL=https://script.google.com/macros/s/.../exec
- * 3. In the mobile app UI under the "Settings" tab!
+ * Precedence order for API URL:
+ * 1. Custom URL set at runtime via Settings screen (saved in AsyncStorage)
+ * 2. Environment variable in .env (EXPO_PUBLIC_GAS_API_URL)
+ * 3. Default fallback URL in src/config/env.ts
  */
 
 const STORAGE_KEY_API_URL = '@goldloan_custom_gas_url';
 const STORAGE_KEY_USE_MOCK = '@goldloan_use_mock';
 
-// If you deploy to Google Apps Script, paste your deployed Web App URL here:
-export const DEFAULT_GAS_WEB_APP_URL =
-  process.env.EXPO_PUBLIC_GAS_API_URL ||
-  "https://script.google.com/macros/s/AKfycbwddMXiZSOzm8ELoiX8PUpRzQJ3bXP8xtJyyN9_BLGESYDJJD_uR__yFDvVJkiAuwsg/exec";
-
-export const SPREADSHEET_ID =
-  process.env.EXPO_PUBLIC_SPREADSHEET_ID ||
-  "1q8JGANWFJ2NEcbW1ZOFOsUC4W5Ppci_cGXJf8nN-1kk";
+export const DEFAULT_GAS_WEB_APP_URL = Env.GAS_API_URL;
+export const SPREADSHEET_ID = Env.SPREADSHEET_ID;
 
 class ApiConfigManager {
   private customUrl: string | null = null;
@@ -48,6 +43,9 @@ class ApiConfigManager {
   }
 
   isMockMode(): boolean {
+    if (Env.FORCE_MOCK_MODE) {
+      return true;
+    }
     if (this.forceMock !== null) {
       return this.forceMock;
     }

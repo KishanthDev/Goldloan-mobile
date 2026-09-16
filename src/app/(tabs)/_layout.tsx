@@ -8,6 +8,7 @@ import { Colors } from '../../constants/theme';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppStore } from '../../services/store';
 import { ApiConfig } from '../../config/api';
+import { Env } from '../../config/env';
 
 interface NavItem {
   name: string;
@@ -111,8 +112,8 @@ export default function TabLayout() {
               <Text style={{ fontSize: 16 }}>🪙</Text>
             </View>
             <View>
-              <Text style={styles.mobileBrandTitle}>Gold Loan Tracker</Text>
-              <Text style={styles.mobileBrandSub}>Bangalore Gold System</Text>
+              <Text style={styles.mobileBrandTitle}>{Env.APP_NAME}</Text>
+              <Text style={styles.mobileBrandSub}>{Env.APP_SUBTITLE}</Text>
             </View>
           </View>
 
@@ -138,8 +139,8 @@ export default function TabLayout() {
                     <Text style={{ fontSize: 20 }}>🪙</Text>
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.brandTitle} numberOfLines={1}>Gold Loan Tracker</Text>
-                    <Text style={styles.brandSub} numberOfLines={1}>Bangalore Valuation</Text>
+                    <Text style={styles.brandTitle} numberOfLines={1}>{Env.APP_NAME}</Text>
+                    <Text style={styles.brandSub} numberOfLines={1}>{Env.APP_SUBTITLE}</Text>
                   </View>
                 </View>
               ) : (
@@ -210,7 +211,7 @@ export default function TabLayout() {
                   <View style={styles.goldTickerCard}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                       <Ionicons name="trending-up" size={14} color={Colors.primaryDark} />
-                      <Text style={styles.tickerTitle}>Bangalore 22K</Text>
+                      <Text style={styles.tickerTitle}>{Env.LOCATION_BENCHMARK} 22K</Text>
                     </View>
                     <Text style={styles.tickerRate}>₹{live22kRate.toLocaleString()} <Text style={styles.tickerUnit}>/g</Text></Text>
                   </View>
@@ -271,8 +272,8 @@ export default function TabLayout() {
                   <Text style={{ fontSize: 20 }}>🪙</Text>
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.brandTitle}>Gold Loan Tracker</Text>
-                  <Text style={styles.brandSub}>Bangalore Gold System</Text>
+                  <Text style={styles.brandTitle}>{Env.APP_NAME}</Text>
+                  <Text style={styles.brandSub}>{Env.APP_SUBTITLE}</Text>
                 </View>
               </View>
               <TouchableOpacity 
