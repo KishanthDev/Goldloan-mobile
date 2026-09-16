@@ -3,12 +3,16 @@ import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, 
   Modal, TextInput, Alert, SafeAreaView, Platform, RefreshControl 
 } from 'react-native';
+import { Image } from 'expo-image';
 import { Colors } from '../../constants/theme';
 import { useAppStore } from '../../services/store';
 import { BankAccount } from '../../types';
 import { DataTable, Column } from '../../components/DataTable';
 import { Badge } from '../../components/Badge';
 import { Ionicons } from '@expo/vector-icons';
+import { ImagePickerField, FilePayload } from '../../components/ImagePickerField';
+import { ImageViewModal } from '../../components/ImageViewModal';
+import { api, getDriveImageUrl } from '../../services/api';
 
 export default function BankAccountsScreen() {
   const store = useAppStore();
@@ -18,6 +22,8 @@ export default function BankAccountsScreen() {
   const [selectedAcc, setSelectedAcc] = useState<BankAccount | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [filesPayload, setFilesPayload] = useState<FilePayload[]>([]);
+  const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -38,6 +44,7 @@ export default function BankAccountsScreen() {
     UPI_ID: '',
     MaxLoanAmount: '500000',
     UtilizedLoanAmount: '0',
+    PassbookImage: '',
     Status: 'Active' as 'Active' | 'Inactive',
   });
 
@@ -48,6 +55,7 @@ export default function BankAccountsScreen() {
   const openAddModal = () => {
     setIsEditing(false);
     setSelectedAcc(null);
+    setFilesPayload([]);
     setForm({
       UserId: store.users[0]?.UserId || 'U001',
       AccountHolderName: store.users[0]?.FullName || '',
@@ -60,6 +68,7 @@ export default function BankAccountsScreen() {
       UPI_ID: '',
       MaxLoanAmount: '500000',
       UtilizedLoanAmount: '0',
+      PassbookImage: '',
       Status: 'Active',
     });
     setModalVisible(true);
@@ -68,6 +77,7 @@ export default function BankAccountsScreen() {
   const openEditModal = (acc: BankAccount) => {
     setIsEditing(true);
     setSelectedAcc(acc);
+    setFilesPayload([]);
     setForm({
       UserId: acc.UserId || '',
       AccountHolderName: acc.AccountHolderName || '',
@@ -80,6 +90,7 @@ export default function BankAccountsScreen() {
       UPI_ID: acc.UPI_ID || '',
       MaxLoanAmount: String(acc.MaxLoanAmount || 0),
       UtilizedLoanAmount: String(acc.UtilizedLoanAmount || 0),
+      PassbookImage: acc.PassbookImage || '',
       Status: acc.Status === 'Inactive' ? 'Inactive' : 'Active',
     });
     setModalVisible(true);
@@ -120,6 +131,7 @@ export default function BankAccountsScreen() {
         ...form,
         MaxLoanAmount: maxNum,
         UtilizedLoanAmount: utilNum,
+        files: filesPayload,
       });
       Alert.alert('Success', 'Bank account updated.');
     } else {
@@ -127,6 +139,7 @@ export default function BankAccountsScreen() {
         ...form,
         MaxLoanAmount: maxNum,
         UtilizedLoanAmount: utilNum,
+        files: filesPayload,
       });
       Alert.alert('Success', 'Bank account added.');
     }
@@ -157,8 +170,20 @@ export default function BankAccountsScreen() {
     {
       key: 'BankName',
       title: 'Bank',
-      width: 120,
-      render: (b) => <Text style={[styles.cellText, { fontWeight: '600' }]} numberOfLines={1}>{b.BankName}</Text>,
+      width: 140,
+      render: (b) => {
+        const directUrl = getDriveImageUrl(b.PassbookImage);
+        return (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            {b.PassbookImage ? (
+              <TouchableOpacity onPress={() => b.PassbookImage && setPreviewImageUrl(b.PassbookImage)}>
+                <Image source={{ uri: directUrl || b.PassbookImage }} style={{ width: 24, height: 24, borderRadius: 4, backgroundColor: '#e2e8f0' }} contentFit="cover" />
+              </TouchableOpacity>
+            ) : null}
+            <Text style={[styles.cellText, { fontWeight: '600', flex: 1 }]} numberOfLines={1}>{b.BankName}</Text>
+          </View>
+        );
+      },
     },
     {
       key: 'City',
@@ -433,6 +458,18 @@ export default function BankAccountsScreen() {
                   <Text style={styles.calcResultVal}>₹{availableCalc.toLocaleString()}</Text>
                 </View>
               </View>
+
+              {/* Passbook / Cheque Leaf Image */}
+              <ImagePickerField
+                type="card"
+                label="Passbook / Cheque Leaf Photo"
+                helperText="Upload photo of bank passbook or cancelled cheque"
+                value={form.PassbookImage}
+                onChange={(url, files) => {
+                  setForm(p => ({ ...p, PassbookImage: url }));
+                  setFilesPayload(files);
+                }}
+              />
             </ScrollView>
 
             <View style={styles.modalFooter}>
@@ -484,6 +521,25 @@ export default function BankAccountsScreen() {
                     Available: ₹{(selectedAcc.AvailableLoanAmount || Math.max(0, (selectedAcc.MaxLoanAmount || 0) - (selectedAcc.UtilizedLoanAmount || 0))).toLocaleString()}
                   </Text>
                 </View>
+
+                {selectedAcc.PassbookImage ? (
+                  <View style={styles.detailSection}>
+                    <Text style={styles.detailSecTitle}>Passbook / Cheque Leaf Document</Text>
+                    <TouchableOpacity
+                      onPress={() => selectedAcc.PassbookImage && setPreviewImageUrl(selectedAcc.PassbookImage)}
+                      style={{ borderRadius: 10, overflow: 'hidden', borderWidth: 1, borderColor: Colors.border, backgroundColor: '#f1f5f9', marginTop: 4 }}
+                    >
+                      <Image
+                        source={{ uri: getDriveImageUrl(selectedAcc.PassbookImage) }}
+                        style={{ width: '100%', height: 160 }}
+                        contentFit="cover"
+                      />
+                      <View style={{ backgroundColor: 'rgba(0,0,0,0.6)', padding: 6, alignItems: 'center' }}>
+                        <Text style={{ color: '#ffffff', fontSize: 11, fontWeight: '600' }}>Tap to view full image</Text>
+                      </View>
+                    </TouchableOpacity>
+                  </View>
+                ) : null}
               </ScrollView>
             ) : null}
 
@@ -495,6 +551,14 @@ export default function BankAccountsScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* FULL-SCREEN IMAGE PREVIEW */}
+      <ImageViewModal
+        visible={!!previewImageUrl}
+        imageUrl={previewImageUrl}
+        title="Passbook / Cheque Leaf Image"
+        onClose={() => setPreviewImageUrl(null)}
+      />
     </SafeAreaView>
   );
 }

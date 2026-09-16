@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { 
   View, Text, StyleSheet, ScrollView, RefreshControl, 
-  TouchableOpacity, SafeAreaView 
+  TouchableOpacity, SafeAreaView, useWindowDimensions 
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Colors } from '../../constants/theme';
@@ -12,15 +12,21 @@ import { Ionicons } from '@expo/vector-icons';
 export default function DashboardScreen() {
   const router = useRouter();
   const store = useAppStore();
+  const { width } = useWindowDimensions();
   const [refreshing, setRefreshing] = useState(false);
+
+  const isDesktop = width >= 1024;
+  const isTablet = width >= 640 && width < 1024;
 
   const dash = store.dashboardData;
   const rates = store.goldRates;
 
-  // Gold Valuation Calculations (exact logic from updateGoldValuationDashboardCards in index.html)
+  // Gold Valuation Calculations
   const totalGoldWeight = dash.totalGoldWeight || 0;
   const buyingGoldValue = Math.round(dash.totalBuyingGoldValue || 0);
   const live22kRate = rates?.gold22k?.rate1g || 8115;
+  const live24kRate = rates?.gold24k?.rate1g || 8850;
+  const live18kRate = rates?.gold18k?.rate1g || 6640;
   const currentGoldValue = Math.round(totalGoldWeight * live22kRate);
   const appreciationGains = currentGoldValue - buyingGoldValue;
   const appreciationPct = buyingGoldValue > 0 ? ((appreciationGains / buyingGoldValue) * 100) : 0;
@@ -32,25 +38,23 @@ export default function DashboardScreen() {
   };
 
   const isLive = !ApiConfig.isMockMode();
+  const utilPercent = dash.totalEligibleLoanAmount > 0 
+    ? Math.min(100, Math.round((dash.totalLoanAmount / dash.totalEligibleLoanAmount) * 100)) 
+    : 0;
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      {/* Top Brand Header */}
-      <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <View style={styles.brandIcon}>
-            <Text style={styles.brandEmoji}>🪙</Text>
-          </View>
-          <View>
-            <Text style={styles.brandTitle}>Gold Loan Tracker</Text>
-            <Text style={styles.brandSubtitle}>Bangalore Gold Valuation System</Text>
-          </View>
+      {/* ─── DASHBOARD TOP ACTION BAR ─── */}
+      <View style={styles.topBar}>
+        <View>
+          <Text style={styles.pageTitle}>Financial Overview</Text>
+          <Text style={styles.pageSubtitle}>Real-time portfolio valuation and gold vault status</Text>
         </View>
-        <View style={[styles.demoBadge, isLive && styles.liveBadge]}>
-          <Text style={[styles.demoBadgeText, isLive && styles.liveBadgeText]}>
-            {isLive ? 'Live Sheets' : 'Demo Active'}
-          </Text>
-        </View>
+
+        <TouchableOpacity onPress={onRefresh} style={styles.refreshActionBtn} activeOpacity={0.7}>
+          <Ionicons name="refresh" size={16} color={Colors.primaryDark} />
+          <Text style={styles.refreshActionText}>Sync Rates & Data</Text>
+        </TouchableOpacity>
       </View>
 
       <ScrollView 
@@ -58,187 +62,283 @@ export default function DashboardScreen() {
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[Colors.primary]} />}
       >
-        {/* LIVE GOLD RATES CARD (GOODRETURNS BANGALORE) */}
-        <View style={styles.goldCard}>
-          <View style={styles.goldCardHeader}>
-            <View style={styles.goldTitleRow}>
-              <Ionicons name="trending-up" size={18} color={Colors.primaryDark} />
-              <Text style={styles.goldCardTitle}>Live Gold Rates</Text>
-              <View style={styles.cityBadge}>
-                <Text style={styles.cityBadgeText}>Bangalore</Text>
+        {/* ─── SECTION 1: LIVE GOLD RATES (BANGALORE MARKET) ─── */}
+        <View style={styles.goldRatesCard}>
+          <View style={styles.cardHeaderRow}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <View style={styles.goldBadgeIcon}>
+                <Ionicons name="trending-up" size={16} color={Colors.primaryDark} />
+              </View>
+              <Text style={styles.cardSectionTitle}>Bangalore Live Gold Benchmark</Text>
+              <View style={styles.cityPill}>
+                <Text style={styles.cityPillText}>Live 24K/22K/18K</Text>
               </View>
             </View>
-            <TouchableOpacity onPress={onRefresh} style={styles.refreshBtn}>
-              <Ionicons name="refresh" size={14} color={Colors.textSecondary} />
-              <Text style={styles.refreshText}>{rates.displayDate}</Text>
-            </TouchableOpacity>
+            <Text style={styles.dateLabel}>{rates?.displayDate || 'Updated Today'}</Text>
           </View>
 
-          {/* 3 side-by-side Gold Rate Cards */}
-          <View style={styles.ratesGrid}>
-            {/* 24K */}
+          {/* 3-Column Rates Grid */}
+          <View style={styles.ratesGridRow}>
+            {/* 24K Pure Gold */}
             <View style={styles.rateBox}>
               <View style={styles.rateBoxHeader}>
-                <Text style={styles.rateKarat}>24K Gold</Text>
+                <Text style={styles.rateKarat}>24K Pure (999)</Text>
                 <View style={[styles.miniBadge, { backgroundColor: '#fef08a' }]}>
                   <Text style={[styles.miniBadgeText, { color: '#854d0e' }]}>99.9%</Text>
                 </View>
               </View>
-              <Text style={styles.rateAmount}>₹{rates.gold24k.rate1g.toLocaleString()}</Text>
-              <Text style={styles.rateUnit}>per gram</Text>
-              <View style={styles.changeBadge}>
-                <Ionicons name="arrow-up" size={11} color={Colors.success} />
-                <Text style={styles.changeText}>+₹{rates.gold24k.change}</Text>
+              <Text style={styles.rateAmount}>₹{live24kRate.toLocaleString()}</Text>
+              <Text style={styles.rateUnit}>per 1g</Text>
+              <View style={styles.sovereignBox}>
+                <Text style={styles.sovereignText}>8g: ₹{(live24kRate * 8).toLocaleString()}</Text>
               </View>
             </View>
 
-            {/* 22K (Featured Jewelry) */}
+            {/* 22K Jewelry Standard (Featured) */}
             <View style={[styles.rateBox, styles.rateBoxFeatured]}>
               <View style={styles.rateBoxHeader}>
-                <Text style={[styles.rateKarat, { color: Colors.primaryDark }]}>22K Standard</Text>
+                <Text style={[styles.rateKarat, { color: Colors.primaryDark }]}>22K Standard (916)</Text>
                 <View style={[styles.miniBadge, { backgroundColor: Colors.primaryDark }]}>
-                  <Text style={[styles.miniBadgeText, { color: '#ffffff' }]}>91.6%</Text>
+                  <Text style={[styles.miniBadgeText, { color: '#ffffff' }]}>Primary</Text>
                 </View>
               </View>
-              <Text style={[styles.rateAmount, styles.rateAmountFeatured]}>₹{rates.gold22k.rate1g.toLocaleString()}</Text>
-              <Text style={styles.rateUnit}>per gram</Text>
-              <View style={styles.changeBadge}>
-                <Ionicons name="arrow-up" size={11} color={Colors.success} />
-                <Text style={styles.changeText}>+₹{rates.gold22k.change}</Text>
+              <Text style={[styles.rateAmount, styles.rateAmountFeatured]}>₹{live22kRate.toLocaleString()}</Text>
+              <Text style={styles.rateUnit}>per 1g</Text>
+              <View style={[styles.sovereignBox, { backgroundColor: '#fef3c7' }]}>
+                <Text style={[styles.sovereignText, { color: '#92400e', fontWeight: '700' }]}>
+                  8g Sovereign: ₹{(live22kRate * 8).toLocaleString()}
+                </Text>
               </View>
             </View>
 
-            {/* 18K */}
+            {/* 18K Hallmarked */}
             <View style={styles.rateBox}>
               <View style={styles.rateBoxHeader}>
-                <Text style={styles.rateKarat}>18K Gold</Text>
+                <Text style={styles.rateKarat}>18K Gold (750)</Text>
                 <View style={[styles.miniBadge, { backgroundColor: '#fed7aa' }]}>
                   <Text style={[styles.miniBadgeText, { color: '#9a3412' }]}>75.0%</Text>
                 </View>
               </View>
-              <Text style={styles.rateAmount}>₹{rates.gold18k.rate1g.toLocaleString()}</Text>
-              <Text style={styles.rateUnit}>per gram</Text>
-              <View style={styles.changeBadge}>
-                <Ionicons name="arrow-up" size={11} color={Colors.success} />
-                <Text style={styles.changeText}>+₹{rates.gold18k.change}</Text>
+              <Text style={styles.rateAmount}>₹{live18kRate.toLocaleString()}</Text>
+              <Text style={styles.rateUnit}>per 1g</Text>
+              <View style={styles.sovereignBox}>
+                <Text style={styles.sovereignText}>8g: ₹{(live18kRate * 8).toLocaleString()}</Text>
               </View>
             </View>
           </View>
         </View>
 
-        {/* 3 GOLD VALUATION CARDS (Current Value, Buying Value, Appreciation Gains) */}
+        {/* ─── SECTION 2: GOLD VAULT VALUATION (3-COLUMN GRID) ─── */}
         <Text style={styles.sectionHeading}>Gold Vault Valuation</Text>
-        <View style={styles.valGrid}>
-          {/* Current Market Value */}
-          <View style={styles.valCard}>
+        <View style={[styles.valGrid, (isDesktop || isTablet) && styles.valGridRow]}>
+          {/* 1. Current Market Value */}
+          <View style={[styles.valCard, (isDesktop || isTablet) && { flex: 1 }]}>
             <View style={styles.valCardTop}>
               <Text style={styles.valTitle}>Current Market Value</Text>
-              <Ionicons name="diamond-outline" size={18} color={Colors.primaryDark} />
+              <View style={[styles.valIconBox, { backgroundColor: '#fef3c7' }]}>
+                <Ionicons name="diamond" size={18} color="#b45309" />
+              </View>
             </View>
             <Text style={styles.valAmount}>₹{currentGoldValue.toLocaleString()}</Text>
-            <Text style={styles.valSub}>{totalGoldWeight.toFixed(2)}g @ ₹{live22kRate}/g (22K)</Text>
+            <View style={styles.valBadge}>
+              <Text style={styles.valBadgeText}>
+                {totalGoldWeight.toFixed(2)}g net wt @ ₹{live22kRate}/g
+              </Text>
+            </View>
           </View>
 
-          {/* Buying Cost Value */}
-          <View style={styles.valCard}>
+          {/* 2. Total Buying Cost */}
+          <View style={[styles.valCard, (isDesktop || isTablet) && { flex: 1 }]}>
             <View style={styles.valCardTop}>
-              <Text style={styles.valTitle}>Total Buying Cost</Text>
-              <Ionicons name="wallet-outline" size={18} color="#475569" />
+              <Text style={styles.valTitle}>Total Acquisition Cost</Text>
+              <View style={[styles.valIconBox, { backgroundColor: '#e2e8f0' }]}>
+                <Ionicons name="wallet" size={18} color="#475569" />
+              </View>
             </View>
             <Text style={styles.valAmount}>₹{buyingGoldValue.toLocaleString()}</Text>
-            <Text style={styles.valSub}>Total cost paid at time of purchase</Text>
+            <View style={[styles.valBadge, { backgroundColor: '#f1f5f9' }]}>
+              <Text style={[styles.valBadgeText, { color: '#64748b' }]}>
+                Historical purchase benchmark
+              </Text>
+            </View>
           </View>
 
-          {/* Appreciation Gains */}
-          <View style={[styles.valCard, styles.valCardSuccess]}>
+          {/* 3. Appreciation Gains */}
+          <View style={[styles.valCard, styles.valCardSuccess, (isDesktop || isTablet) && { flex: 1 }]}>
             <View style={styles.valCardTop}>
               <Text style={[styles.valTitle, { color: '#15803d' }]}>Appreciation Gains</Text>
-              <Ionicons name="trending-up-outline" size={18} color="#15803d" />
+              <View style={[styles.valIconBox, { backgroundColor: '#dcfce7' }]}>
+                <Ionicons name="trending-up" size={18} color="#16a34a" />
+              </View>
             </View>
             <Text style={[styles.valAmount, { color: '#15803d' }]}>
               +{appreciationGains >= 0 ? '' : '-'}₹{Math.abs(appreciationGains).toLocaleString()}
             </Text>
-            <Text style={[styles.valSub, { color: '#16a34a', fontWeight: '600' }]}>
-              +{appreciationPct.toFixed(1)}% total portfolio gain
-            </Text>
+            <View style={[styles.valBadge, { backgroundColor: '#dcfce7' }]}>
+              <Text style={[styles.valBadgeText, { color: '#15803d', fontWeight: '700' }]}>
+                +{appreciationPct.toFixed(1)}% portfolio growth
+              </Text>
+            </View>
           </View>
         </View>
 
-        {/* OPERATIONAL METRICS (Customers, Banks, Active Loans, Pledged Ornaments) */}
+        {/* ─── SECTION 3: OPERATIONAL PORTFOLIO (4-COLUMN GRID ON DESKTOP) ─── */}
         <Text style={styles.sectionHeading}>Operational Portfolio</Text>
-        <View style={styles.metricsGrid}>
+        <View style={[styles.metricsGrid, isDesktop && styles.metricsGridDesktop]}>
           {/* Customers */}
           <TouchableOpacity 
-            style={styles.metricCard} 
+            style={[styles.metricCard, isDesktop && styles.metricCardDesktop]} 
             onPress={() => router.push('/(tabs)/users' as any)}
             activeOpacity={0.7}
           >
-            <View style={styles.metricIconBox}>
-              <Ionicons name="people" size={20} color={Colors.primaryDark} />
+            <View style={styles.metricTop}>
+              <View style={styles.metricIconBox}>
+                <Ionicons name="people" size={20} color={Colors.primaryDark} />
+              </View>
+              <Ionicons name="chevron-forward" size={16} color={Colors.textMuted} />
             </View>
             <Text style={styles.metricVal}>{dash.totalUsers}</Text>
-            <Text style={styles.metricLabel}>Customers</Text>
+            <Text style={styles.metricLabel}>Active Customers</Text>
+            <Text style={styles.metricHint}>Registered borrowers</Text>
           </TouchableOpacity>
 
-          {/* Banks */}
+          {/* Bank Accounts */}
           <TouchableOpacity 
-            style={styles.metricCard} 
+            style={[styles.metricCard, isDesktop && styles.metricCardDesktop]} 
             onPress={() => router.push('/(tabs)/bank-accounts' as any)}
             activeOpacity={0.7}
           >
-            <View style={[styles.metricIconBox, { backgroundColor: '#e0f2fe' }]}>
-              <Ionicons name="business" size={20} color="#0284c7" />
+            <View style={styles.metricTop}>
+              <View style={[styles.metricIconBox, { backgroundColor: '#e0f2fe' }]}>
+                <Ionicons name="business" size={20} color="#0284c7" />
+              </View>
+              <Ionicons name="chevron-forward" size={16} color={Colors.textMuted} />
             </View>
             <Text style={styles.metricVal}>{dash.totalBankAccounts}</Text>
             <Text style={styles.metricLabel}>Bank Accounts</Text>
+            <Text style={styles.metricHint}>Linked disbursement banks</Text>
           </TouchableOpacity>
 
           {/* Active Loans */}
           <TouchableOpacity 
-            style={styles.metricCard} 
+            style={[styles.metricCard, isDesktop && styles.metricCardDesktop]} 
             onPress={() => router.push('/(tabs)/loans' as any)}
             activeOpacity={0.7}
           >
-            <View style={[styles.metricIconBox, { backgroundColor: '#fef3c7' }]}>
-              <Ionicons name="cash" size={20} color="#b45309" />
+            <View style={styles.metricTop}>
+              <View style={[styles.metricIconBox, { backgroundColor: '#fef3c7' }]}>
+                <Ionicons name="cash" size={20} color="#b45309" />
+              </View>
+              <Ionicons name="chevron-forward" size={16} color={Colors.textMuted} />
             </View>
             <Text style={styles.metricVal}>₹{(dash.totalLoanAmount / 1000).toFixed(0)}k</Text>
             <Text style={styles.metricLabel}>{dash.activeLoans} Active Loans</Text>
+            <Text style={styles.metricHint}>Total disbursed capital</Text>
           </TouchableOpacity>
 
-          {/* Pledged Gold */}
+          {/* Pledged Ornaments */}
           <TouchableOpacity 
-            style={styles.metricCard} 
+            style={[styles.metricCard, isDesktop && styles.metricCardDesktop]} 
             onPress={() => router.push('/(tabs)/ornaments' as any)}
             activeOpacity={0.7}
           >
-            <View style={[styles.metricIconBox, { backgroundColor: '#dcfce7' }]}>
-              <Ionicons name="shield-checkmark" size={20} color="#16a34a" />
+            <View style={styles.metricTop}>
+              <View style={[styles.metricIconBox, { backgroundColor: '#dcfce7' }]}>
+                <Ionicons name="shield-checkmark" size={20} color="#16a34a" />
+              </View>
+              <Ionicons name="chevron-forward" size={16} color={Colors.textMuted} />
             </View>
             <Text style={styles.metricVal}>{dash.pledgedGrams.toFixed(1)}g</Text>
             <Text style={styles.metricLabel}>{dash.pledgedOrnamentsCount} Pledged Items</Text>
+            <Text style={styles.metricHint}>Secured in bank vault</Text>
           </TouchableOpacity>
         </View>
 
-        {/* Bank Utilization Progress */}
+        {/* ─── SECTION 4: BANK LIMIT UTILIZATION ─── */}
         <View style={styles.bankUtilCard}>
           <View style={styles.bankUtilHeader}>
-            <Text style={styles.bankUtilTitle}>Bank Loan Limit Utilization</Text>
-            <Text style={styles.bankUtilNums}>
-              ₹{dash.totalLoanAmount.toLocaleString()} / ₹{dash.totalEligibleLoanAmount.toLocaleString()}
+            <View>
+              <Text style={styles.bankUtilTitle}>Bank Loan Limit Utilization</Text>
+              <Text style={styles.bankUtilSubText}>Overall credit line exposure across banks</Text>
+            </View>
+            <View style={styles.utilPill}>
+              <Text style={styles.utilPillText}>{utilPercent}% Utilized</Text>
+            </View>
+          </View>
+
+          <View style={styles.utilAmountsRow}>
+            <View>
+              <Text style={styles.utilAmountLabel}>Total Disbursed</Text>
+              <Text style={styles.utilAmountVal}>₹{dash.totalLoanAmount.toLocaleString()}</Text>
+            </View>
+            <View style={{ alignItems: 'flex-end' }}>
+              <Text style={styles.utilAmountLabel}>Eligible Limit</Text>
+              <Text style={styles.utilAmountVal}>₹{dash.totalEligibleLoanAmount.toLocaleString()}</Text>
+            </View>
+          </View>
+
+          <View style={styles.barBg}>
+            <View style={[styles.barFill, { width: `${utilPercent}%` }]} />
+          </View>
+
+          <View style={styles.utilFooter}>
+            <Ionicons name="checkmark-circle" size={16} color={Colors.success} />
+            <Text style={styles.bankUtilSub}>
+              Available credit headroom for new loans: <Text style={{ color: Colors.success, fontWeight: '700' }}>₹{dash.totalAvailableLoanAmount.toLocaleString()}</Text>
             </Text>
           </View>
-          <View style={styles.barBg}>
-            <View 
-              style={[
-                styles.barFill, 
-                { width: `${dash.totalEligibleLoanAmount > 0 ? Math.min(100, (dash.totalLoanAmount / dash.totalEligibleLoanAmount) * 100) : 0}%` }
-              ]} 
-            />
-          </View>
-          <Text style={styles.bankUtilSub}>
-            Available headroom for new loans: <Text style={{ color: Colors.success, fontWeight: '700' }}>₹{dash.totalAvailableLoanAmount.toLocaleString()}</Text>
-          </Text>
+        </View>
+
+        {/* ─── SECTION 5: QUICK ACTIONS GRID ─── */}
+        <Text style={styles.sectionHeading}>Quick Actions</Text>
+        <View style={[styles.quickActionsGrid, (isDesktop || isTablet) && styles.quickActionsGridWide]}>
+          <TouchableOpacity 
+            style={styles.actionCard} 
+            onPress={() => router.push('/(tabs)/loans' as any)}
+            activeOpacity={0.7}
+          >
+            <View style={[styles.actionIconBox, { backgroundColor: '#fef3c7' }]}>
+              <Ionicons name="add-circle" size={20} color="#b45309" />
+            </View>
+            <Text style={styles.actionTitle}>New Loan</Text>
+            <Text style={styles.actionSub}>Create disbursement</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={styles.actionCard} 
+            onPress={() => router.push('/(tabs)/users' as any)}
+            activeOpacity={0.7}
+          >
+            <View style={[styles.actionIconBox, { backgroundColor: '#e0f2fe' }]}>
+              <Ionicons name="person-add" size={20} color="#0284c7" />
+            </View>
+            <Text style={styles.actionTitle}>Add Customer</Text>
+            <Text style={styles.actionSub}>Register KYC profile</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={styles.actionCard} 
+            onPress={() => router.push('/(tabs)/ornaments' as any)}
+            activeOpacity={0.7}
+          >
+            <View style={[styles.actionIconBox, { backgroundColor: '#fef9c3' }]}>
+              <Ionicons name="diamond" size={20} color="#854d0e" />
+            </View>
+            <Text style={styles.actionTitle}>Pledge Gold</Text>
+            <Text style={styles.actionSub}>Deposit vault item</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={styles.actionCard} 
+            onPress={() => router.push('/(tabs)/closure' as any)}
+            activeOpacity={0.7}
+          >
+            <View style={[styles.actionIconBox, { backgroundColor: '#dcfce7' }]}>
+              <Ionicons name="receipt" size={20} color="#16a34a" />
+            </View>
+            <Text style={styles.actionTitle}>Repayment</Text>
+            <Text style={styles.actionSub}>Record settlement</Text>
+          </TouchableOpacity>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -248,139 +348,120 @@ export default function DashboardScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: Colors.surface,
+    backgroundColor: Colors.background,
   },
-  header: {
+  topBar: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    backgroundColor: Colors.surface,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
-    backgroundColor: Colors.surface,
   },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  brandIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#fef08a',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#facc15',
-  },
-  brandEmoji: {
+  pageTitle: {
     fontSize: 18,
-  },
-  brandTitle: {
-    fontSize: 16,
     fontWeight: '800',
     color: Colors.textPrimary,
   },
-  brandSubtitle: {
-    fontSize: 11,
+  pageSubtitle: {
+    fontSize: 12,
     color: Colors.textSecondary,
+    marginTop: 2,
   },
-  demoBadge: {
-    backgroundColor: '#fef3c7',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
+  refreshActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 8,
+    backgroundColor: Colors.primarySubtle,
     borderWidth: 1,
     borderColor: '#fde68a',
   },
-  demoBadgeText: {
-    fontSize: 10,
+  refreshActionText: {
+    fontSize: 12,
     fontWeight: '700',
-    color: '#92400e',
-  },
-  liveBadge: {
-    backgroundColor: '#dcfce7',
-    borderColor: '#86efac',
-  },
-  liveBadgeText: {
-    color: '#166534',
+    color: Colors.primaryDark,
   },
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
   },
   content: {
-    padding: 16,
+    padding: 20,
     paddingBottom: 40,
+    maxWidth: 1400,
+    alignSelf: 'center',
+    width: '100%',
   },
-  goldCard: {
-    backgroundColor: '#ffffff',
+
+  // ─── RATES CARD ───
+  goldRatesCard: {
+    backgroundColor: Colors.surface,
     borderRadius: 16,
-    padding: 14,
+    padding: 16,
     borderWidth: 1,
     borderColor: Colors.border,
     marginBottom: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
-    shadowRadius: 3,
+    shadowRadius: 4,
     elevation: 2,
   },
-  goldCardHeader: {
+  cardHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 14,
   },
-  goldTitleRow: {
-    flexDirection: 'row',
+  goldBadgeIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#fef08a',
     alignItems: 'center',
-    gap: 6,
+    justifyContent: 'center',
   },
-  goldCardTitle: {
+  cardSectionTitle: {
     fontSize: 14,
-    fontWeight: '700',
+    fontWeight: '800',
     color: Colors.textPrimary,
   },
-  cityBadge: {
+  cityPill: {
     backgroundColor: '#fef08a',
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 6,
   },
-  cityBadgeText: {
+  cityPillText: {
     fontSize: 10,
     fontWeight: '700',
     color: '#854d0e',
   },
-  refreshBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  refreshText: {
+  dateLabel: {
     fontSize: 11,
-    color: Colors.textSecondary,
+    color: Colors.textMuted,
   },
-  ratesGrid: {
+  ratesGridRow: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 10,
   },
   rateBox: {
     flex: 1,
     backgroundColor: '#f8fafc',
     borderRadius: 12,
-    padding: 10,
+    padding: 12,
     borderWidth: 1,
     borderColor: Colors.border,
     alignItems: 'center',
   },
   rateBoxFeatured: {
     backgroundColor: '#fffdf5',
-    borderColor: Colors.primary,
-    elevation: 1,
+    borderColor: '#facc15',
+    borderWidth: 1.5,
   },
   rateBoxHeader: {
     flexDirection: 'row',
@@ -394,59 +475,70 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
   },
   miniBadge: {
-    paddingHorizontal: 4,
+    paddingHorizontal: 5,
     paddingVertical: 1,
     borderRadius: 4,
   },
   miniBadgeText: {
     fontSize: 9,
-    fontWeight: '700',
+    fontWeight: '800',
   },
   rateAmount: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '800',
     color: Colors.textPrimary,
   },
   rateAmountFeatured: {
     color: Colors.primaryDark,
+    fontSize: 20,
   },
   rateUnit: {
     fontSize: 10,
     color: Colors.textMuted,
+    marginTop: 1,
   },
-  changeBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 2,
-    backgroundColor: '#dcfce7',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 10,
-    marginTop: 6,
+  sovereignBox: {
+    marginTop: 8,
+    backgroundColor: '#f1f5f9',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
   },
-  changeText: {
+  sovereignText: {
     fontSize: 10,
-    fontWeight: '700',
-    color: Colors.success,
+    fontWeight: '600',
+    color: Colors.textSecondary,
   },
+
+  // ─── HEADINGS ───
   sectionHeading: {
     fontSize: 13,
     fontWeight: '800',
     color: Colors.textSecondary,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
-    marginBottom: 10,
+    marginBottom: 12,
+    marginTop: 4,
   },
+
+  // ─── VALUATION GRID ───
   valGrid: {
-    gap: 10,
-    marginBottom: 20,
+    gap: 12,
+    marginBottom: 24,
+  },
+  valGridRow: {
+    flexDirection: 'row',
   },
   valCard: {
-    backgroundColor: '#ffffff',
+    backgroundColor: Colors.surface,
     borderRadius: 14,
-    padding: 14,
+    padding: 16,
     borderWidth: 1,
     borderColor: Colors.border,
+    shadowColor: '#000',
+    shadowOpacity: 0.03,
+    shadowRadius: 3,
+    elevation: 1,
   },
   valCardSuccess: {
     backgroundColor: '#f0fdf4',
@@ -456,38 +548,68 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 4,
+    marginBottom: 6,
   },
   valTitle: {
     fontSize: 12,
     fontWeight: '700',
     color: Colors.textSecondary,
     textTransform: 'uppercase',
+    letterSpacing: 0.3,
+  },
+  valIconBox: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   valAmount: {
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: '800',
     color: Colors.textPrimary,
-    marginBottom: 2,
+    marginBottom: 8,
   },
-  valSub: {
+  valBadge: {
+    backgroundColor: '#fef3c7',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    alignSelf: 'flex-start',
+  },
+  valBadgeText: {
     fontSize: 11,
-    color: Colors.textMuted,
+    fontWeight: '600',
+    color: '#92400e',
   },
+
+  // ─── METRICS GRID ───
   metricsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 10,
-    marginBottom: 16,
+    gap: 12,
+    marginBottom: 24,
+  },
+  metricsGridDesktop: {
+    flexWrap: 'nowrap',
   },
   metricCard: {
     flex: 1,
-    minWidth: '45%',
-    backgroundColor: '#ffffff',
+    minWidth: '46%',
+    backgroundColor: Colors.surface,
     borderRadius: 14,
-    padding: 14,
+    padding: 16,
     borderWidth: 1,
     borderColor: Colors.border,
+  },
+  metricCardDesktop: {
+    minWidth: 0,
+  },
+  metricTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
   },
   metricIconBox: {
     width: 36,
@@ -496,54 +618,131 @@ const styles = StyleSheet.create({
     backgroundColor: '#fef08a',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 8,
   },
   metricVal: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: '800',
     color: Colors.textPrimary,
   },
   metricLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: Colors.textPrimary,
+    marginTop: 3,
+  },
+  metricHint: {
     fontSize: 11,
-    color: Colors.textSecondary,
+    color: Colors.textMuted,
     marginTop: 2,
   },
+
+  // ─── BANK UTILIZATION ───
   bankUtilCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 14,
-    padding: 14,
+    backgroundColor: Colors.surface,
+    borderRadius: 16,
+    padding: 18,
     borderWidth: 1,
     borderColor: Colors.border,
+    marginBottom: 24,
   },
   bankUtilHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 8,
+    alignItems: 'flex-start',
+    marginBottom: 12,
   },
   bankUtilTitle: {
-    fontSize: 13,
-    fontWeight: '700',
+    fontSize: 14,
+    fontWeight: '800',
     color: Colors.textPrimary,
   },
-  bankUtilNums: {
-    fontSize: 12,
-    fontWeight: '600',
+  bankUtilSubText: {
+    fontSize: 11,
     color: Colors.textSecondary,
+    marginTop: 2,
+  },
+  utilPill: {
+    backgroundColor: '#e0f2fe',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  utilPillText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#0284c7',
+  },
+  utilAmountsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  utilAmountLabel: {
+    fontSize: 11,
+    color: Colors.textMuted,
+  },
+  utilAmountVal: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: Colors.textPrimary,
+    marginTop: 2,
   },
   barBg: {
-    height: 8,
+    height: 10,
     backgroundColor: '#f1f5f9',
-    borderRadius: 4,
+    borderRadius: 5,
     overflow: 'hidden',
-    marginBottom: 8,
+    marginBottom: 10,
   },
   barFill: {
     height: '100%',
     backgroundColor: Colors.primaryDark,
-    borderRadius: 4,
+    borderRadius: 5,
+  },
+  utilFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   bankUtilSub: {
+    fontSize: 12,
+    color: Colors.textSecondary,
+  },
+
+  // ─── QUICK ACTIONS GRID ───
+  quickActionsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  quickActionsGridWide: {
+    flexWrap: 'nowrap',
+  },
+  actionCard: {
+    flex: 1,
+    minWidth: '46%',
+    backgroundColor: Colors.surface,
+    borderRadius: 14,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  actionIconBox: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  actionTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: Colors.textPrimary,
+  },
+  actionSub: {
     fontSize: 11,
     color: Colors.textMuted,
+    marginTop: 2,
   },
 });

@@ -3,12 +3,16 @@ import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, 
   Modal, TextInput, Alert, SafeAreaView, Platform, RefreshControl 
 } from 'react-native';
+import { Image } from 'expo-image';
 import { Colors } from '../../constants/theme';
 import { useAppStore } from '../../services/store';
 import { User } from '../../types';
 import { DataTable, Column } from '../../components/DataTable';
 import { Badge } from '../../components/Badge';
 import { Ionicons } from '@expo/vector-icons';
+import { ImagePickerField, FilePayload } from '../../components/ImagePickerField';
+import { ImageViewModal } from '../../components/ImageViewModal';
+import { api, getDriveImageUrl } from '../../services/api';
 
 export default function UsersScreen() {
   const store = useAppStore();
@@ -19,6 +23,8 @@ export default function UsersScreen() {
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [filesPayload, setFilesPayload] = useState<FilePayload[]>([]);
+  const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -44,12 +50,14 @@ export default function UsersScreen() {
     City: 'Bengaluru',
     State: 'Karnataka',
     Pincode: '560001',
+    CustomerPhoto: '',
     Status: 'Active' as 'Active' | 'Inactive',
   });
 
   const openAddModal = () => {
     setIsEditing(false);
     setSelectedUser(null);
+    setFilesPayload([]);
     setForm({
       FullName: '',
       FatherHusbandName: '',
@@ -67,6 +75,7 @@ export default function UsersScreen() {
       City: 'Bengaluru',
       State: 'Karnataka',
       Pincode: '560001',
+      CustomerPhoto: '',
       Status: 'Active',
     });
     setModalVisible(true);
@@ -75,6 +84,7 @@ export default function UsersScreen() {
   const openEditModal = (user: User) => {
     setIsEditing(true);
     setSelectedUser(user);
+    setFilesPayload([]);
     setForm({
       FullName: user.FullName || '',
       FatherHusbandName: user.FatherHusbandName || '',
@@ -92,6 +102,7 @@ export default function UsersScreen() {
       City: user.City || 'Bengaluru',
       State: user.State || 'Karnataka',
       Pincode: user.Pincode || '560001',
+      CustomerPhoto: user.CustomerPhoto || '',
       Status: user.Status === 'Inactive' ? 'Inactive' : 'Active',
     });
     setModalVisible(true);
@@ -128,10 +139,10 @@ export default function UsersScreen() {
     }
 
     if (isEditing && selectedUser) {
-      store.updateUser(selectedUser.UserId, form);
+      store.updateUser(selectedUser.UserId, { ...form, files: filesPayload });
       Alert.alert('Success', 'Customer updated successfully.');
     } else {
-      store.addUser(form);
+      store.addUser({ ...form, files: filesPayload });
       Alert.alert('Success', 'Customer registered successfully.');
     }
     setModalVisible(false);
@@ -148,13 +159,27 @@ export default function UsersScreen() {
     {
       key: 'FullName',
       title: 'Name',
-      width: 150,
-      render: (u) => (
-        <View>
-          <Text style={styles.primaryCellText} numberOfLines={1}>{u.FullName}</Text>
-          {u.CustomerCode ? <Text style={styles.subCellText} numberOfLines={1}>{u.CustomerCode}</Text> : null}
-        </View>
-      ),
+      width: 170,
+      render: (u) => {
+        const directUrl = getDriveImageUrl(u.CustomerPhoto);
+        return (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <TouchableOpacity onPress={() => u.CustomerPhoto && setPreviewImageUrl(u.CustomerPhoto)}>
+              {u.CustomerPhoto ? (
+                <Image source={{ uri: directUrl || u.CustomerPhoto }} style={styles.tableAvatar} contentFit="cover" />
+              ) : (
+                <View style={styles.tableAvatarPlaceholder}>
+                  <Text style={styles.avatarInitials}>{u.FullName.charAt(0) || 'U'}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.primaryCellText} numberOfLines={1}>{u.FullName}</Text>
+              {u.CustomerCode ? <Text style={styles.subCellText} numberOfLines={1}>{u.CustomerCode}</Text> : null}
+            </View>
+          </View>
+        );
+      },
     },
     {
       key: 'MobileNumber',
@@ -236,6 +261,18 @@ export default function UsersScreen() {
             </View>
 
             <ScrollView style={styles.modalBody}>
+              {/* Photo Upload */}
+              <ImagePickerField
+                type="avatar"
+                label="Customer Photo"
+                helperText="Upload passport-size profile photo"
+                value={form.CustomerPhoto}
+                onChange={(url, files) => {
+                  setForm(p => ({ ...p, CustomerPhoto: url }));
+                  setFilesPayload(files);
+                }}
+              />
+
               {/* --- Personal Info --- */}
               <Text style={styles.sectionDivider}>Personal Information</Text>
 
@@ -470,12 +507,27 @@ export default function UsersScreen() {
 
             {selectedUser ? (
               <ScrollView style={styles.modalBody}>
-                <View style={styles.detailCard}>
-                  <Text style={styles.detailName}>{selectedUser.FullName}</Text>
-                  <Text style={styles.detailCode}>ID: {selectedUser.UserId} • {selectedUser.CustomerCode}</Text>
-                  {selectedUser.FatherHusbandName ? <Text style={styles.detailSubCode}>S/O, W/O: {selectedUser.FatherHusbandName}</Text> : null}
-                  <View style={{ marginTop: 6 }}>
-                    <Badge label={selectedUser.Status} variant={selectedUser.Status === 'Active' ? 'success' : 'default'} />
+                <View style={[styles.detailCard, { flexDirection: 'row', alignItems: 'center', gap: 14 }]}>
+                  <TouchableOpacity onPress={() => selectedUser.CustomerPhoto && setPreviewImageUrl(selectedUser.CustomerPhoto)}>
+                    {selectedUser.CustomerPhoto ? (
+                      <Image
+                        source={{ uri: getDriveImageUrl(selectedUser.CustomerPhoto) }}
+                        style={{ width: 64, height: 64, borderRadius: 32, borderWidth: 2, borderColor: Colors.primary }}
+                        contentFit="cover"
+                      />
+                    ) : (
+                      <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: Colors.primarySubtle, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: Colors.primaryLight }}>
+                        <Text style={{ fontSize: 24, fontWeight: '700', color: Colors.primaryDark }}>{selectedUser.FullName.charAt(0) || 'U'}</Text>
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.detailName}>{selectedUser.FullName}</Text>
+                    <Text style={styles.detailCode}>ID: {selectedUser.UserId} • {selectedUser.CustomerCode}</Text>
+                    {selectedUser.FatherHusbandName ? <Text style={styles.detailSubCode}>S/O, W/O: {selectedUser.FatherHusbandName}</Text> : null}
+                    <View style={{ marginTop: 6, alignSelf: 'flex-start' }}>
+                      <Badge label={selectedUser.Status} variant={selectedUser.Status === 'Active' ? 'success' : 'default'} />
+                    </View>
                   </View>
                 </View>
 
@@ -518,11 +570,40 @@ export default function UsersScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* FULL-SCREEN IMAGE PREVIEW */}
+      <ImageViewModal
+        visible={!!previewImageUrl}
+        imageUrl={previewImageUrl}
+        title="Customer Photo"
+        onClose={() => setPreviewImageUrl(null)}
+      />
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  tableAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#e2e8f0',
+  },
+  tableAvatarPlaceholder: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: Colors.primarySubtle,
+    borderWidth: 1,
+    borderColor: Colors.primaryLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarInitials: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: Colors.primaryDark,
+  },
   safeArea: {
     flex: 1,
     backgroundColor: Colors.surface,

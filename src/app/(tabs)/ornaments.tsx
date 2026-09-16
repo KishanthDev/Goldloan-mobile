@@ -6,11 +6,13 @@ import {
 import { Image } from 'expo-image';
 import { Colors } from '../../constants/theme';
 import { useAppStore } from '../../services/store';
-import { getDriveDirectImageUrl } from '../../services/api';
+import { getDriveImageUrl, api } from '../../services/api';
 import { Ornament } from '../../types';
 import { DataTable, Column } from '../../components/DataTable';
 import { Badge } from '../../components/Badge';
 import { Ionicons } from '@expo/vector-icons';
+import { ImagePickerField, FilePayload } from '../../components/ImagePickerField';
+import { ImageViewModal } from '../../components/ImageViewModal';
 
 export default function OrnamentsScreen() {
   const store = useAppStore();
@@ -20,6 +22,8 @@ export default function OrnamentsScreen() {
   const [selectedOrn, setSelectedOrn] = useState<Ornament | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [filesPayload, setFilesPayload] = useState<FilePayload[]>([]);
+  const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -58,13 +62,13 @@ export default function OrnamentsScreen() {
   const currentPrice = parseFloat(form.CurrentPricePerGram) || 0;
 
   // Buying Cost = Metal Weight × Buying Price/g
-  const buyingCost = Math.round(metal * buyingPrice * 100) / 100;
+  const buyingCostCalc = Math.round(metal * buyingPrice * 100) / 100;
   // Market Value = Metal Weight × Current Price/g
-  const marketVal = Math.round(metal * currentPrice * 100) / 100;
-  // Appreciation Value = Market Value − Buying Cost
-  const apprVal = Math.round((marketVal - buyingCost) * 100) / 100;
-  // Appreciation % = (Appreciation Value ÷ Buying Cost) × 100
-  const apprPct = buyingCost > 0 ? Math.round(((apprVal / buyingCost) * 100) * 100) / 100 : 0;
+  const marketValCalc = Math.round(metal * currentPrice * 100) / 100;
+  // Appreciation Value = Market Value - Buying Cost
+  const apprValCalc = Math.round((marketValCalc - buyingCostCalc) * 100) / 100;
+  // Appreciation % = (Appreciation Value / Buying Cost) × 100
+  const apprPctCalc = buyingCostCalc > 0 ? Math.round(((apprValCalc / buyingCostCalc) * 100) * 100) / 100 : 0;
 
   // On Purity Change: auto-set Current Price from live rates (onOrnamentPurityChange from index.html)
   const handlePuritySelect = (purity: string) => {
@@ -84,6 +88,8 @@ export default function OrnamentsScreen() {
   const openAddModal = () => {
     setIsEditing(false);
     setSelectedOrn(null);
+    setFilesPayload([]);
+    // Default rate from Bangalore live rates in store if available
     const live22k = store.goldRates?.gold22k?.rate1g || 8115;
     const live24k = store.goldRates?.gold24k?.rate1g || 8850;
 
@@ -113,6 +119,7 @@ export default function OrnamentsScreen() {
   const openEditModal = (orn: Ornament) => {
     setIsEditing(true);
     setSelectedOrn(orn);
+    setFilesPayload([]);
     setForm({
       UserId: orn.UserId || '',
       OrnamentName: orn.OrnamentName || '',
@@ -144,7 +151,7 @@ export default function OrnamentsScreen() {
   const handleDelete = (orn: Ornament) => {
     Alert.alert(
       'Delete Ornament',
-      `Are you sure you want to delete ${orn.OrnamentName}?`,
+      `Are you sure you want to delete ${orn.OrnamentName}? This will archive it.`,
       [
         { text: 'Cancel', style: 'cancel' },
         { 
@@ -177,6 +184,7 @@ export default function OrnamentsScreen() {
         CurrentPricePerGram: currentPrice,
         Quantity: parseInt(form.Quantity) || 1,
         EstimatedValue: parseFloat(form.EstimatedValue) || undefined,
+        files: filesPayload,
       });
       Alert.alert('Success', 'Ornament updated.');
     } else {
@@ -190,6 +198,7 @@ export default function OrnamentsScreen() {
         CurrentPricePerGram: currentPrice,
         Quantity: parseInt(form.Quantity) || 1,
         EstimatedValue: parseFloat(form.EstimatedValue) || undefined,
+        files: filesPayload,
       });
       Alert.alert('Success', 'Ornament added to vault.');
     }
@@ -215,13 +224,24 @@ export default function OrnamentsScreen() {
     {
       key: 'OrnamentName',
       title: 'Name',
-      width: 145,
-      render: (o) => (
-        <View>
-          <Text style={styles.primaryCellText} numberOfLines={1}>{o.OrnamentName}</Text>
-          {o.HallmarkNumber ? <Text style={styles.subCellText} numberOfLines={1}>HM: {o.HallmarkNumber}</Text> : null}
-        </View>
-      ),
+      width: 165,
+      render: (o) => {
+        const firstImg = o.OrnamentImages ? o.OrnamentImages.split(' | ').filter(Boolean)[0] : '';
+        const directUrl = firstImg ? getDriveImageUrl(firstImg) : '';
+        return (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            {firstImg ? (
+              <TouchableOpacity onPress={() => setPreviewImageUrl(firstImg)}>
+                <Image source={{ uri: directUrl || firstImg }} style={{ width: 28, height: 28, borderRadius: 6, backgroundColor: '#f1f5f9' }} contentFit="cover" />
+              </TouchableOpacity>
+            ) : null}
+            <View style={{ flex: 1 }}>
+              <Text style={styles.primaryCellText} numberOfLines={1}>{o.OrnamentName}</Text>
+              {o.HallmarkNumber ? <Text style={styles.subCellText} numberOfLines={1}>HM: {o.HallmarkNumber}</Text> : null}
+            </View>
+          </View>
+        );
+      },
     },
     {
       key: 'OrnamentType',
@@ -483,16 +503,16 @@ export default function OrnamentsScreen() {
                 <Text style={styles.calcBoxTitle}>Automatic Valuation Formulas</Text>
                 <View style={styles.calcRow}>
                   <Text style={styles.calcLabel}>Buying Cost ({metal.toFixed(2)}g × ₹{buyingPrice}):</Text>
-                  <Text style={styles.calcVal}>₹{buyingCost.toLocaleString()}</Text>
+                  <Text style={styles.calcVal}>₹{buyingCostCalc.toLocaleString()}</Text>
                 </View>
                 <View style={styles.calcRow}>
                   <Text style={styles.calcLabel}>Market Value ({metal.toFixed(2)}g × ₹{currentPrice}):</Text>
-                  <Text style={[styles.calcVal, { color: Colors.success }]}>₹{marketVal.toLocaleString()}</Text>
+                  <Text style={[styles.calcVal, { color: Colors.success }]}>₹{marketValCalc.toLocaleString()}</Text>
                 </View>
                 <View style={[styles.calcRow, { borderTopWidth: 1, borderTopColor: '#fef08a', paddingTop: 6, marginTop: 4 }]}>
                   <Text style={styles.calcLabel}>Appreciation Gains:</Text>
-                  <Text style={[styles.calcVal, { color: apprVal >= 0 ? Colors.success : Colors.danger }]}>
-                    {apprVal >= 0 ? '+' : ''}₹{apprVal.toLocaleString()} ({apprPct.toFixed(2)}%)
+                  <Text style={[styles.calcVal, { color: apprValCalc >= 0 ? Colors.success : Colors.danger }]}>
+                    {apprValCalc >= 0 ? '+' : ''}₹{apprValCalc.toLocaleString()} ({apprPctCalc.toFixed(2)}%)
                   </Text>
                 </View>
               </View>
@@ -566,15 +586,18 @@ export default function OrnamentsScreen() {
                 />
               </View>
 
-              <View style={styles.field}>
-                <Text style={styles.label}>Google Drive / Image URLs</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="e.g. https://drive.google.com/file/d/... | https://..."
-                  value={form.OrnamentImages}
-                  onChangeText={v => setForm(p => ({ ...p, OrnamentImages: v }))}
-                />
-              </View>
+              {/* Image Picker */}
+              <ImagePickerField
+                multiple
+                type="card"
+                label="Ornament Photos / Pledged Images"
+                helperText="Upload photos of ornaments or jewelry items"
+                value={form.OrnamentImages}
+                onChange={(urls, files) => {
+                  setForm(p => ({ ...p, OrnamentImages: urls }));
+                  setFilesPayload(files);
+                }}
+              />
 
               <View style={styles.field}>
                 <Text style={styles.label}>Remarks</Text>
@@ -674,11 +697,11 @@ export default function OrnamentsScreen() {
                     <Text style={styles.detailSecTitle}>Google Drive Photos</Text>
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingVertical: 4 }}>
                       {selectedOrn.OrnamentImages.split(' | ').filter(Boolean).map((imgUrl, i) => {
-                        const directUrl = getDriveDirectImageUrl(imgUrl);
+                        const directUrl = getDriveImageUrl(imgUrl);
                         return (
                           <TouchableOpacity 
                             key={i} 
-                            onPress={() => Linking.openURL(imgUrl)}
+                            onPress={() => setPreviewImageUrl(imgUrl)}
                             style={{ borderRadius: 8, overflow: 'hidden', borderWidth: 1, borderColor: Colors.border }}
                           >
                             <Image
@@ -687,7 +710,7 @@ export default function OrnamentsScreen() {
                               contentFit="cover"
                             />
                             <View style={{ backgroundColor: 'rgba(0,0,0,0.6)', paddingVertical: 2, paddingHorizontal: 4 }}>
-                              <Text style={{ color: '#fff', fontSize: 9, textAlign: 'center' }}>Tap to view</Text>
+                              <Text style={{ color: '#fff', fontSize: 9, textAlign: 'center' }}>Tap to enlarge</Text>
                             </View>
                           </TouchableOpacity>
                         );
@@ -714,6 +737,14 @@ export default function OrnamentsScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* FULL-SCREEN IMAGE PREVIEW */}
+      <ImageViewModal
+        visible={!!previewImageUrl}
+        imageUrl={previewImageUrl}
+        title="Ornament Photo Preview"
+        onClose={() => setPreviewImageUrl(null)}
+      />
     </SafeAreaView>
   );
 }
