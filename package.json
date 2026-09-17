@@ -37,8 +37,10 @@
   "scripts": {
     "start": "expo start",
     "android": "expo start --android",
+    "android:build": "eas build -p android --profile preview",
     "ios": "expo start --ios",
     "web": "expo start --web",
+    "web:deploy": "eas deploy",
     "lint": "expo lint"
   },
   "private": true
