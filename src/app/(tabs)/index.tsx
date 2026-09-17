@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { 
   View, Text, StyleSheet, ScrollView, RefreshControl, 
-  TouchableOpacity, useWindowDimensions 
+  TouchableOpacity, useWindowDimensions, ActivityIndicator 
 } from 'react-native';
+import { Skeleton } from '../../components/Skeleton';
 import { useRouter } from 'expo-router';
 import { Colors } from '../../constants/theme';
 import { useAppStore } from '../../services/store';
@@ -48,7 +49,7 @@ export default function DashboardScreen() {
   return (
     <View style={styles.screenRoot}>
       {/* ─── DASHBOARD TOP ACTION BAR (Protected, Never Overflows) ─── */}
-      <View style={styles.topBar}>
+      <View style={[styles.topBar, isDesktop && styles.topBarDesktop]}>
         <View style={styles.topBarTitleGroup}>
           <SidebarTrigger />
           <View style={styles.topBarTextWrapper}>
@@ -67,9 +68,61 @@ export default function DashboardScreen() {
 
       <ScrollView 
         style={styles.container} 
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[styles.content, isDesktop && styles.contentDesktop]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[Colors.primary]} />}
       >
+        {/* ─── INITIAL SYNC SKELETON LOADER (When cache is empty & syncing) ─── */}
+        {store.isSyncing && store.users.length === 0 && store.loans.length === 0 ? (
+          <View style={{ gap: 20 }}>
+            {/* Syncing Pill Notice */}
+            <View style={styles.syncNoticePill}>
+              <ActivityIndicator size="small" color={Colors.primaryDark} />
+              <Text style={styles.syncNoticeText}>Loading portfolio data from Google Sheets...</Text>
+            </View>
+
+            {/* Rates Card Skeleton */}
+            <View style={styles.goldRatesCard}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 }}>
+                <Skeleton width={200} height={20} />
+                <Skeleton width={80} height={20} />
+              </View>
+              <View style={{ gap: 10 }}>
+                <Skeleton width="100%" height={90} borderRadius={12} />
+                <View style={{ flexDirection: 'row', gap: 10 }}>
+                  <Skeleton width="50%" height={80} borderRadius={12} style={{ flex: 1 }} />
+                  <Skeleton width="50%" height={80} borderRadius={12} style={{ flex: 1 }} />
+                </View>
+              </View>
+            </View>
+
+            {/* Valuation Skeleton */}
+            <Skeleton width={180} height={16} style={{ marginBottom: -8 }} />
+            <View style={{ gap: 12 }}>
+              <Skeleton width="100%" height={95} borderRadius={14} />
+              <Skeleton width="100%" height={95} borderRadius={14} />
+              <Skeleton width="100%" height={95} borderRadius={14} />
+            </View>
+
+            {/* Operational Metrics Skeleton */}
+            <Skeleton width={180} height={16} style={{ marginBottom: -8 }} />
+            {isDesktop ? (
+              <View style={{ flexDirection: 'row', gap: 12 }}>
+                <Skeleton width="25%" height={105} borderRadius={14} style={{ flex: 1 }} />
+                <Skeleton width="25%" height={105} borderRadius={14} style={{ flex: 1 }} />
+                <Skeleton width="25%" height={105} borderRadius={14} style={{ flex: 1 }} />
+                <Skeleton width="25%" height={105} borderRadius={14} style={{ flex: 1 }} />
+              </View>
+            ) : (
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 10 }}>
+                <Skeleton width="48.5%" height={105} borderRadius={14} />
+                <Skeleton width="48.5%" height={105} borderRadius={14} />
+                <Skeleton width="48.5%" height={105} borderRadius={14} />
+                <Skeleton width="48.5%" height={105} borderRadius={14} />
+              </View>
+            )}
+          </View>
+        ) : (
+          <>
         {/* ─── SECTION 1: LIVE GOLD RATES (RESPONSIVE HERO ON MOBILE) ─── */}
         <View style={styles.goldRatesCard}>
           <View style={styles.cardHeaderRow}>
@@ -269,10 +322,10 @@ export default function DashboardScreen() {
 
         {/* ─── SECTION 3: OPERATIONAL PORTFOLIO (4-COLUMN GRID ON DESKTOP) ─── */}
         <Text style={styles.sectionHeading}>Operational Portfolio</Text>
-        <View style={[styles.metricsGrid, isDesktop && styles.metricsGridDesktop]}>
+        <View style={isDesktop ? styles.metricsGridDesktop : styles.metricsGridMobile}>
           {/* Customers */}
           <TouchableOpacity 
-            style={[styles.metricCard, isDesktop && styles.metricCardDesktop]} 
+            style={isDesktop ? styles.metricCardDesktop : styles.metricCardMobile} 
             onPress={() => router.push('/(tabs)/users' as any)}
             activeOpacity={0.7}
           >
@@ -291,7 +344,7 @@ export default function DashboardScreen() {
 
           {/* Bank Accounts */}
           <TouchableOpacity 
-            style={[styles.metricCard, isDesktop && styles.metricCardDesktop]} 
+            style={isDesktop ? styles.metricCardDesktop : styles.metricCardMobile} 
             onPress={() => router.push('/(tabs)/bank-accounts' as any)}
             activeOpacity={0.7}
           >
@@ -310,7 +363,7 @@ export default function DashboardScreen() {
 
           {/* Active Loans */}
           <TouchableOpacity 
-            style={[styles.metricCard, isDesktop && styles.metricCardDesktop]} 
+            style={isDesktop ? styles.metricCardDesktop : styles.metricCardMobile} 
             onPress={() => router.push('/(tabs)/loans' as any)}
             activeOpacity={0.7}
           >
@@ -329,7 +382,7 @@ export default function DashboardScreen() {
 
           {/* Pledged Ornaments */}
           <TouchableOpacity 
-            style={[styles.metricCard, isDesktop && styles.metricCardDesktop]} 
+            style={isDesktop ? styles.metricCardDesktop : styles.metricCardMobile} 
             onPress={() => router.push('/(tabs)/ornaments' as any)}
             activeOpacity={0.7}
           >
@@ -382,11 +435,11 @@ export default function DashboardScreen() {
           </View>
         </View>
 
-        {/* ─── SECTION 5: QUICK ACTIONS GRID ─── */}
+        {/* ─── SECTION 5: QUICK ACTIONS GRID (4-IN-A-ROW ON DESKTOP, 2x2 ON MOBILE) ─── */}
         <Text style={styles.sectionHeading}>Quick Actions</Text>
-        <View style={[styles.quickActionsGrid, (isDesktop || isTablet) && styles.quickActionsGridWide]}>
+        <View style={isDesktop ? styles.quickActionsGridDesktop : styles.quickActionsGridMobile}>
           <TouchableOpacity 
-            style={styles.actionCard} 
+            style={isDesktop ? styles.actionCardDesktop : styles.actionCardMobile} 
             onPress={() => router.push('/loans/new' as any)} 
             activeOpacity={0.7}
           >
@@ -398,7 +451,7 @@ export default function DashboardScreen() {
           </TouchableOpacity>
 
           <TouchableOpacity 
-            style={styles.actionCard} 
+            style={isDesktop ? styles.actionCardDesktop : styles.actionCardMobile} 
             onPress={() => router.push('/customers/new' as any)} 
             activeOpacity={0.7}
           >
@@ -410,7 +463,7 @@ export default function DashboardScreen() {
           </TouchableOpacity>
 
           <TouchableOpacity 
-            style={styles.actionCard} 
+            style={isDesktop ? styles.actionCardDesktop : styles.actionCardMobile} 
             onPress={() => router.push('/ornaments/new' as any)} 
             activeOpacity={0.7}
           >
@@ -422,7 +475,7 @@ export default function DashboardScreen() {
           </TouchableOpacity>
 
           <TouchableOpacity 
-            style={styles.actionCard} 
+            style={isDesktop ? styles.actionCardDesktop : styles.actionCardMobile} 
             onPress={() => router.push('/(tabs)/closure' as any)} 
             activeOpacity={0.7}
           >
@@ -433,6 +486,8 @@ export default function DashboardScreen() {
             <Text style={styles.actionSub} numberOfLines={1}>Record settlement</Text>
           </TouchableOpacity>
         </View>
+          </>
+        )}
       </ScrollView>
     </View>
   );
@@ -496,12 +551,37 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  syncNoticePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#fefce8',
+    borderColor: '#fef08a',
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+  },
+  syncNoticeText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#854d0e',
+  },
+  topBarDesktop: {
+    paddingHorizontal: 28,
+    paddingVertical: 14,
+  },
   content: {
     padding: 16,
     paddingBottom: 80,
-    maxWidth: 1400,
-    alignSelf: 'center',
     width: '100%',
+  },
+  contentDesktop: {
+    paddingHorizontal: 28,
+    paddingVertical: 20,
+    maxWidth: '100%',
+    alignSelf: 'stretch',
   },
 
   // ─── RATES CARD ───
@@ -756,37 +836,47 @@ const styles = StyleSheet.create({
     color: '#92400e',
   },
 
-  // ─── METRICS GRID ───
-  metricsGrid: {
+  // ─── METRICS GRID (2x2 on Mobile, 4 in a row on Desktop) ───
+  metricsGridDesktop: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 20,
+    width: '100%',
+  },
+  metricsGridMobile: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 12,
-    marginBottom: 24,
+    justifyContent: 'space-between',
+    rowGap: 10,
+    marginBottom: 20,
+    width: '100%',
   },
-  metricsGridDesktop: {
-    flexWrap: 'nowrap',
-  },
-  metricCard: {
+  metricCardDesktop: {
     flex: 1,
-    minWidth: '46%',
+    minWidth: 0,
     backgroundColor: Colors.surface,
     borderRadius: 14,
-    padding: 16,
+    padding: 14,
     borderWidth: 1,
     borderColor: Colors.border,
   },
-  metricCardDesktop: {
-    minWidth: 0,
+  metricCardMobile: {
+    width: '48.5%',
+    backgroundColor: Colors.surface,
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
   metricTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 8,
   },
   metricIconBox: {
-    width: 36,
-    height: 36,
+    width: 34,
+    height: 34,
     borderRadius: 10,
     backgroundColor: '#fef08a',
     alignItems: 'center',
@@ -794,7 +884,7 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
   metricVal: {
-    fontSize: 20,
+    fontSize: 19,
     fontWeight: '800',
     color: Colors.textPrimary,
   },
@@ -802,11 +892,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     color: Colors.textPrimary,
-    marginTop: 3,
+    marginTop: 2,
     flex: 1,
   },
   metricHint: {
-    fontSize: 11,
+    fontSize: 10.5,
     color: Colors.textMuted,
     marginTop: 2,
   },
@@ -815,10 +905,10 @@ const styles = StyleSheet.create({
   bankUtilCard: {
     backgroundColor: Colors.surface,
     borderRadius: 16,
-    padding: 18,
+    padding: 16,
     borderWidth: 1,
     borderColor: Colors.border,
-    marginBottom: 24,
+    marginBottom: 20,
   },
   bankUtilHeader: {
     flexDirection: 'row',
@@ -890,39 +980,51 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
-  // ─── QUICK ACTIONS GRID ───
-  quickActionsGrid: {
+  // ─── QUICK ACTIONS GRID (2x2 on Mobile, 4 in a row on Desktop) ───
+  quickActionsGridDesktop: {
+    flexDirection: 'row',
+    gap: 12,
+    width: '100%',
+  },
+  quickActionsGridMobile: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 12,
+    justifyContent: 'space-between',
+    rowGap: 10,
+    width: '100%',
   },
-  quickActionsGridWide: {
-    flexWrap: 'nowrap',
-  },
-  actionCard: {
+  actionCardDesktop: {
     flex: 1,
-    minWidth: '46%',
+    minWidth: 0,
     backgroundColor: Colors.surface,
     borderRadius: 14,
-    padding: 16,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  actionCardMobile: {
+    width: '48.5%',
+    backgroundColor: Colors.surface,
+    borderRadius: 14,
+    padding: 14,
     borderWidth: 1,
     borderColor: Colors.border,
   },
   actionIconBox: {
-    width: 36,
-    height: 36,
+    width: 34,
+    height: 34,
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 8,
   },
   actionTitle: {
-    fontSize: 13,
+    fontSize: 12.5,
     fontWeight: '700',
     color: Colors.textPrimary,
   },
   actionSub: {
-    fontSize: 11,
+    fontSize: 10.5,
     color: Colors.textMuted,
     marginTop: 2,
   },

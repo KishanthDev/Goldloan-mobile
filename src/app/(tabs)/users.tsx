@@ -230,6 +230,7 @@ export default function UsersScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[Colors.primary]} />}
       >
         <DataTable
+          isLoading={store.isSyncing && store.users.length === 0}
           headerLeft={<SidebarTrigger />}
           title="Users / Customers"
           subtitle="Manage borrower registrations and KYC profiles"

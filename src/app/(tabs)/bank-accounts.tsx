@@ -263,6 +263,7 @@ export default function BankAccountsScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[Colors.primary]} />}
       >
         <DataTable
+          isLoading={store.isSyncing && store.bankAccounts.length === 0}
           headerLeft={<SidebarTrigger />}
           title="Bank Accounts"
           subtitle="Manage lending bank credit limits and account details"

@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { 
   View, Text, StyleSheet, TouchableOpacity, 
-  ScrollView, Animated, Easing, useWindowDimensions, Platform, StatusBar as RNStatusBar 
+  ScrollView, Animated, Easing, useWindowDimensions, Platform, StatusBar as RNStatusBar,
+  Image 
 } from 'react-native';
 import { Tabs, useRouter, usePathname } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -106,8 +107,8 @@ function TabLayoutInner() {
   }, [collapsed]);
 
   const textOpacity = sidebarWidthAnim.interpolate({
-    inputRange: [68, 140, 240],
-    outputRange: [0, 0.2, 1],
+    inputRange: [68, 120, 240],
+    outputRange: [0, 0, 1],
     extrapolate: 'clamp',
   });
 
@@ -177,17 +178,17 @@ function TabLayoutInner() {
         {isDesktop && (
           <Animated.View style={[styles.desktopSidebar, { width: sidebarWidthAnim }]}>
             {/* Clean Sidebar Header */}
-            <View style={[styles.sidebarHeader, collapsed && styles.sidebarHeaderCollapsed]}>
-              <View style={styles.brandRow}>
-                <View style={styles.brandIcon}>
-                  <Text style={{ fontSize: 20 }}>🪙</Text>
-                </View>
-                {!collapsed && (
-                  <Animated.View style={[styles.brandTextWrapper, { opacity: textOpacity }]}>
-                    <Text style={styles.brandTitle} numberOfLines={1}>{Env.APP_NAME}</Text>
-                    <Text style={styles.brandSub} numberOfLines={1}>{Env.APP_SUBTITLE}</Text>
-                  </Animated.View>
-                )}
+            <View style={styles.desktopSidebarHeader}>
+              <View style={styles.desktopBrandRow}>
+                <Image
+                  source={require('../../../assets/Logo.png')}
+                  style={styles.brandLogo}
+                  resizeMode="contain"
+                />
+                <Animated.View style={[styles.desktopBrandTextWrapper, { opacity: textOpacity }]}>
+                  <Text style={styles.brandTitle} numberOfLines={1}>{Env.APP_NAME}</Text>
+                  <Text style={styles.brandSub} numberOfLines={1}>{Env.APP_SUBTITLE}</Text>
+                </Animated.View>
               </View>
             </View>
 
@@ -200,26 +201,27 @@ function TabLayoutInner() {
                     key={item.name}
                     onPress={() => navigateTo(item)}
                     style={[
-                      styles.navItem,
-                      collapsed && styles.navItemCollapsed,
+                      styles.desktopNavItem,
                       active && styles.navItemActive,
                     ]}
                     activeOpacity={0.7}
                   >
                     {active && <View style={styles.activePillIndicator} />}
-                    <Ionicons
-                      name={active ? item.activeIcon : item.icon}
-                      size={20}
-                      color={active ? Colors.primaryDark : Colors.textSecondary}
-                    />
-                    {!collapsed && (
-                      <Animated.Text 
-                        style={[styles.navText, active && styles.navTextActive, { opacity: textOpacity }]}
+                    <View style={styles.desktopNavIconBox}>
+                      <Ionicons
+                        name={active ? item.activeIcon : item.icon}
+                        size={20}
+                        color={active ? Colors.primaryDark : Colors.textSecondary}
+                      />
+                    </View>
+                    <Animated.View style={[styles.desktopNavTextWrapper, { opacity: textOpacity }]}>
+                      <Text 
+                        style={[styles.navText, active && styles.navTextActive]}
                         numberOfLines={1}
                       >
                         {item.title}
-                      </Animated.Text>
-                    )}
+                      </Text>
+                    </Animated.View>
                   </TouchableOpacity>
                 );
               })}
@@ -308,9 +310,11 @@ function TabLayoutInner() {
             {/* Header (Strictly bounded, never overflows) */}
             <View style={styles.mobileDrawerHeader}>
               <View style={styles.drawerBrandGroup}>
-                <View style={styles.brandIcon}>
-                  <Text style={{ fontSize: 20 }}>🪙</Text>
-                </View>
+                <Image
+                  source={require('../../../assets/Logo.png')}
+                  style={styles.brandLogo}
+                  resizeMode="contain"
+                />
                 <View style={styles.drawerBrandTexts}>
                   <Text style={styles.brandTitle} numberOfLines={1} ellipsizeMode="tail">
                     {Env.APP_NAME}
@@ -398,6 +402,48 @@ const styles = StyleSheet.create({
     flexDirection: 'column',
     overflow: 'hidden',
   },
+  desktopSidebarHeader: {
+    paddingHorizontal: 16,
+    paddingVertical: 18,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+    overflow: 'hidden',
+  },
+  desktopBrandRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    overflow: 'hidden',
+    width: '100%',
+  },
+  desktopBrandTextWrapper: {
+    flex: 1,
+    minWidth: 0,
+    overflow: 'hidden',
+    marginLeft: 10,
+  },
+  desktopNavItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderRadius: 10,
+    position: 'relative',
+    minHeight: 42,
+    overflow: 'hidden',
+    width: '100%',
+  },
+  desktopNavIconBox: {
+    width: 52,
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  desktopNavTextWrapper: {
+    flex: 1,
+    minWidth: 0,
+    overflow: 'hidden',
+    paddingRight: 8,
+  },
   sidebarHeader: {
     paddingHorizontal: 14,
     paddingVertical: 18,
@@ -406,8 +452,9 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   sidebarHeaderCollapsed: {
+    alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 8,
+    paddingHorizontal: 0,
   },
   brandRow: {
     flexDirection: 'row',
@@ -415,15 +462,16 @@ const styles = StyleSheet.create({
     gap: 10,
     overflow: 'hidden',
   },
-  brandIcon: {
+  brandRowCollapsed: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: '100%',
+    gap: 0,
+  },
+  brandLogo: {
     width: 36,
     height: 36,
-    borderRadius: 18,
-    backgroundColor: '#fef08a',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#facc15',
+    borderRadius: 8,
     flexShrink: 0,
   },
   brandTextWrapper: {

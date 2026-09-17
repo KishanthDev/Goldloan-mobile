@@ -181,6 +181,7 @@ export default function ClosureScreen() {
 
         {/* DataTable */}
         <DataTable
+          isLoading={store.isSyncing && store.loans.length === 0}
           headerLeft={<SidebarTrigger />}
           title="Loan Closure & Release"
           subtitle={`Settle active loans and release pledged ornaments (${activeLoans.length} active)`}

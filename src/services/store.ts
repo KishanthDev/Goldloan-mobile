@@ -45,8 +45,8 @@ export async function hydrateFromCache() {
       cache.get<GoldRateData>('gold_rates_bangalore', true),
     ]);
 
-    // If cache has remnants of old mock data (Rajesh Sharma), wipe it so user has clean slate
-    if (cachedUsers.data && cachedUsers.data.some(u => u.FullName === 'Rajesh Sharma' || u.UserId === 'U001')) {
+    // Only wipe if specifically the legacy hardcoded mock user exists with matching CUST-001
+    if (cachedUsers.data && cachedUsers.data.some(u => u.FullName === 'Rajesh Sharma' && u.CustomerCode === 'CUST-001')) {
       await cache.clearAll();
       usersState = [];
       bankAccountsState = [];

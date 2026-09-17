@@ -329,6 +329,7 @@ export default function LoansScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[Colors.primary]} />}
       >
         <DataTable
+          isLoading={store.isSyncing && store.loans.length === 0}
           headerLeft={<SidebarTrigger />}
           title="Gold Loans"
           subtitle="Originate and track active, closed, and overdue gold contracts"

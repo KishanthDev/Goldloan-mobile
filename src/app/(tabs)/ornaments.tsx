@@ -343,6 +343,7 @@ export default function OrnamentsScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[Colors.primary]} />}
       >
         <DataTable
+          isLoading={store.isSyncing && store.ornaments.length === 0}
           headerLeft={<SidebarTrigger />}
           title="Gold Vault (Ornaments)"
           subtitle="Inventory of pledged, available, and released gold jewelry"

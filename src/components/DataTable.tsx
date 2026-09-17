@@ -1,3 +1,4 @@
+import { Skeleton } from './Skeleton';
 import React, { useState, useMemo } from 'react';
 import { 
   View, Text, StyleSheet, TextInput, TouchableOpacity, 
@@ -25,6 +26,7 @@ interface DataTableProps<T> {
   title?: string;
   subtitle?: string;
   headerLeft?: React.ReactNode;
+  isLoading?: boolean;
 }
 
 export function DataTable<T>({
@@ -38,6 +40,7 @@ export function DataTable<T>({
   title,
   subtitle,
   headerLeft,
+  isLoading = false,
 }: DataTableProps<T>) {
   const [search, setSearch] = useState('');
   const [pageSize, setPageSize] = useState(10);
@@ -185,7 +188,29 @@ export function DataTable<T>({
             </View>
 
             {/* Table Rows */}
-            {pageData.length === 0 ? (
+            {isLoading && data.length === 0 ? (
+              // ─── SHIMMER SKELETON ROWS ───
+              Array.from({ length: 5 }).map((_, rIdx) => (
+                <View 
+                  key={`skeleton_${rIdx}`} 
+                  style={[styles.tr, rIdx % 2 !== 0 && styles.trAlt, { width: tableContentWidth, minWidth: '100%' }]}
+                >
+                  {columns.map((col, cIdx) => (
+                    <View 
+                      key={`skel_${cIdx}`} 
+                      style={[
+                        styles.td, 
+                        { width: effectiveColWidths[cIdx] },
+                        col.align === 'center' && { alignItems: 'center', justifyContent: 'center' },
+                        col.align === 'right' && { alignItems: 'flex-end', justifyContent: 'center' },
+                      ]}
+                    >
+                      <Skeleton width={Math.max(40, Math.round((col.width || 120) * 0.7))} height={16} borderRadius={4} />
+                    </View>
+                  ))}
+                </View>
+              ))
+            ) : pageData.length === 0 ? (
               <View style={[styles.emptyRow, { width: tableContentWidth, minWidth: '100%' }]}>
                 <Text style={styles.emptyText}>No records found.</Text>
               </View>
