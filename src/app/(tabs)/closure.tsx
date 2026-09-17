@@ -8,13 +8,14 @@ import { useTheme } from '../../context/ThemeContext';
 import { useAppStore } from '../../services/store';
 import { Loan } from '../../types';
 import { DataTable, Column } from '../../components/DataTable';
-import { SidebarTrigger } from '../../components/SidebarTrigger';
 import { Ionicons } from '@expo/vector-icons';
+import { useToast } from '../../context/ToastContext';
 
 export default function ClosureScreen() {
   const { colors, isDark } = useTheme();
   const styles = getStyles(colors, isDark);
   const store = useAppStore();
+  const toast = useToast();
 
   const [confirmModalVisible, setConfirmModalVisible] = useState(false);
   const [selectedLoan, setSelectedLoan] = useState<Loan | null>(null);
@@ -51,6 +52,7 @@ export default function ClosureScreen() {
       'Loan Closed Successfully',
       `Loan ${closedNumber} has been successfully marked as Closed. All pledged ornaments have been released back to Available status in the vault.`
     );
+    toast.success(`Loan ${closedNumber} settled & ornaments released!`);
   };
 
   // Find linked ornaments for selected loan
@@ -185,9 +187,6 @@ export default function ClosureScreen() {
         {/* DataTable */}
         <DataTable
           isLoading={store.isSyncing && store.loans.length === 0}
-          headerLeft={<SidebarTrigger />}
-          title="Loan Closure & Release"
-          subtitle={`Settle active loans and release pledged ornaments (${activeLoans.length} active)`}
           columns={columns}
           data={activeLoans}
           searchPlaceholder="Search by Loan No, Customer, Mobile..."

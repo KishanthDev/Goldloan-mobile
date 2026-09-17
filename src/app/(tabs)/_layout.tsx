@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { 
   View, Text, StyleSheet, TouchableOpacity, 
   ScrollView, Animated, Easing, useWindowDimensions, Platform, StatusBar as RNStatusBar,
-  Image 
+  Image, ActivityIndicator 
 } from 'react-native';
 import { Tabs, useRouter, usePathname } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -12,6 +12,7 @@ import { useAppStore } from '../../services/store';
 import { ApiConfig } from '../../config/api';
 import { Env } from '../../config/env';
 import { SidebarProvider, useSidebar } from '../../context/SidebarContext';
+import { SidebarTrigger } from '../../components/SidebarTrigger';
 import { useTheme } from '../../context/ThemeContext';
 import { ThemeColors } from '../../constants/theme';
 import { ThemeToggleBtn } from '../../components/ThemeToggleBtn';
@@ -69,6 +70,33 @@ const NAV_ITEMS: NavItem[] = [
   },
 ];
 
+const TAB_METADATA: Record<string, { title: string; subtitle: string }> = {
+  index: {
+    title: 'Financial Overview',
+    subtitle: 'Real-time portfolio valuation & gold vault status',
+  },
+  users: {
+    title: 'Customers & Borrowers',
+    subtitle: 'KYC profiles, pledged assets & credit tracking',
+  },
+  'bank-accounts': {
+    title: 'Lending Bank Accounts',
+    subtitle: 'Manage credit limits, lenders & utilized balances',
+  },
+  ornaments: {
+    title: 'Gold Vault Inventory',
+    subtitle: 'Physical inventory, karat purity & vault custody',
+  },
+  loans: {
+    title: 'Active Loans Portfolio',
+    subtitle: 'Disbursements, interest tenure & repayments',
+  },
+  closure: {
+    title: 'Loan Closure & Settlements',
+    subtitle: 'Settle active loans & release vault collateral',
+  },
+};
+
 export default function TabLayout() {
   return (
     <SidebarProvider>
@@ -82,6 +110,16 @@ function TabLayoutInner() {
   const pathname = usePathname();
   const store = useAppStore();
   const { width } = useWindowDimensions();
+
+  const currentTabKey = (() => {
+    if (pathname === '/' || pathname === '/(tabs)' || pathname === '/(tabs)/') return 'index';
+    for (const key of Object.keys(TAB_METADATA)) {
+      if (key !== 'index' && pathname.includes(key)) return key;
+    }
+    return 'index';
+  })();
+
+  const activeTabMeta = TAB_METADATA[currentTabKey] || TAB_METADATA.index;
   const insets = useSafeAreaInsets();
   const { collapsed, setCollapsed, mobileDrawerOpen, setMobileDrawerOpen, isDesktop } = useSidebar();
   const { colors, isDark } = useTheme();
@@ -280,19 +318,53 @@ function TabLayoutInner() {
 
         {/* ─── TAB SCREENS CONTENT (Full height, bottom bar permanently hidden) ─── */}
         <View style={styles.screensWrapper}>
-          <Tabs
-            screenOptions={{
-              headerShown: false,
-              tabBarStyle: { display: 'none' },
-            }}
-          >
-            <Tabs.Screen name="index" options={{ title: 'Dashboard' }} />
-            <Tabs.Screen name="users" options={{ title: 'Users' }} />
-            <Tabs.Screen name="bank-accounts" options={{ title: 'Banks' }} />
-            <Tabs.Screen name="ornaments" options={{ title: 'Vault' }} />
-            <Tabs.Screen name="loans" options={{ title: 'Loans' }} />
-            <Tabs.Screen name="closure" options={{ title: 'Closure' }} />
-          </Tabs>
+          {/* ─── GLOBAL SHARED TOP NAVIGATION BAR ─── */}
+          <View style={[styles.topBar, isDesktop && styles.topBarDesktop]}>
+            <View style={styles.topBarTitleGroup}>
+              <SidebarTrigger />
+              <View style={styles.topBarTextWrapper}>
+                <Text style={styles.pageTitle} numberOfLines={1}>{activeTabMeta.title}</Text>
+                <Text style={styles.pageSubtitle} numberOfLines={1} ellipsizeMode="tail">
+                  {activeTabMeta.subtitle}
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.topBarActions}>
+              <ThemeToggleBtn size={15} />
+              <TouchableOpacity 
+                onPress={() => store.syncFromBackend(true)} 
+                style={styles.refreshActionBtn} 
+                activeOpacity={0.7}
+                disabled={store.isSyncing}
+              >
+                {store.isSyncing ? (
+                  <ActivityIndicator size="small" color={isDark ? '#fbbf24' : colors.primaryDark} />
+                ) : (
+                  <Ionicons name="refresh" size={15} color={isDark ? '#fbbf24' : colors.primaryDark} />
+                )}
+                <Text style={styles.refreshActionText}>
+                  {store.isSyncing ? 'Syncing...' : isDesktop ? 'Sync Rates & Data' : 'Sync'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          <View style={{ flex: 1 }}>
+            <Tabs
+              screenOptions={{
+                headerShown: false,
+                tabBarStyle: { display: 'none' },
+              }}
+            >
+              <Tabs.Screen name="index" options={{ title: 'Dashboard' }} />
+              <Tabs.Screen name="users" options={{ title: 'Users' }} />
+              <Tabs.Screen name="bank-accounts" options={{ title: 'Banks' }} />
+              <Tabs.Screen name="ornaments" options={{ title: 'Vault' }} />
+              <Tabs.Screen name="loans" options={{ title: 'Loans' }} />
+              <Tabs.Screen name="closure" options={{ title: 'Closure' }} />
+            </Tabs>
+          </View>
         </View>
       </View>
 
@@ -407,6 +479,66 @@ const getStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
   screensWrapper: {
     flex: 1,
     backgroundColor: colors.background,
+  },
+
+  // ─── GLOBAL TOP NAVIGATION BAR ───
+  topBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: colors.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    zIndex: 10,
+  },
+  topBarDesktop: {
+    paddingHorizontal: 28,
+    paddingVertical: 14,
+  },
+  topBarTitleGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+    minWidth: 160,
+  },
+  topBarTextWrapper: {
+    flex: 1,
+    minWidth: 0,
+  },
+  pageTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: colors.textPrimary,
+  },
+  pageSubtitle: {
+    fontSize: 11,
+    color: colors.textSecondary,
+    marginTop: 1,
+  },
+  topBarActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  refreshActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 8,
+    backgroundColor: isDark ? '#1e293b' : colors.primarySubtle,
+    borderWidth: 1,
+    borderColor: isDark ? '#334155' : '#fde68a',
+    flexShrink: 0,
+  },
+  refreshActionText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: isDark ? '#fbbf24' : colors.primaryDark,
   },
 
   // ─── DESKTOP SIDEBAR ───

@@ -11,19 +11,23 @@ import { getDriveImageUrl, api } from '../../services/api';
 import { Env } from '../../config/env';
 import { Ornament } from '../../types';
 import { DataTable, Column } from '../../components/DataTable';
-import { SidebarTrigger } from '../../components/SidebarTrigger';
 import { Badge } from '../../components/Badge';
 import { Ionicons } from '@expo/vector-icons';
 import { ImagePickerField, FilePayload } from '../../components/ImagePickerField';
 import { ImageViewModal } from '../../components/ImageViewModal';
+import { ConfirmModal } from '../../components/ConfirmModal';
+import { useToast } from '../../context/ToastContext';
 
 export default function OrnamentsScreen() {
   const { colors, isDark } = useTheme();
   const styles = getStyles(colors, isDark);
   const store = useAppStore();
+  const toast = useToast();
 
   const [modalVisible, setModalVisible] = useState(false);
   const [detailModalVisible, setDetailModalVisible] = useState(false);
+  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+  const [ornToDelete, setOrnToDelete] = useState<Ornament | null>(null);
   const [selectedOrn, setSelectedOrn] = useState<Ornament | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -154,18 +158,17 @@ export default function OrnamentsScreen() {
   };
 
   const handleDelete = (orn: Ornament) => {
-    Alert.alert(
-      'Delete Ornament',
-      `Are you sure you want to delete ${orn.OrnamentName}? This will archive it.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Delete', 
-          style: 'destructive',
-          onPress: () => store.deleteOrnament(orn.OrnamentId)
-        }
-      ]
-    );
+    setOrnToDelete(orn);
+    setDeleteModalVisible(true);
+  };
+
+  const confirmDelete = () => {
+    if (!ornToDelete) return;
+    const name = ornToDelete.OrnamentName;
+    store.deleteOrnament(ornToDelete.OrnamentId);
+    setDeleteModalVisible(false);
+    setOrnToDelete(null);
+    toast.danger(`Ornament "${name}" removed from vault`);
   };
 
   const handleSave = () => {
@@ -191,7 +194,7 @@ export default function OrnamentsScreen() {
         EstimatedValue: parseFloat(form.EstimatedValue) || undefined,
         files: filesPayload,
       });
-      Alert.alert('Success', 'Ornament updated.');
+      toast.success(`Ornament "${form.OrnamentName}" updated successfully`);
     } else {
       store.addOrnament({
         ...form,
@@ -205,7 +208,7 @@ export default function OrnamentsScreen() {
         EstimatedValue: parseFloat(form.EstimatedValue) || undefined,
         files: filesPayload,
       });
-      Alert.alert('Success', 'Ornament added to vault.');
+      toast.success(`Ornament "${form.OrnamentName}" added to vault`);
     }
     setModalVisible(false);
   };
@@ -347,9 +350,6 @@ export default function OrnamentsScreen() {
       >
         <DataTable
           isLoading={store.isSyncing && store.ornaments.length === 0}
-          headerLeft={<SidebarTrigger />}
-          title="Gold Vault (Ornaments)"
-          subtitle="Inventory of pledged, available, and released gold jewelry"
           addButtonLabel="Add Ornament"
           onAddPress={openAddModal}
           columns={columns}
@@ -751,6 +751,21 @@ export default function OrnamentsScreen() {
         imageUrl={previewImageUrl}
         title="Ornament Photo Preview"
         onClose={() => setPreviewImageUrl(null)}
+      />
+
+      {/* CONFIRM DELETE MODAL */}
+      <ConfirmModal
+        visible={deleteModalVisible}
+        title="Delete Gold Ornament"
+        message={`Are you sure you want to delete ornament "${ornToDelete?.OrnamentName}"? This will archive it and remove it from active vault stock.`}
+        confirmLabel="Delete Ornament"
+        cancelLabel="Cancel"
+        type="danger"
+        onConfirm={confirmDelete}
+        onCancel={() => {
+          setDeleteModalVisible(false);
+          setOrnToDelete(null);
+        }}
       />
     </SafeAreaView>
   );

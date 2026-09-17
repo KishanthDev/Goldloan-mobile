@@ -8,14 +8,15 @@ import { useTheme } from '../../context/ThemeContext';
 import { useAppStore } from '../../services/store';
 import { Loan, Payment } from '../../types';
 import { DataTable, Column } from '../../components/DataTable';
-import { SidebarTrigger } from '../../components/SidebarTrigger';
 import { Badge } from '../../components/Badge';
 import { Ionicons } from '@expo/vector-icons';
+import { useToast } from '../../context/ToastContext';
 
 export default function LoansScreen() {
   const { colors, isDark } = useTheme();
   const styles = getStyles(colors, isDark);
   const store = useAppStore();
+  const toast = useToast();
 
   const [modalVisible, setModalVisible] = useState(false);
   const [detailModalVisible, setDetailModalVisible] = useState(false);
@@ -193,6 +194,7 @@ export default function LoansScreen() {
     });
 
     Alert.alert('Success', 'Loan contract created and ornaments pledged!');
+    toast.success(`Loan ${form.LoanNumber} created successfully!`);
     setModalVisible(false);
   };
 
@@ -217,6 +219,7 @@ export default function LoansScreen() {
     });
 
     Alert.alert('Success', `Repayment of ₹${payAmt.toLocaleString()} recorded.`);
+    toast.success(`Repayment of ₹${payAmt.toLocaleString()} recorded.`);
     setPayModalVisible(false);
   };
 
@@ -333,9 +336,6 @@ export default function LoansScreen() {
       >
         <DataTable
           isLoading={store.isSyncing && store.loans.length === 0}
-          headerLeft={<SidebarTrigger />}
-          title="Gold Loans"
-          subtitle="Originate and track active, closed, and overdue gold contracts"
           addButtonLabel="Add Loan"
           onAddPress={openAddModal}
           columns={columns}

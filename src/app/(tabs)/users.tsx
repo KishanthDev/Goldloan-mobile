@@ -9,21 +9,25 @@ import { useTheme } from '../../context/ThemeContext';
 import { useAppStore } from '../../services/store';
 import { User } from '../../types';
 import { DataTable, Column } from '../../components/DataTable';
-import { SidebarTrigger } from '../../components/SidebarTrigger';
 import { Badge } from '../../components/Badge';
 import { Ionicons } from '@expo/vector-icons';
 import { ImagePickerField, FilePayload } from '../../components/ImagePickerField';
 import { ImageViewModal } from '../../components/ImageViewModal';
+import { ConfirmModal } from '../../components/ConfirmModal';
+import { useToast } from '../../context/ToastContext';
 import { api, getDriveImageUrl } from '../../services/api';
 
 export default function UsersScreen() {
   const { colors, isDark } = useTheme();
   const styles = getStyles(colors, isDark);
   const store = useAppStore();
+  const toast = useToast();
 
   // Modals state
   const [modalVisible, setModalVisible] = useState(false);
   const [detailModalVisible, setDetailModalVisible] = useState(false);
+  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+  const [userToDelete, setUserToDelete] = useState<User | null>(null);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -118,18 +122,17 @@ export default function UsersScreen() {
   };
 
   const handleDelete = (user: User) => {
-    Alert.alert(
-      'Delete Customer',
-      `Are you sure you want to delete ${user.FullName}?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Delete', 
-          style: 'destructive',
-          onPress: () => store.deleteUser(user.UserId)
-        }
-      ]
-    );
+    setUserToDelete(user);
+    setDeleteModalVisible(true);
+  };
+
+  const confirmDelete = () => {
+    if (!userToDelete) return;
+    const name = userToDelete.FullName;
+    store.deleteUser(userToDelete.UserId);
+    setDeleteModalVisible(false);
+    setUserToDelete(null);
+    toast.danger(`Customer "${name}" deleted successfully`);
   };
 
   const handleSave = () => {
@@ -144,10 +147,10 @@ export default function UsersScreen() {
 
     if (isEditing && selectedUser) {
       store.updateUser(selectedUser.UserId, { ...form, files: filesPayload });
-      Alert.alert('Success', 'Customer updated successfully.');
+      toast.success(`Customer "${form.FullName}" updated successfully`);
     } else {
       store.addUser({ ...form, files: filesPayload });
-      Alert.alert('Success', 'Customer registered successfully.');
+      toast.success(`Customer "${form.FullName}" registered successfully`);
     }
     setModalVisible(false);
   };
@@ -234,9 +237,6 @@ export default function UsersScreen() {
       >
         <DataTable
           isLoading={store.isSyncing && store.users.length === 0}
-          headerLeft={<SidebarTrigger />}
-          title="Users / Customers"
-          subtitle="Manage borrower registrations and KYC profiles"
           addButtonLabel="Add User"
           onAddPress={openAddModal}
           columns={columns}
@@ -583,6 +583,21 @@ export default function UsersScreen() {
         imageUrl={previewImageUrl}
         title="Customer Photo"
         onClose={() => setPreviewImageUrl(null)}
+      />
+
+      {/* CONFIRM DELETE MODAL */}
+      <ConfirmModal
+        visible={deleteModalVisible}
+        title="Delete Customer"
+        message={`Are you sure you want to delete "${userToDelete?.FullName}"? This action will permanently remove this customer from the local database and sheets.`}
+        confirmLabel="Delete Customer"
+        cancelLabel="Cancel"
+        type="danger"
+        onConfirm={confirmDelete}
+        onCancel={() => {
+          setDeleteModalVisible(false);
+          setUserToDelete(null);
+        }}
       />
     </SafeAreaView>
   );

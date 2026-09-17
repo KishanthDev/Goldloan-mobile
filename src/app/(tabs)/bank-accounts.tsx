@@ -9,20 +9,24 @@ import { useTheme } from '../../context/ThemeContext';
 import { useAppStore } from '../../services/store';
 import { BankAccount } from '../../types';
 import { DataTable, Column } from '../../components/DataTable';
-import { SidebarTrigger } from '../../components/SidebarTrigger';
 import { Badge } from '../../components/Badge';
 import { Ionicons } from '@expo/vector-icons';
 import { ImagePickerField, FilePayload } from '../../components/ImagePickerField';
 import { ImageViewModal } from '../../components/ImageViewModal';
+import { ConfirmModal } from '../../components/ConfirmModal';
+import { useToast } from '../../context/ToastContext';
 import { api, getDriveImageUrl } from '../../services/api';
 
 export default function BankAccountsScreen() {
   const { colors, isDark } = useTheme();
   const styles = getStyles(colors, isDark);
   const store = useAppStore();
+  const toast = useToast();
 
   const [modalVisible, setModalVisible] = useState(false);
   const [detailModalVisible, setDetailModalVisible] = useState(false);
+  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+  const [accountToDelete, setAccountToDelete] = useState<BankAccount | null>(null);
   const [selectedAcc, setSelectedAcc] = useState<BankAccount | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -106,18 +110,17 @@ export default function BankAccountsScreen() {
   };
 
   const handleDelete = (acc: BankAccount) => {
-    Alert.alert(
-      'Delete Bank Account',
-      `Are you sure you want to delete ${acc.BankName} (Acc: ${acc.AccountNumber})?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Delete', 
-          style: 'destructive',
-          onPress: () => store.deleteBankAccount(acc.BankAccountId)
-        }
-      ]
-    );
+    setAccountToDelete(acc);
+    setDeleteModalVisible(true);
+  };
+
+  const confirmDelete = () => {
+    if (!accountToDelete) return;
+    const name = accountToDelete.BankName;
+    store.deleteBankAccount(accountToDelete.BankAccountId);
+    setDeleteModalVisible(false);
+    setAccountToDelete(null);
+    toast.danger(`Bank account "${name}" deleted successfully`);
   };
 
   const handleSave = () => {
@@ -137,7 +140,7 @@ export default function BankAccountsScreen() {
         UtilizedLoanAmount: utilNum,
         files: filesPayload,
       });
-      Alert.alert('Success', 'Bank account updated.');
+      toast.success(`Bank account "${form.BankName}" updated successfully`);
     } else {
       store.addBankAccount({
         ...form,
@@ -145,7 +148,7 @@ export default function BankAccountsScreen() {
         UtilizedLoanAmount: utilNum,
         files: filesPayload,
       });
-      Alert.alert('Success', 'Bank account added.');
+      toast.success(`Bank account "${form.BankName}" added successfully`);
     }
     setModalVisible(false);
   };
@@ -267,9 +270,6 @@ export default function BankAccountsScreen() {
       >
         <DataTable
           isLoading={store.isSyncing && store.bankAccounts.length === 0}
-          headerLeft={<SidebarTrigger />}
-          title="Bank Accounts"
-          subtitle="Manage lending bank credit limits and account details"
           addButtonLabel="Add Account"
           onAddPress={openAddModal}
           columns={columns}
@@ -564,6 +564,21 @@ export default function BankAccountsScreen() {
         imageUrl={previewImageUrl}
         title="Passbook / Cheque Leaf Image"
         onClose={() => setPreviewImageUrl(null)}
+      />
+
+      {/* CONFIRM DELETE MODAL */}
+      <ConfirmModal
+        visible={deleteModalVisible}
+        title="Delete Bank Account"
+        message={`Are you sure you want to delete account "${accountToDelete?.BankName}" (${accountToDelete?.AccountNumber})? This action cannot be undone.`}
+        confirmLabel="Delete Account"
+        cancelLabel="Cancel"
+        type="danger"
+        onConfirm={confirmDelete}
+        onCancel={() => {
+          setDeleteModalVisible(false);
+          setAccountToDelete(null);
+        }}
       />
     </SafeAreaView>
   );

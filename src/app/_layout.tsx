@@ -4,6 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ApiConfig } from '../config/api';
 import { ThemeProvider, useTheme } from '../context/ThemeContext';
+import { ToastProvider } from '../context/ToastContext';
 
 export default function RootLayout() {
   useEffect(() => {
@@ -13,7 +14,9 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <ThemeProvider>
-        <RootLayoutInner />
+        <ToastProvider>
+          <RootLayoutInner />
+        </ToastProvider>
       </ThemeProvider>
     </SafeAreaProvider>
   );

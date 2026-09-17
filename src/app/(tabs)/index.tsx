@@ -7,12 +7,10 @@ import { Skeleton } from '../../components/Skeleton';
 import { useRouter } from 'expo-router';
 import { Colors, ThemeColors } from '../../constants/theme';
 import { useTheme } from '../../context/ThemeContext';
-import { ThemeToggleBtn } from '../../components/ThemeToggleBtn';
 import { useAppStore } from '../../services/store';
 import { ApiConfig } from '../../config/api';
 import { Env } from '../../config/env';
 import { Ionicons } from '@expo/vector-icons';
-import { SidebarTrigger } from '../../components/SidebarTrigger';
 
 export default function DashboardScreen() {
   const router = useRouter();
@@ -52,27 +50,6 @@ export default function DashboardScreen() {
 
   return (
     <View style={styles.screenRoot}>
-      {/* ─── DASHBOARD TOP ACTION BAR (Protected, Never Overflows) ─── */}
-      <View style={[styles.topBar, isDesktop && styles.topBarDesktop]}>
-        <View style={styles.topBarTitleGroup}>
-          <SidebarTrigger />
-          <View style={styles.topBarTextWrapper}>
-            <Text style={styles.pageTitle} numberOfLines={1}>Financial Overview</Text>
-            <Text style={styles.pageSubtitle} numberOfLines={1} ellipsizeMode="tail">
-              Real-time portfolio valuation & gold vault status
-            </Text>
-          </View>
-        </View>
-
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          <ThemeToggleBtn size={15} />
-          <TouchableOpacity onPress={onRefresh} style={styles.refreshActionBtn} activeOpacity={0.7}>
-            <Ionicons name="refresh" size={15} color={isDark ? '#fbbf24' : colors.primaryDark} />
-            <Text style={styles.refreshActionText}>Sync Rates & Data</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-
       <ScrollView 
         style={styles.container} 
         contentContainerStyle={[styles.content, isDesktop && styles.contentDesktop]}
@@ -504,60 +481,6 @@ const getStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
   screenRoot: {
     flex: 1,
     backgroundColor: colors.background,
-  },
-  topBar: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: 10,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: colors.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  topBarDesktop: {
-    paddingHorizontal: 28,
-    paddingVertical: 14,
-  },
-  topBarTitleGroup: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    flex: 1,
-    minWidth: 200,
-  },
-  topBarTextWrapper: {
-    flex: 1,
-    minWidth: 0,
-  },
-  pageTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: colors.textPrimary,
-  },
-  pageSubtitle: {
-    fontSize: 11,
-    color: colors.textSecondary,
-    marginTop: 1,
-  },
-  refreshActionBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 8,
-    backgroundColor: isDark ? '#1e293b' : colors.primarySubtle,
-    borderWidth: 1,
-    borderColor: isDark ? '#334155' : '#fde68a',
-    flexShrink: 0,
-  },
-  refreshActionText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: isDark ? '#fbbf24' : colors.primaryDark,
   },
   container: {
     flex: 1,

@@ -2,7 +2,7 @@ import { Skeleton } from './Skeleton';
 import React, { useState, useMemo } from 'react';
 import { 
   View, Text, StyleSheet, TextInput, TouchableOpacity, 
-  ScrollView, LayoutChangeEvent 
+  ScrollView, LayoutChangeEvent, useWindowDimensions 
 } from 'react-native';
 import { Colors, ThemeColors } from '../constants/theme';
 import { useTheme } from '../context/ThemeContext';
@@ -44,6 +44,8 @@ export function DataTable<T>({
   isLoading = false,
 }: DataTableProps<T>) {
   const { colors, isDark } = useTheme();
+  const { width: screenWidth } = useWindowDimensions();
+  const isDesktop = screenWidth >= 768;
   const styles = getStyles(colors, isDark);
   const [search, setSearch] = useState('');
   const [pageSize, setPageSize] = useState(10);
@@ -99,8 +101,8 @@ export function DataTable<T>({
 
   return (
     <View style={styles.container}>
-      {/* Top Header Row (Title & Add Button) */}
-      {(title || onAddPress || headerLeft) ? (
+      {/* Optional Top Header Row (Only if title or headerLeft is explicitly provided) */}
+      {(title || headerLeft) ? (
         <View style={styles.topHeader}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
             {headerLeft}
@@ -109,49 +111,96 @@ export function DataTable<T>({
               {subtitle ? <Text style={styles.sectionSub} numberOfLines={1} ellipsizeMode="tail">{subtitle}</Text> : null}
             </View>
           </View>
-
-          {onAddPress ? (
-            <TouchableOpacity style={styles.addBtn} onPress={onAddPress} activeOpacity={0.8}>
-              <Ionicons name="add" size={18} color="#ffffff" />
-              <Text style={styles.addBtnText}>{addButtonLabel}</Text>
-            </TouchableOpacity>
-          ) : null}
         </View>
       ) : null}
 
-      {/* Toolbar: Search + Page size */}
-      <View style={styles.toolbar}>
-        <View style={styles.pageSizeBox}>
-          <Text style={styles.toolLabel}>Show</Text>
-          {[5, 10, 20].map(sz => (
-            <TouchableOpacity
-              key={sz}
-              style={[styles.sizeBtn, pageSize === sz && styles.sizeBtnActive]}
-              onPress={() => { setPageSize(sz); setPage(1); }}
-            >
-              <Text style={[styles.sizeBtnText, pageSize === sz && styles.sizeBtnTextActive]}>
-                {sz}
-              </Text>
-            </TouchableOpacity>
-          ))}
-          <Text style={styles.toolLabel}>entries</Text>
-        </View>
+      {/* Toolbar: Page size + Full-width Search + Add Button */}
+      <View style={[styles.toolbar, !isDesktop && styles.toolbarMobile]}>
+        {isDesktop ? (
+          <>
+            <View style={styles.pageSizeBox}>
+              <Text style={styles.toolLabel}>Show</Text>
+              {[5, 10, 20].map(sz => (
+                <TouchableOpacity
+                  key={sz}
+                  style={[styles.sizeBtn, pageSize === sz && styles.sizeBtnActive]}
+                  onPress={() => { setPageSize(sz); setPage(1); }}
+                >
+                  <Text style={[styles.sizeBtnText, pageSize === sz && styles.sizeBtnTextActive]}>
+                    {sz}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+              <Text style={styles.toolLabel}>entries</Text>
+            </View>
 
-        <View style={styles.searchBox}>
-          <Ionicons name="search" size={15} color={Colors.textMuted} style={{ marginRight: 6 }} />
-          <TextInput
-            style={styles.searchInput}
-            placeholder={searchPlaceholder}
-            placeholderTextColor={colors.placeholder}
-            value={search}
-            onChangeText={t => { setSearch(t); setPage(1); }}
-          />
-          {search ? (
-            <TouchableOpacity onPress={() => setSearch('')}>
-              <Ionicons name="close-circle" size={16} color={colors.textMuted} />
-            </TouchableOpacity>
-          ) : null}
-        </View>
+            <View style={styles.searchBox}>
+              <Ionicons name="search" size={15} color={colors.textMuted} style={{ marginRight: 6 }} />
+              <TextInput
+                style={styles.searchInput}
+                placeholder={searchPlaceholder}
+                placeholderTextColor={colors.placeholder}
+                value={search}
+                onChangeText={t => { setSearch(t); setPage(1); }}
+              />
+              {search ? (
+                <TouchableOpacity onPress={() => setSearch('')}>
+                  <Ionicons name="close-circle" size={16} color={colors.textMuted} />
+                </TouchableOpacity>
+              ) : null}
+            </View>
+
+            {onAddPress ? (
+              <TouchableOpacity style={styles.addBtn} onPress={onAddPress} activeOpacity={0.8}>
+                <Ionicons name="add" size={18} color="#ffffff" />
+                <Text style={styles.addBtnText}>{addButtonLabel}</Text>
+              </TouchableOpacity>
+            ) : null}
+          </>
+        ) : (
+          <>
+            <View style={styles.toolbarMobileTopRow}>
+              <View style={[styles.searchBox, { flex: 1, minWidth: 0 }]}>
+                <Ionicons name="search" size={15} color={colors.textMuted} style={{ marginRight: 6 }} />
+                <TextInput
+                  style={styles.searchInput}
+                  placeholder={searchPlaceholder}
+                  placeholderTextColor={colors.placeholder}
+                  value={search}
+                  onChangeText={t => { setSearch(t); setPage(1); }}
+                />
+                {search ? (
+                  <TouchableOpacity onPress={() => setSearch('')}>
+                    <Ionicons name="close-circle" size={16} color={colors.textMuted} />
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+
+              {onAddPress ? (
+                <TouchableOpacity style={styles.addBtn} onPress={onAddPress} activeOpacity={0.8}>
+                  <Ionicons name="add" size={18} color="#ffffff" />
+                  <Text style={styles.addBtnText}>{addButtonLabel}</Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
+
+            <View style={styles.pageSizeBox}>
+              <Text style={styles.toolLabel}>Show</Text>
+              {[5, 10, 20].map(sz => (
+                <TouchableOpacity
+                  key={sz}
+                  style={[styles.sizeBtn, pageSize === sz && styles.sizeBtnActive]}
+                  onPress={() => { setPageSize(sz); setPage(1); }}
+                >
+                  <Text style={[styles.sizeBtnText, pageSize === sz && styles.sizeBtnTextActive]}>
+                    {sz}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+              <Text style={styles.toolLabel}>entries</Text>
+            </View>
+          </>
+        )}
       </View>
 
       {/* Mobile Horizontal Scroll Hint */}
@@ -325,12 +374,16 @@ const getStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
   addBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.primaryDark,
+    backgroundColor: isDark ? '#d97706' : colors.primaryDark,
     paddingHorizontal: 12,
     paddingVertical: 7,
-    borderRadius: 9,
+    borderRadius: 8,
     gap: 5,
     flexShrink: 0,
+    shadowColor: '#ca8a04',
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 2,
   },
   addBtnText: {
     color: '#ffffff',
@@ -339,7 +392,6 @@ const getStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
   },
   toolbar: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 12,
     paddingVertical: 10,
@@ -347,8 +399,18 @@ const getStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
     borderTopWidth: 1,
     borderBottomWidth: 1,
     borderColor: colors.border,
-    flexWrap: 'wrap',
+    gap: 10,
+  },
+  toolbarMobile: {
+    flexDirection: 'column',
+    alignItems: 'stretch',
     gap: 8,
+  },
+  toolbarMobileTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    width: '100%',
   },
   pageSizeBox: {
     flexDirection: 'row',
