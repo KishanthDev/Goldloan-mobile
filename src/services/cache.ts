@@ -9,12 +9,12 @@ interface CacheEntry<T> {
 const CACHE_PREFIX = '@gl_cache:';
 
 export const CacheTTL = {
-  GOLD_RATES: 30 * 60 * 1000,    // 30 minutes
-  DASHBOARD: 5 * 60 * 1000,       // 5 minutes
-  LISTS: 10 * 60 * 1000,          // 10 minutes (users, ornaments, loans, payments)
-  DETAILS: 10 * 60 * 1000,        // 10 minutes
-  SHORT: 60 * 1000,               // 1 minute
-  SYNC_DATA: 5 * 60 * 1000,       // 5 minutes
+  GOLD_RATES: 60 * 60 * 1000,    // 60 minutes
+  DASHBOARD: 30 * 60 * 1000,     // 30 minutes
+  LISTS: 30 * 60 * 1000,         // 30 minutes (users, ornaments, loans, payments)
+  DETAILS: 30 * 60 * 1000,       // 30 minutes
+  SHORT: 2 * 60 * 1000,          // 2 minutes
+  SYNC_DATA: 30 * 60 * 1000,     // 30 minutes
 };
 
 class CacheService {

@@ -32,22 +32,26 @@ class ApiService {
 
   /**
    * Universal HTTP request to Google Apps Script Web App
-   * Tries POST (with text/plain to avoid preflight issues) then falls back to GET (or vice-versa).
-   * Robust against non-JSON error pages and network drops.
+   * Always appends action query parameter to preserve action during Google redirects.
+   * Uses GET for queries and POST for mutations with automatic fallback.
    */
-  async callGas<T>(action: string, payload: any = {}, preferredMethod: 'POST' | 'GET' = 'POST'): Promise<ApiResponse<T>> {
+  async callGas<T>(action: string, payload: any = {}, preferredMethod: 'POST' | 'GET' = 'GET'): Promise<ApiResponse<T>> {
     const baseUrl = ApiConfig.getApiUrl();
     if (!baseUrl) {
       return { success: false, error: "Google Apps Script Web App URL not configured." };
     }
 
-    const methods: ('POST' | 'GET')[] = preferredMethod === 'POST' ? ['POST', 'GET'] : ['GET', 'POST'];
+    const methods: ('GET' | 'POST')[] = preferredMethod === 'GET' ? ['GET', 'POST'] : ['POST', 'GET'];
 
     for (const method of methods) {
       try {
         let response: Response;
+        const separator = baseUrl.includes('?') ? '&' : '?';
+
         if (method === 'POST') {
-          response = await fetch(baseUrl, {
+          // Always keep action in URL query so Google 302 redirect preserves the action
+          const urlWithAction = `${baseUrl}${separator}action=${encodeURIComponent(action)}`;
+          response = await fetch(urlWithAction, {
             method: 'POST',
             headers: {
               'Content-Type': 'text/plain;charset=utf-8',
@@ -55,8 +59,15 @@ class ApiService {
             body: JSON.stringify({ action, ...payload }),
           });
         } else {
-          const query = new URLSearchParams({ action, ...payload }).toString();
-          response = await fetch(`${baseUrl}?${query}`);
+          // For GET, append action and any scalar payload properties as query parameters
+          const queryParams: Record<string, string> = { action };
+          for (const [k, v] of Object.entries(payload)) {
+            if (v !== undefined && v !== null && typeof v !== 'object') {
+              queryParams[k] = String(v);
+            }
+          }
+          const query = new URLSearchParams(queryParams).toString();
+          response = await fetch(`${baseUrl}${separator}${query}`);
         }
 
         if (!response.ok) {
@@ -67,6 +78,11 @@ class ApiService {
         try {
           const parsed = JSON.parse(text);
           if (parsed && typeof parsed === 'object') {
+            // If response indicates action was dropped on redirect, try the fallback method!
+            if (parsed.success === false && parsed.error === 'No action specified in request') {
+              console.warn(`[API] ${method} returned 'No action specified in request', attempting fallback method...`);
+              continue;
+            }
             return parsed;
           }
         } catch {
@@ -84,7 +100,7 @@ class ApiService {
       }
     }
 
-    return { success: false, error: `Network request failed for "${action}". Check connection or Web App deployment.` };
+    return { success: false, error: `Network request failed for "${action}". Please check your internet connection.` };
   }
 
   private async postToGas<T>(action: string, payload: any = {}): Promise<ApiResponse<T>> {
@@ -92,7 +108,7 @@ class ApiService {
   }
 
   private async getFromGas<T>(action: string, params: Record<string, string> = {}): Promise<ApiResponse<T>> {
-    return this.callGas<T>(action, params, 'POST');
+    return this.callGas<T>(action, params, 'GET');
   }
 
   /**
@@ -121,7 +137,7 @@ class ApiService {
       return { success: true, data: mockData, isCached: false };
     }
 
-    const res = await this.callGas<InitialSyncData>('getInitialSyncData', {}, 'POST');
+    const res = await this.callGas<InitialSyncData>('getInitialSyncData', {}, 'GET');
     if (res.success && res.data) {
       await cache.set(CACHE_KEY, res.data, CacheTTL.SYNC_DATA);
       // Pre-populate individual entity caches

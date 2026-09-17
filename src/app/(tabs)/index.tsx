@@ -55,6 +55,25 @@ export default function DashboardScreen() {
         contentContainerStyle={[styles.content, isDesktop && styles.contentDesktop]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />}
       >
+        {/* ─── OFFLINE CACHE NOTICE BANNER (When showing cached data offline) ─── */}
+        {store.syncError && (store.users.length > 0 || store.loans.length > 0) ? (
+          <View style={styles.offlineNoticeBanner}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
+              <Ionicons name="cloud-offline-outline" size={15} color={isDark ? '#fbbf24' : '#b45309'} />
+              <Text style={styles.offlineNoticeText} numberOfLines={1}>
+                {store.syncError}
+              </Text>
+            </View>
+            <TouchableOpacity 
+              onPress={() => store.syncFromBackend(true)}
+              style={styles.offlineRetryPill}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Text style={styles.offlineRetryPillText}>Retry</Text>
+            </TouchableOpacity>
+          </View>
+        ) : null}
+
         {/* ─── INITIAL SYNC SKELETON LOADER (When cache is empty & syncing) ─── */}
         {store.isSyncing && store.users.length === 0 && store.loans.length === 0 ? (
           <View style={{ gap: 20 }}>
@@ -104,6 +123,25 @@ export default function DashboardScreen() {
                 <Skeleton width="48.5%" height={105} borderRadius={14} />
               </View>
             )}
+          </View>
+        ) : store.users.length === 0 && store.loans.length === 0 ? (
+          /* ─── EMPTY OFFLINE STATE (First run without internet) ─── */
+          <View style={styles.offlineEmptyContainer}>
+            <View style={styles.offlineIconCircle}>
+              <Ionicons name="cloud-offline-outline" size={36} color={isDark ? '#fbbf24' : colors.primaryDark} />
+            </View>
+            <Text style={styles.offlineEmptyTitle}>Unable to Connect</Text>
+            <Text style={styles.offlineEmptySub}>
+              {store.syncError || 'Could not reach Google Sheets. Please check your internet connection and tap retry.'}
+            </Text>
+            <TouchableOpacity 
+              style={styles.offlineMainRetryBtn} 
+              onPress={() => store.syncFromBackend(true)}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="refresh" size={16} color="#fff" />
+              <Text style={styles.offlineMainRetryBtnText}>Retry Connection</Text>
+            </TouchableOpacity>
           </View>
         ) : (
           <>
@@ -501,6 +539,88 @@ const getStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     color: isDark ? '#fbbf24' : '#854d0e',
+  },
+  offlineNoticeBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: isDark ? '#261a02' : '#fefce8',
+    borderColor: isDark ? '#78350f' : '#fde68a',
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    marginBottom: 14,
+    gap: 8,
+  },
+  offlineNoticeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: isDark ? '#fbbf24' : '#854d0e',
+    flex: 1,
+  },
+  offlineRetryPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 6,
+    backgroundColor: isDark ? '#382504' : '#fef08a',
+    borderWidth: 1,
+    borderColor: isDark ? '#78350f' : '#f59e0b',
+  },
+  offlineRetryPillText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: isDark ? '#fbbf24' : '#b45309',
+  },
+  offlineEmptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 60,
+    paddingHorizontal: 24,
+    backgroundColor: colors.surface,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+    marginTop: 20,
+  },
+  offlineIconCircle: {
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    backgroundColor: isDark ? '#261a02' : '#fef3c7',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  offlineEmptyTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: colors.textPrimary,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  offlineEmptySub: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 18,
+    marginBottom: 20,
+    maxWidth: 300,
+  },
+  offlineMainRetryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: isDark ? '#d97706' : colors.primaryDark,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 10,
+    elevation: 2,
+  },
+  offlineMainRetryBtnText: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '700',
   },
   content: {
     padding: 16,

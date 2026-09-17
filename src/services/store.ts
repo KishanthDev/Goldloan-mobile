@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { User, BankAccount, Ornament, Loan, Payment, GoldRateData, DashboardData } from '../types';
+import { User, BankAccount, Ornament, Loan, Payment, GoldRateData, DashboardData, InitialSyncData } from '../types';
 import { 
   mockUsers, mockBankAccounts, mockOrnaments, 
   mockLoans, mockPayments, mockGoldRates, mockDashboardData 
@@ -36,29 +36,48 @@ function notify() {
 export async function hydrateFromCache() {
   if (isCacheHydrated) return;
   try {
-    const [cachedUsers, cachedBanks, cachedOrns, cachedLoans, cachedPayments, cachedRates] = await Promise.all([
-      cache.get<User[]>('users_list', true),
-      cache.get<BankAccount[]>('bank_accounts_all', true),
-      cache.get<Ornament[]>('ornaments_all', true),
-      cache.get<Loan[]>('loans_all', true),
-      cache.get<Payment[]>('payments_all', true),
-      cache.get<GoldRateData>('gold_rates_bangalore', true),
-    ]);
+    // 1. Check unified sync snapshot first (fastest, all entities in 1 read)
+    const syncSnapshot = await cache.get<InitialSyncData>('initial_sync_data', true);
+    let updated = false;
 
-    // Only wipe if specifically the legacy hardcoded mock user exists with matching CUST-001
-    if (cachedUsers.data && cachedUsers.data.some(u => u.FullName === 'Rajesh Sharma' && u.CustomerCode === 'CUST-001')) {
-      await cache.clearAll();
-      usersState = [];
-      bankAccountsState = [];
-      ornamentsState = [];
-      loansState = [];
-      paymentsState = [];
-      isCacheHydrated = true;
-      notify();
-      return;
+    if (syncSnapshot.data) {
+      const d = syncSnapshot.data;
+      if (Array.isArray(d.users) && d.users.length > 0) {
+        usersState = d.users;
+        updated = true;
+      }
+      if (Array.isArray(d.bankAccounts) && d.bankAccounts.length > 0) {
+        bankAccountsState = d.bankAccounts;
+        updated = true;
+      }
+      if (Array.isArray(d.ornaments) && d.ornaments.length > 0) {
+        ornamentsState = d.ornaments;
+        updated = true;
+      }
+      if (Array.isArray(d.loans) && d.loans.length > 0) {
+        loansState = d.loans;
+        updated = true;
+      }
+      if (Array.isArray(d.payments) && d.payments.length > 0) {
+        paymentsState = d.payments;
+        updated = true;
+      }
+      if (d.goldRates) {
+        goldRatesState = d.goldRates;
+        updated = true;
+      }
     }
 
-    let updated = false;
+    // 2. Also check individual entity caches for any missing collections
+    const [cachedUsers, cachedBanks, cachedOrns, cachedLoans, cachedPayments, cachedRates] = await Promise.all([
+      usersState.length === 0 ? cache.get<User[]>('users_list', true) : Promise.resolve({ data: null }),
+      bankAccountsState.length === 0 ? cache.get<BankAccount[]>('bank_accounts_all', true) : Promise.resolve({ data: null }),
+      ornamentsState.length === 0 ? cache.get<Ornament[]>('ornaments_all', true) : Promise.resolve({ data: null }),
+      loansState.length === 0 ? cache.get<Loan[]>('loans_all', true) : Promise.resolve({ data: null }),
+      paymentsState.length === 0 ? cache.get<Payment[]>('payments_all', true) : Promise.resolve({ data: null }),
+      !syncSnapshot.data?.goldRates ? cache.get<GoldRateData>('gold_rates_bangalore', true) : Promise.resolve({ data: null }),
+    ]);
+
     if (cachedUsers.data && cachedUsers.data.length > 0) {
       usersState = cachedUsers.data;
       updated = true;
@@ -104,11 +123,10 @@ export async function syncFromBackend(force: boolean = false) {
   }
 
   isSyncing = true;
-  syncError = null;
   notify();
 
   try {
-    // 1. First attempt fast unified sync (1 round trip)
+    // 1. First attempt fast unified sync (1 round trip) via GET
     const syncRes = await api.getInitialSyncData(force);
     if (syncRes.success && syncRes.data) {
       const data = syncRes.data;
@@ -118,6 +136,15 @@ export async function syncFromBackend(force: boolean = false) {
       if (Array.isArray(data.loans)) loansState = data.loans;
       if (Array.isArray(data.payments)) paymentsState = data.payments;
       if (data.goldRates) goldRatesState = data.goldRates;
+
+      // Always persist the fresh data to disk cache!
+      await cache.set('initial_sync_data', data, CacheTTL.SYNC_DATA);
+      if (Array.isArray(data.users)) await cache.set('users_list', data.users, CacheTTL.LISTS);
+      if (Array.isArray(data.bankAccounts)) await cache.set('bank_accounts_all', data.bankAccounts, CacheTTL.LISTS);
+      if (Array.isArray(data.ornaments)) await cache.set('ornaments_all', data.ornaments, CacheTTL.LISTS);
+      if (Array.isArray(data.loans)) await cache.set('loans_all', data.loans, CacheTTL.LISTS);
+      if (Array.isArray(data.payments)) await cache.set('payments_all', data.payments, CacheTTL.LISTS);
+      if (data.goldRates) await cache.set('gold_rates_bangalore', data.goldRates, CacheTTL.GOLD_RATES);
 
       lastSyncedAt = new Date().toLocaleTimeString();
       lastSyncTimestamp = Date.now();
@@ -137,18 +164,56 @@ export async function syncFromBackend(force: boolean = false) {
 
     const [usersRes, banksRes, ornsRes, loansRes, paymentsRes, ratesRes] = results;
 
-    if (usersRes.status === 'fulfilled' && Array.isArray(usersRes.value)) usersState = usersRes.value;
-    if (banksRes.status === 'fulfilled' && Array.isArray(banksRes.value)) bankAccountsState = banksRes.value;
-    if (ornsRes.status === 'fulfilled' && Array.isArray(ornsRes.value)) ornamentsState = ornsRes.value;
-    if (loansRes.status === 'fulfilled' && Array.isArray(loansRes.value)) loansState = loansRes.value;
-    if (paymentsRes.status === 'fulfilled' && Array.isArray(paymentsRes.value)) paymentsState = paymentsRes.value;
-    if (ratesRes.status === 'fulfilled' && ratesRes.value?.data) goldRatesState = ratesRes.value.data;
+    let hasAnySuccess = false;
+    if (usersRes.status === 'fulfilled' && Array.isArray(usersRes.value) && usersRes.value.length > 0) {
+      usersState = usersRes.value;
+      hasAnySuccess = true;
+      cache.set('users_list', usersState, CacheTTL.LISTS);
+    }
+    if (banksRes.status === 'fulfilled' && Array.isArray(banksRes.value) && banksRes.value.length > 0) {
+      bankAccountsState = banksRes.value;
+      hasAnySuccess = true;
+      cache.set('bank_accounts_all', bankAccountsState, CacheTTL.LISTS);
+    }
+    if (ornsRes.status === 'fulfilled' && Array.isArray(ornsRes.value) && ornsRes.value.length > 0) {
+      ornamentsState = ornsRes.value;
+      hasAnySuccess = true;
+      cache.set('ornaments_all', ornamentsState, CacheTTL.LISTS);
+    }
+    if (loansRes.status === 'fulfilled' && Array.isArray(loansRes.value) && loansRes.value.length > 0) {
+      loansState = loansRes.value;
+      hasAnySuccess = true;
+      cache.set('loans_all', loansState, CacheTTL.LISTS);
+    }
+    if (paymentsRes.status === 'fulfilled' && Array.isArray(paymentsRes.value) && paymentsRes.value.length > 0) {
+      paymentsState = paymentsRes.value;
+      hasAnySuccess = true;
+      cache.set('payments_all', paymentsState, CacheTTL.LISTS);
+    }
+    if (ratesRes.status === 'fulfilled' && ratesRes.value?.data) {
+      goldRatesState = ratesRes.value.data;
+      hasAnySuccess = true;
+      cache.set('gold_rates_bangalore', goldRatesState, CacheTTL.GOLD_RATES);
+    }
 
-    lastSyncedAt = new Date().toLocaleTimeString();
-    lastSyncTimestamp = Date.now();
+    if (hasAnySuccess) {
+      lastSyncedAt = new Date().toLocaleTimeString();
+      lastSyncTimestamp = Date.now();
+      syncError = null;
+    } else {
+      if (usersState.length > 0 || loansState.length > 0) {
+        syncError = 'Offline mode — showing cached portfolio data';
+      } else {
+        syncError = 'Offline — unable to connect to Google Sheets. Check internet connection.';
+      }
+    }
   } catch (err: any) {
     console.warn('[Store] syncFromBackend warning:', err?.message || err);
-    syncError = 'Live sync offline - using cached data';
+    if (usersState.length > 0 || loansState.length > 0) {
+      syncError = 'Offline mode — showing cached portfolio data';
+    } else {
+      syncError = 'Offline — unable to connect to Google Sheets. Check internet connection.';
+    }
   } finally {
     isSyncing = false;
     notify();
