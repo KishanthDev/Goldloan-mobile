@@ -21,6 +21,7 @@ interface NavItem {
   name: string;
   route: string;
   title: string;
+  shortTitle: string;
   icon: keyof typeof Ionicons.glyphMap;
   activeIcon: keyof typeof Ionicons.glyphMap;
 }
@@ -30,6 +31,7 @@ const NAV_ITEMS: NavItem[] = [
     name: 'index',
     route: '/(tabs)',
     title: 'Dashboard',
+    shortTitle: 'Dashboard',
     icon: 'pie-chart-outline',
     activeIcon: 'pie-chart',
   },
@@ -37,6 +39,7 @@ const NAV_ITEMS: NavItem[] = [
     name: 'users',
     route: '/(tabs)/users',
     title: 'Customers',
+    shortTitle: 'Customers',
     icon: 'people-outline',
     activeIcon: 'people',
   },
@@ -44,6 +47,7 @@ const NAV_ITEMS: NavItem[] = [
     name: 'bank-accounts',
     route: '/(tabs)/bank-accounts',
     title: 'Bank Accounts',
+    shortTitle: 'Banks',
     icon: 'business-outline',
     activeIcon: 'business',
   },
@@ -51,6 +55,7 @@ const NAV_ITEMS: NavItem[] = [
     name: 'ornaments',
     route: '/(tabs)/ornaments',
     title: 'Gold Vault',
+    shortTitle: 'Vault',
     icon: 'diamond-outline',
     activeIcon: 'diamond',
   },
@@ -58,6 +63,7 @@ const NAV_ITEMS: NavItem[] = [
     name: 'loans',
     route: '/(tabs)/loans',
     title: 'Active Loans',
+    shortTitle: 'Loans',
     icon: 'cash-outline',
     activeIcon: 'cash',
   },
@@ -65,6 +71,7 @@ const NAV_ITEMS: NavItem[] = [
     name: 'closure',
     route: '/(tabs)/closure',
     title: 'Settlements',
+    shortTitle: 'Closure',
     icon: 'checkmark-done-circle-outline',
     activeIcon: 'checkmark-done-circle',
   },
@@ -121,7 +128,7 @@ function TabLayoutInner() {
 
   const activeTabMeta = TAB_METADATA[currentTabKey] || TAB_METADATA.index;
   const insets = useSafeAreaInsets();
-  const { collapsed, setCollapsed, mobileDrawerOpen, setMobileDrawerOpen, isDesktop } = useSidebar();
+  const { collapsed, setCollapsed, isDesktop } = useSidebar();
   const { colors, isDark } = useTheme();
   const styles = getStyles(colors, isDark);
 
@@ -155,47 +162,6 @@ function TabLayoutInner() {
     extrapolate: 'clamp',
   });
 
-  // ─── MOBILE DRAWER SMOOTH ANIMATION ───
-  const drawerWidth = Math.min(300, Math.round(width * 0.84));
-  const drawerSlideAnim = useRef(new Animated.Value(-drawerWidth)).current;
-  const backdropFadeAnim = useRef(new Animated.Value(0)).current;
-  const [drawerRendered, setDrawerRendered] = useState(false);
-
-  useEffect(() => {
-    if (mobileDrawerOpen) {
-      setDrawerRendered(true);
-      Animated.parallel([
-        Animated.timing(drawerSlideAnim, {
-          toValue: 0,
-          duration: 250,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
-        }),
-        Animated.timing(backdropFadeAnim, {
-          toValue: 1,
-          duration: 250,
-          useNativeDriver: true,
-        }),
-      ]).start();
-    } else if (drawerRendered) {
-      Animated.parallel([
-        Animated.timing(drawerSlideAnim, {
-          toValue: -drawerWidth,
-          duration: 220,
-          easing: Easing.in(Easing.cubic),
-          useNativeDriver: true,
-        }),
-        Animated.timing(backdropFadeAnim, {
-          toValue: 0,
-          duration: 220,
-          useNativeDriver: true,
-        }),
-      ]).start(() => {
-        setDrawerRendered(false);
-      });
-    }
-  }, [mobileDrawerOpen]);
-
   const isRouteActive = (item: NavItem) => {
     if (item.name === 'index') {
       return pathname === '/' || pathname === '/(tabs)' || pathname === '/(tabs)/';
@@ -209,13 +175,10 @@ function TabLayoutInner() {
     } else {
       router.push(`/(tabs)/${item.name}` as any);
     }
-    if (!isDesktop) {
-      setMobileDrawerOpen(false);
-    }
   };
 
   return (
-    <View style={[styles.root, { paddingTop: appTopPadding, paddingBottom: bottomInset }]}>
+    <View style={[styles.root, { paddingTop: appTopPadding, paddingBottom: isDesktop ? bottomInset : 0 }]}>
       <View style={styles.mainContainer}>
         {/* ─── DESKTOP COLLAPSIBLE SIDEBAR WITH SMOOTH ANIMATION ─── */}
         {isDesktop && (
@@ -316,19 +279,39 @@ function TabLayoutInner() {
           </Animated.View>
         )}
 
-        {/* ─── TAB SCREENS CONTENT (Full height, bottom bar permanently hidden) ─── */}
+        {/* ─── TAB SCREENS CONTENT ─── */}
         <View style={styles.screensWrapper}>
           {/* ─── GLOBAL SHARED TOP NAVIGATION BAR ─── */}
           <View style={[styles.topBar, isDesktop && styles.topBarDesktop]}>
-            <View style={styles.topBarTitleGroup}>
-              <SidebarTrigger />
-              <View style={styles.topBarTextWrapper}>
-                <Text style={styles.pageTitle} numberOfLines={1}>{activeTabMeta.title}</Text>
-                <Text style={styles.pageSubtitle} numberOfLines={1} ellipsizeMode="tail">
-                  {activeTabMeta.subtitle}
-                </Text>
+            {isDesktop ? (
+              /* Desktop: Sidebar Trigger + Page Title & Subtitle */
+              <View style={styles.topBarTitleGroup}>
+                <SidebarTrigger />
+                <View style={styles.topBarTextWrapper}>
+                  <Text style={styles.pageTitle} numberOfLines={1}>{activeTabMeta.title}</Text>
+                  <Text style={styles.pageSubtitle} numberOfLines={1} ellipsizeMode="tail">
+                    {activeTabMeta.subtitle}
+                  </Text>
+                </View>
               </View>
-            </View>
+            ) : (
+              /* Mobile: Brand Logo + Company Name & Subtitle */
+              <View style={styles.mobileTopBarBrandGroup}>
+                <Image
+                  source={require('../../../assets/Logo.png')}
+                  style={styles.mobileBrandLogo}
+                  resizeMode="contain"
+                />
+                <View style={styles.mobileBrandTextWrapper}>
+                  <Text style={styles.mobileBrandTitle} numberOfLines={1}>
+                    {Env.APP_NAME}
+                  </Text>
+                  <Text style={styles.mobileBrandSub} numberOfLines={1} ellipsizeMode="tail">
+                    {Env.APP_SUBTITLE}
+                  </Text>
+                </View>
+              </View>
+            )}
 
             <View style={styles.topBarActions}>
               <ThemeToggleBtn size={15} />
@@ -350,6 +333,7 @@ function TabLayoutInner() {
             </View>
           </View>
 
+          {/* Screen Content Tabs */}
           <View style={{ flex: 1 }}>
             <Tabs
               screenOptions={{
@@ -365,104 +349,42 @@ function TabLayoutInner() {
               <Tabs.Screen name="closure" options={{ title: 'Closure' }} />
             </Tabs>
           </View>
-        </View>
-      </View>
 
-      {/* ─── MOBILE SLIDE-IN DRAWER OVERLAY WITH ACCURATE INSETS ─── */}
-      {!isDesktop && drawerRendered && (
-        <View style={styles.mobileOverlay}>
-          {/* Animated Backdrop */}
-          <Animated.View style={[styles.mobileBackdrop, { opacity: backdropFadeAnim }]}>
-            <TouchableOpacity 
-              style={{ flex: 1 }} 
-              activeOpacity={1} 
-              onPress={() => setMobileDrawerOpen(false)} 
-            />
-          </Animated.View>
-
-          {/* Animated Drawer Container */}
-          <Animated.View 
-            style={[
-              styles.mobileDrawer, 
-              { 
-                width: drawerWidth, 
-                paddingTop: statusBarHeight,
-                paddingBottom: Math.max(bottomInset, 16),
-                transform: [{ translateX: drawerSlideAnim }] 
-              }
-            ]}
-          >
-            {/* Header (Strictly bounded, never overflows) */}
-            <View style={styles.mobileDrawerHeader}>
-              <View style={styles.drawerBrandGroup}>
-                <Image
-                  source={require('../../../assets/Logo.png')}
-                  style={styles.brandLogo}
-                  resizeMode="contain"
-                />
-                <View style={styles.drawerBrandTexts}>
-                  <Text style={styles.brandTitle} numberOfLines={1} ellipsizeMode="tail">
-                    {Env.APP_NAME}
-                  </Text>
-                  <Text style={styles.brandSub} numberOfLines={1} ellipsizeMode="tail">
-                    {Env.APP_SUBTITLE}
-                  </Text>
-                </View>
-              </View>
-              <View style={{ marginRight: 8 }}>
-                <ThemeToggleBtn size={16} />
-              </View>
-              <TouchableOpacity 
-                onPress={() => setMobileDrawerOpen(false)}
-                style={styles.drawerCloseBtn}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                accessibilityLabel="Close navigation"
-              >
-                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  <Ionicons name="chevron-back" size={16} color={Colors.textSecondary} />
-                  <Ionicons name="chevron-back" size={16} color={Colors.textSecondary} style={{ marginLeft: -8 }} />
-                </View>
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView style={styles.navScroll} contentContainerStyle={styles.navContent}>
+          {/* ─── MOBILE BOTTOM NAVIGATION BAR (WhatsApp / YouTube style) ─── */}
+          {!isDesktop && (
+            <View style={[styles.mobileBottomNav, { paddingBottom: Math.max(bottomInset, 8) }]}>
               {NAV_ITEMS.map((item) => {
                 const active = isRouteActive(item);
                 return (
                   <TouchableOpacity
                     key={item.name}
                     onPress={() => navigateTo(item)}
-                    style={[styles.navItem, active && styles.navItemActive]}
+                    style={styles.bottomNavItem}
                     activeOpacity={0.7}
                   >
-                    {active && <View style={styles.activePillIndicator} />}
-                    <Ionicons
-                      name={active ? item.activeIcon : item.icon}
-                      size={22}
-                      color={active ? (isDark ? '#fbbf24' : colors.primaryDark) : colors.textSecondary}
-                    />
-                    <Text style={[styles.navText, active && styles.navTextActive, { fontSize: 14 }]} numberOfLines={1}>
-                      {item.title}
+                    <View style={[styles.bottomNavIconWrapper, active && styles.bottomNavIconWrapperActive]}>
+                      <Ionicons
+                        name={active ? item.activeIcon : item.icon}
+                        size={21}
+                        color={active ? (isDark ? '#fbbf24' : colors.primaryDark) : colors.textSecondary}
+                      />
+                    </View>
+                    <Text 
+                      style={[
+                        styles.bottomNavText, 
+                        active && styles.bottomNavTextActive
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {item.shortTitle}
                     </Text>
                   </TouchableOpacity>
                 );
               })}
-            </ScrollView>
-
-            {live22kRate ? (
-              <View style={styles.mobileDrawerFooter}>
-                <View style={styles.goldTickerCard}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <Ionicons name="trending-up" size={14} color={Colors.primaryDark} />
-                    <Text style={styles.tickerTitle}>{Env.LOCATION_BENCHMARK} 22K Gold</Text>
-                  </View>
-                  <Text style={styles.tickerRate}>₹{live22kRate.toLocaleString()} <Text style={styles.tickerUnit}>/g</Text></Text>
-                </View>
-              </View>
-            ) : null}
-          </Animated.View>
+            </View>
+          )}
         </View>
-      )}
+      </View>
     </View>
   );
 }
@@ -515,6 +437,38 @@ const getStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
   },
   pageSubtitle: {
     fontSize: 11,
+    color: colors.textSecondary,
+    marginTop: 1,
+  },
+
+  // ─── MOBILE TOP BAR BRANDING ───
+  mobileTopBarBrandGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+    minWidth: 0,
+  },
+  mobileBrandLogo: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    flexShrink: 0,
+  },
+  mobileBrandTextWrapper: {
+    flex: 1,
+    minWidth: 0,
+    justifyContent: 'center',
+  },
+  mobileBrandTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: colors.textPrimary,
+    letterSpacing: 0.1,
+  },
+  mobileBrandSub: {
+    fontSize: 10,
+    fontWeight: '500',
     color: colors.textSecondary,
     marginTop: 1,
   },
@@ -617,15 +571,8 @@ const getStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
     paddingHorizontal: 8,
     gap: 4,
   },
-  navItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 10,
-    position: 'relative',
-    minHeight: 42,
+  desktopNavItemActive: {
+    backgroundColor: isDark ? '#261a02' : colors.primarySubtle,
   },
   navItemActive: {
     backgroundColor: isDark ? '#261a02' : colors.primarySubtle,
@@ -699,70 +646,49 @@ const getStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
     borderTopColor: colors.border,
   },
 
-  // ─── MOBILE DRAWER OVERLAY ───
-  mobileOverlay: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    left: 0,
-    right: 0,
-    zIndex: 9999,
+  // ─── MOBILE BOTTOM NAVIGATION (WhatsApp / YouTube style) ───
+  mobileBottomNav: {
     flexDirection: 'row',
-  },
-  mobileBackdrop: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.65)',
-  },
-  mobileDrawer: {
-    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'space-around',
     backgroundColor: colors.surface,
-    borderRightWidth: 1,
-    borderRightColor: colors.border,
-    zIndex: 10000,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    paddingTop: 6,
+    paddingHorizontal: 2,
     shadowColor: '#000',
-    shadowOpacity: 0.35,
-    shadowRadius: 12,
+    shadowOffset: { width: 0, height: -3 },
+    shadowOpacity: isDark ? 0.25 : 0.06,
+    shadowRadius: 6,
     elevation: 10,
-    overflow: 'hidden',
+    zIndex: 20,
   },
-  mobileDrawerHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  drawerBrandGroup: {
+  bottomNavItem: {
     flex: 1,
-    flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    marginRight: 8,
+    justifyContent: 'center',
+    paddingVertical: 3,
     minWidth: 0,
   },
-  drawerBrandTexts: {
-    flex: 1,
-    minWidth: 0,
-    overflow: 'hidden',
-  },
-  drawerCloseBtn: {
-    flexShrink: 0,
-    padding: 8,
-    borderRadius: 8,
-    backgroundColor: isDark ? '#1e293b' : '#f1f5f9',
+  bottomNavIconWrapper: {
+    paddingHorizontal: 12,
+    paddingVertical: 3,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  mobileDrawerFooter: {
-    padding: 14,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-    backgroundColor: colors.surface,
+  bottomNavIconWrapperActive: {
+    backgroundColor: isDark ? 'rgba(251, 191, 36, 0.16)' : 'rgba(217, 119, 6, 0.12)',
+  },
+  bottomNavText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: colors.textSecondary,
+    marginTop: 2,
+    textAlign: 'center',
+  },
+  bottomNavTextActive: {
+    fontWeight: '800',
+    color: isDark ? '#fbbf24' : colors.primaryDark,
   },
 });
