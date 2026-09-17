@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { Colors } from '../constants/theme';
+import { useTheme } from '../context/ThemeContext';
 
 interface BadgeProps {
   label: string;
@@ -9,20 +9,22 @@ interface BadgeProps {
 }
 
 export const Badge: React.FC<BadgeProps> = ({ label, variant = 'default', size = 'md' }) => {
+  const { colors, isDark } = useTheme();
+
   const getColors = () => {
     switch (variant) {
       case 'success':
-        return { bg: Colors.successBg, text: Colors.success };
+        return { bg: colors.successBg, text: colors.success };
       case 'warning':
-        return { bg: Colors.warningBg, text: Colors.warning };
+        return { bg: colors.warningBg, text: colors.warning };
       case 'danger':
-        return { bg: Colors.dangerBg, text: Colors.danger };
+        return { bg: colors.dangerBg, text: colors.danger };
       case 'info':
-        return { bg: Colors.infoBg, text: Colors.info };
+        return { bg: colors.infoBg, text: colors.info };
       case 'gold':
-        return { bg: '#fef9c3', text: '#854d0e' };
+        return { bg: isDark ? '#382504' : '#fef9c3', text: isDark ? '#fbbf24' : '#854d0e' };
       default:
-        return { bg: Colors.surfaceSubtle, text: Colors.textSecondary };
+        return { bg: colors.surfaceSubtle, text: colors.textSecondary };
     }
   };
 

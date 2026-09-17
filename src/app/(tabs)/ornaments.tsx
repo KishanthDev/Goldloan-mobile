@@ -4,7 +4,8 @@ import {
   Modal, TextInput, Alert, SafeAreaView, Platform, RefreshControl, Linking 
 } from 'react-native';
 import { Image } from 'expo-image';
-import { Colors } from '../../constants/theme';
+import { Colors, ThemeColors } from '../../constants/theme';
+import { useTheme } from '../../context/ThemeContext';
 import { useAppStore } from '../../services/store';
 import { getDriveImageUrl, api } from '../../services/api';
 import { Env } from '../../config/env';
@@ -17,6 +18,8 @@ import { ImagePickerField, FilePayload } from '../../components/ImagePickerField
 import { ImageViewModal } from '../../components/ImageViewModal';
 
 export default function OrnamentsScreen() {
+  const { colors, isDark } = useTheme();
+  const styles = getStyles(colors, isDark);
   const store = useAppStore();
 
   const [modalVisible, setModalVisible] = useState(false);
@@ -234,7 +237,7 @@ export default function OrnamentsScreen() {
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
             {firstImg ? (
               <TouchableOpacity onPress={() => setPreviewImageUrl(firstImg)}>
-                <Image source={{ uri: directUrl || firstImg }} style={{ width: 28, height: 28, borderRadius: 6, backgroundColor: '#f1f5f9' }} contentFit="cover" />
+                <Image source={{ uri: directUrl || firstImg }} style={{ width: 28, height: 28, borderRadius: 6, backgroundColor: isDark ? '#1e293b' : '#f1f5f9' }} contentFit="cover" />
               </TouchableOpacity>
             ) : null}
             <View style={{ flex: 1 }}>
@@ -278,7 +281,7 @@ export default function OrnamentsScreen() {
       width: 90,
       align: 'right',
       render: (o) => (
-        <Text style={[styles.cellText, { fontWeight: '700', color: Colors.primaryDark }]}>
+        <Text style={[styles.cellText, { fontWeight: '700', color: colors.primaryDark }]}>
           {Number(o.NetWeight || o.MetalWeight || 0).toFixed(2)}g
         </Text>
       ),
@@ -325,10 +328,10 @@ export default function OrnamentsScreen() {
             <Ionicons name="eye-outline" size={16} color="#0284c7" />
           </TouchableOpacity>
           <TouchableOpacity onPress={() => openEditModal(o)} style={styles.actionBtn}>
-            <Ionicons name="pencil-outline" size={16} color={Colors.primaryDark} />
+            <Ionicons name="pencil-outline" size={16} color={colors.primaryDark} />
           </TouchableOpacity>
           <TouchableOpacity onPress={() => handleDelete(o)} style={styles.actionBtn}>
-            <Ionicons name="trash-outline" size={16} color={Colors.danger} />
+            <Ionicons name="trash-outline" size={16} color={colors.danger} />
           </TouchableOpacity>
         </View>
       ),
@@ -340,7 +343,7 @@ export default function OrnamentsScreen() {
       <ScrollView 
         style={styles.container} 
         contentContainerStyle={styles.content}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[Colors.primary]} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />}
       >
         <DataTable
           isLoading={store.isSyncing && store.ornaments.length === 0}
@@ -373,7 +376,7 @@ export default function OrnamentsScreen() {
                 {isEditing ? 'Edit Gold Ornament' : 'Add Gold Ornament'}
               </Text>
               <TouchableOpacity onPress={() => setModalVisible(false)}>
-                <Ionicons name="close" size={22} color={Colors.textSecondary} />
+                <Ionicons name="close" size={22} color={colors.textSecondary} />
               </TouchableOpacity>
             </View>
 
@@ -382,8 +385,8 @@ export default function OrnamentsScreen() {
               <View style={styles.field}>
                 <Text style={styles.label}>Select Borrower *</Text>
                 {store.users.length === 0 ? (
-                  <View style={{ backgroundColor: Colors.warningBg, padding: 10, borderRadius: 8, marginTop: 4 }}>
-                    <Text style={{ fontSize: 13, color: Colors.warning, fontWeight: '500' }}>
+                  <View style={{ backgroundColor: colors.warningBg, padding: 10, borderRadius: 8, marginTop: 4 }}>
+                    <Text style={{ fontSize: 13, color: colors.warning, fontWeight: '500' }}>
                       ⚠️ No borrowers registered yet. Please add a customer in the Users tab first.
                     </Text>
                   </View>
@@ -470,7 +473,7 @@ export default function OrnamentsScreen() {
                 <View style={[styles.field, { flex: 1 }]}>
                   <Text style={styles.label}>Metal / Net (g)</Text>
                   <TextInput
-                    style={[styles.input, { fontWeight: '700', color: Colors.primaryDark }]}
+                    style={[styles.input, { fontWeight: '700', color: colors.primaryDark }]}
                     placeholder={metal.toFixed(2)}
                     keyboardType="decimal-pad"
                     value={form.MetalWeight || (metal > 0 ? metal.toFixed(2) : '')}
@@ -511,11 +514,11 @@ export default function OrnamentsScreen() {
                 </View>
                 <View style={styles.calcRow}>
                   <Text style={styles.calcLabel}>Market Value ({metal.toFixed(2)}g × ₹{currentPrice}):</Text>
-                  <Text style={[styles.calcVal, { color: Colors.success }]}>₹{marketValCalc.toLocaleString()}</Text>
+                  <Text style={[styles.calcVal, { color: colors.success }]}>₹{marketValCalc.toLocaleString()}</Text>
                 </View>
                 <View style={[styles.calcRow, { borderTopWidth: 1, borderTopColor: '#fef08a', paddingTop: 6, marginTop: 4 }]}>
                   <Text style={styles.calcLabel}>Appreciation Gains:</Text>
-                  <Text style={[styles.calcVal, { color: apprValCalc >= 0 ? Colors.success : Colors.danger }]}>
+                  <Text style={[styles.calcVal, { color: apprValCalc >= 0 ? colors.success : colors.danger }]}>
                     {apprValCalc >= 0 ? '+' : ''}₹{apprValCalc.toLocaleString()} ({apprPctCalc.toFixed(2)}%)
                   </Text>
                 </View>
@@ -654,7 +657,7 @@ export default function OrnamentsScreen() {
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Ornament Details</Text>
               <TouchableOpacity onPress={() => setDetailModalVisible(false)}>
-                <Ionicons name="close" size={22} color={Colors.textSecondary} />
+                <Ionicons name="close" size={22} color={colors.textSecondary} />
               </TouchableOpacity>
             </View>
 
@@ -681,7 +684,7 @@ export default function OrnamentsScreen() {
                   <Text style={styles.detailSecTitle}>Weight Breakdown</Text>
                   <Text style={styles.detailRowText}><Text style={styles.bold}>Gross Weight:</Text> {Number(selectedOrn.GrossWeight || 0).toFixed(2)} g</Text>
                   <Text style={styles.detailRowText}><Text style={styles.bold}>Stone Weight:</Text> {Number(selectedOrn.StoneWeight || 0).toFixed(2)} g</Text>
-                  <Text style={[styles.detailRowText, { color: Colors.primaryDark, fontWeight: '700' }]}>
+                  <Text style={[styles.detailRowText, { color: colors.primaryDark, fontWeight: '700' }]}>
                     Net Metal Weight: {Number(selectedOrn.NetWeight || selectedOrn.MetalWeight || 0).toFixed(2)} g
                   </Text>
                 </View>
@@ -691,7 +694,7 @@ export default function OrnamentsScreen() {
                   <Text style={styles.detailRowText}><Text style={styles.bold}>Buying Cost:</Text> ₹{(selectedOrn.BuyingCost || selectedOrn.TotalPrice || 0).toLocaleString()} (@ ₹{selectedOrn.BuyingPricePerGram}/g)</Text>
                   <Text style={styles.detailRowText}><Text style={styles.bold}>Current Market Value:</Text> ₹{(selectedOrn.MarketValue || 0).toLocaleString()} (@ ₹{selectedOrn.CurrentPricePerGram}/g)</Text>
                   {selectedOrn.EstimatedValue ? <Text style={styles.detailRowText}><Text style={styles.bold}>Estimated Value:</Text> ₹{Number(selectedOrn.EstimatedValue).toLocaleString()}</Text> : null}
-                  <Text style={[styles.detailRowText, { color: Colors.success, fontWeight: '700' }]}>
+                  <Text style={[styles.detailRowText, { color: colors.success, fontWeight: '700' }]}>
                     Appreciation Gains: +₹{(selectedOrn.AppreciationValue || 0).toLocaleString()} ({selectedOrn.AppreciationPercentage?.toFixed(2)}%)
                   </Text>
                 </View>
@@ -706,11 +709,11 @@ export default function OrnamentsScreen() {
                           <TouchableOpacity 
                             key={i} 
                             onPress={() => setPreviewImageUrl(imgUrl)}
-                            style={{ borderRadius: 8, overflow: 'hidden', borderWidth: 1, borderColor: Colors.border }}
+                            style={{ borderRadius: 8, overflow: 'hidden', borderWidth: 1, borderColor: colors.border }}
                           >
                             <Image
                               source={{ uri: directUrl || imgUrl }}
-                              style={{ width: 140, height: 100, backgroundColor: '#f1f5f9' }}
+                              style={{ width: 140, height: 100, backgroundColor: isDark ? '#1e293b' : '#f1f5f9' }}
                               contentFit="cover"
                             />
                             <View style={{ backgroundColor: 'rgba(0,0,0,0.6)', paddingVertical: 2, paddingHorizontal: 4 }}>
@@ -753,14 +756,14 @@ export default function OrnamentsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
   },
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: colors.background,
   },
   content: {
     padding: 12,
@@ -769,21 +772,21 @@ const styles = StyleSheet.create({
   idText: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#64748b',
+    color: isDark ? '#94a3b8' : '#64748b',
   },
   primaryCellText: {
     fontSize: 13,
     fontWeight: '700',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
   subCellText: {
     fontSize: 11,
-    color: Colors.textMuted,
+    color: colors.textMuted,
     marginTop: 1,
   },
   cellText: {
     fontSize: 13,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
   },
   actionRow: {
     flexDirection: 'row',
@@ -794,7 +797,7 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 6,
-    backgroundColor: '#f1f5f9',
+    backgroundColor: isDark ? '#1e293b' : '#f1f5f9',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -806,7 +809,7 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   modalBox: {
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.surface,
     borderRadius: 16,
     width: Platform.select({ web: '55%', default: '94%' }),
     maxWidth: 650,
@@ -820,12 +823,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 14,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    borderBottomColor: colors.border,
   },
   modalTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
   modalBody: {
     padding: 16,
@@ -835,7 +838,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
     padding: 12,
     borderTopWidth: 1,
-    borderTopColor: Colors.border,
+    borderTopColor: colors.border,
     gap: 10,
   },
   field: {
@@ -848,35 +851,35 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 12,
     fontWeight: '600',
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     marginBottom: 4,
   },
   input: {
-    backgroundColor: '#f8fafc',
+    backgroundColor: isDark ? '#090d16' : '#f8fafc',
     borderRadius: 8,
     paddingHorizontal: 10,
     paddingVertical: 8,
     fontSize: 13,
     borderWidth: 1,
-    borderColor: Colors.border,
-    color: Colors.textPrimary,
+    borderColor: colors.border,
+    color: colors.textPrimary,
   },
   userChip: {
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 16,
-    backgroundColor: '#f1f5f9',
+    backgroundColor: isDark ? '#1e293b' : '#f1f5f9',
     marginRight: 6,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
   },
   userChipActive: {
-    backgroundColor: Colors.primaryDark,
-    borderColor: Colors.primaryDark,
+    backgroundColor: colors.primaryDark,
+    borderColor: colors.primaryDark,
   },
   userChipText: {
     fontSize: 12,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     fontWeight: '600',
   },
   userChipTextActive: {
@@ -891,34 +894,34 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     alignItems: 'center',
     borderRadius: 6,
-    backgroundColor: '#f1f5f9',
+    backgroundColor: isDark ? '#1e293b' : '#f1f5f9',
   },
   purityBtnActive: {
     backgroundColor: '#fef08a',
-    borderColor: Colors.primary,
+    borderColor: colors.primary,
     borderWidth: 1,
   },
   purityBtnText: {
     fontSize: 11,
     fontWeight: '700',
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
   },
   purityBtnTextActive: {
-    color: '#854d0e',
+    color: isDark ? '#fbbf24' : '#854d0e',
   },
   calcBox: {
-    backgroundColor: '#fefce8',
+    backgroundColor: isDark ? '#261a02' : '#fefce8',
     borderRadius: 10,
     padding: 12,
     borderWidth: 1,
-    borderColor: '#fef08a',
+    borderColor: isDark ? '#334155' : '#fef08a',
     marginBottom: 12,
     gap: 4,
   },
   calcBoxTitle: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#854d0e',
+    color: isDark ? '#fbbf24' : '#854d0e',
     textTransform: 'uppercase',
     marginBottom: 4,
   },
@@ -928,12 +931,12 @@ const styles = StyleSheet.create({
   },
   calcLabel: {
     fontSize: 12,
-    color: '#854d0e',
+    color: isDark ? '#fbbf24' : '#854d0e',
   },
   calcVal: {
     fontSize: 13,
     fontWeight: '700',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
   statusToggleRow: {
     flexDirection: 'row',
@@ -944,15 +947,15 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     alignItems: 'center',
     borderRadius: 6,
-    backgroundColor: '#f1f5f9',
+    backgroundColor: isDark ? '#1e293b' : '#f1f5f9',
   },
   statusBtnActive: {
-    backgroundColor: Colors.primaryDark,
+    backgroundColor: colors.primaryDark,
   },
   statusBtnText: {
     fontSize: 11,
     fontWeight: '600',
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
   },
   statusBtnTextActive: {
     color: '#ffffff',
@@ -962,15 +965,15 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
   },
   cancelBtnText: {
     fontSize: 13,
     fontWeight: '600',
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
   },
   saveBtn: {
-    backgroundColor: Colors.primaryDark,
+    backgroundColor: colors.primaryDark,
     paddingHorizontal: 18,
     paddingVertical: 10,
     borderRadius: 8,
@@ -981,26 +984,26 @@ const styles = StyleSheet.create({
     color: '#ffffff',
   },
   detailCard: {
-    backgroundColor: '#fffbeb',
+    backgroundColor: isDark ? '#1e293b' : '#fffbeb',
     borderRadius: 10,
     padding: 12,
     borderWidth: 1,
-    borderColor: '#fef08a',
+    borderColor: isDark ? '#334155' : '#fef08a',
     marginBottom: 14,
   },
   detailName: {
     fontSize: 18,
     fontWeight: '800',
-    color: '#713f12',
+    color: isDark ? '#fbbf24' : '#713f12',
   },
   detailCode: {
     fontSize: 12,
-    color: '#a16207',
+    color: isDark ? '#facc15' : '#a16207',
     marginTop: 2,
   },
   detailSubCode: {
     fontSize: 11,
-    color: '#92400e',
+    color: isDark ? '#fbbf24' : '#92400e',
     marginTop: 1,
     fontStyle: 'italic',
   },
@@ -1011,23 +1014,23 @@ const styles = StyleSheet.create({
   },
   detailSection: {
     marginBottom: 14,
-    backgroundColor: '#f8fafc',
+    backgroundColor: isDark ? '#090d16' : '#f8fafc',
     borderRadius: 10,
     padding: 12,
   },
   detailSecTitle: {
     fontSize: 13,
     fontWeight: '700',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     marginBottom: 8,
   },
   detailRowText: {
     fontSize: 12,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     marginBottom: 4,
   },
   bold: {
     fontWeight: '700',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
 });

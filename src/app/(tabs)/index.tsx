@@ -5,7 +5,9 @@ import {
 } from 'react-native';
 import { Skeleton } from '../../components/Skeleton';
 import { useRouter } from 'expo-router';
-import { Colors } from '../../constants/theme';
+import { Colors, ThemeColors } from '../../constants/theme';
+import { useTheme } from '../../context/ThemeContext';
+import { ThemeToggleBtn } from '../../components/ThemeToggleBtn';
 import { useAppStore } from '../../services/store';
 import { ApiConfig } from '../../config/api';
 import { Env } from '../../config/env';
@@ -16,6 +18,8 @@ export default function DashboardScreen() {
   const router = useRouter();
   const store = useAppStore();
   const { width } = useWindowDimensions();
+  const { colors, isDark } = useTheme();
+  const styles = getStyles(colors, isDark);
   const [refreshing, setRefreshing] = useState(false);
 
   const isDesktop = width >= 1024;
@@ -60,23 +64,26 @@ export default function DashboardScreen() {
           </View>
         </View>
 
-        <TouchableOpacity onPress={onRefresh} style={styles.refreshActionBtn} activeOpacity={0.7}>
-          <Ionicons name="refresh" size={15} color={Colors.primaryDark} />
-          <Text style={styles.refreshActionText}>Sync Rates & Data</Text>
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <ThemeToggleBtn size={15} />
+          <TouchableOpacity onPress={onRefresh} style={styles.refreshActionBtn} activeOpacity={0.7}>
+            <Ionicons name="refresh" size={15} color={isDark ? '#fbbf24' : colors.primaryDark} />
+            <Text style={styles.refreshActionText}>Sync Rates & Data</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView 
         style={styles.container} 
         contentContainerStyle={[styles.content, isDesktop && styles.contentDesktop]}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[Colors.primary]} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />}
       >
         {/* ─── INITIAL SYNC SKELETON LOADER (When cache is empty & syncing) ─── */}
         {store.isSyncing && store.users.length === 0 && store.loans.length === 0 ? (
           <View style={{ gap: 20 }}>
             {/* Syncing Pill Notice */}
             <View style={styles.syncNoticePill}>
-              <ActivityIndicator size="small" color={Colors.primaryDark} />
+              <ActivityIndicator size="small" color={isDark ? '#fbbf24' : colors.primaryDark} />
               <Text style={styles.syncNoticeText}>Loading portfolio data from Google Sheets...</Text>
             </View>
 
@@ -154,7 +161,7 @@ export default function DashboardScreen() {
                     <Text style={[styles.rateKarat, styles.rateKaratFeatured]} numberOfLines={1}>
                       22K Standard (916)
                     </Text>
-                    <View style={[styles.miniBadge, { backgroundColor: Colors.primaryDark }]}>
+                    <View style={[styles.miniBadge, { backgroundColor: isDark ? '#b45309' : colors.primaryDark }]}>
                       <Text style={[styles.miniBadgeText, { color: '#ffffff' }]}>Primary</Text>
                     </View>
                   </View>
@@ -226,7 +233,7 @@ export default function DashboardScreen() {
               {/* 22K Jewelry Standard (Featured) */}
               <View style={[styles.rateBox, styles.rateBoxFeatured]}>
                 <View style={styles.rateBoxHeader}>
-                  <Text style={[styles.rateKarat, { color: Colors.primaryDark }]} numberOfLines={1}>
+                  <Text style={[styles.rateKarat, { color: isDark ? '#fbbf24' : colors.primaryDark }]} numberOfLines={1}>
                     22K Standard (916)
                   </Text>
                   <View style={[styles.miniBadge, { backgroundColor: Colors.primaryDark }]}>
@@ -295,7 +302,7 @@ export default function DashboardScreen() {
               ₹{buyingGoldValue.toLocaleString()}
             </Text>
             <View style={[styles.valBadge, { backgroundColor: '#f1f5f9' }]}>
-              <Text style={[styles.valBadgeText, { color: Colors.textSecondary }]} numberOfLines={1}>
+              <Text style={[styles.valBadgeText, { color: colors.textSecondary }]} numberOfLines={1}>
                 Historical purchase benchmark
               </Text>
             </View>
@@ -331,9 +338,9 @@ export default function DashboardScreen() {
           >
             <View style={styles.metricTop}>
               <View style={styles.metricIconBox}>
-                <Ionicons name="people" size={20} color={Colors.primaryDark} />
+                <Ionicons name="people" size={20} color={isDark ? '#fbbf24' : colors.primaryDark} />
               </View>
-              <Ionicons name="chevron-forward" size={16} color={Colors.textMuted} />
+              <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
             </View>
             <Text style={styles.metricVal} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
               {dash.totalUsers}
@@ -352,7 +359,7 @@ export default function DashboardScreen() {
               <View style={[styles.metricIconBox, { backgroundColor: '#e0f2fe' }]}>
                 <Ionicons name="business" size={20} color="#0284c7" />
               </View>
-              <Ionicons name="chevron-forward" size={16} color={Colors.textMuted} />
+              <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
             </View>
             <Text style={styles.metricVal} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
               {dash.totalBankAccounts}
@@ -371,7 +378,7 @@ export default function DashboardScreen() {
               <View style={[styles.metricIconBox, { backgroundColor: '#fef3c7' }]}>
                 <Ionicons name="cash" size={20} color="#b45309" />
               </View>
-              <Ionicons name="chevron-forward" size={16} color={Colors.textMuted} />
+              <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
             </View>
             <Text style={styles.metricVal} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
               ₹{(dash.totalLoanAmount / 1000).toFixed(0)}k
@@ -390,7 +397,7 @@ export default function DashboardScreen() {
               <View style={[styles.metricIconBox, { backgroundColor: '#dcfce7' }]}>
                 <Ionicons name="shield-checkmark" size={20} color="#16a34a" />
               </View>
-              <Ionicons name="chevron-forward" size={16} color={Colors.textMuted} />
+              <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
             </View>
             <Text style={styles.metricVal} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
               {dash.pledgedGrams.toFixed(1)}g
@@ -428,9 +435,9 @@ export default function DashboardScreen() {
           </View>
 
           <View style={styles.utilFooter}>
-            <Ionicons name="checkmark-circle" size={16} color={Colors.success} />
+            <Ionicons name="checkmark-circle" size={16} color={colors.success} />
             <Text style={styles.bankUtilSub} numberOfLines={1} ellipsizeMode="tail">
-              Available credit headroom: <Text style={{ color: Colors.success, fontWeight: '700' }}>₹{dash.totalAvailableLoanAmount.toLocaleString()}</Text>
+              Available credit headroom: <Text style={{ color: colors.success, fontWeight: '700' }}>₹{dash.totalAvailableLoanAmount.toLocaleString()}</Text>
             </Text>
           </View>
         </View>
@@ -444,7 +451,7 @@ export default function DashboardScreen() {
             activeOpacity={0.7}
           >
             <View style={[styles.actionIconBox, { backgroundColor: '#fef08a' }]}>
-              <Ionicons name="add-circle" size={20} color={Colors.primaryDark} />
+              <Ionicons name="add-circle" size={20} color={isDark ? '#fbbf24' : colors.primaryDark} />
             </View>
             <Text style={styles.actionTitle} numberOfLines={1}>New Loan</Text>
             <Text style={styles.actionSub} numberOfLines={1}>Disburse collateral</Text>
@@ -493,10 +500,10 @@ export default function DashboardScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
   screenRoot: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: colors.background,
   },
   topBar: {
     flexDirection: 'row',
@@ -506,9 +513,13 @@ const styles = StyleSheet.create({
     gap: 10,
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    borderBottomColor: colors.border,
+  },
+  topBarDesktop: {
+    paddingHorizontal: 28,
+    paddingVertical: 14,
   },
   topBarTitleGroup: {
     flexDirection: 'row',
@@ -524,11 +535,11 @@ const styles = StyleSheet.create({
   pageTitle: {
     fontSize: 18,
     fontWeight: '800',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
   pageSubtitle: {
     fontSize: 11,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     marginTop: 1,
   },
   refreshActionBtn: {
@@ -538,15 +549,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 7,
     borderRadius: 8,
-    backgroundColor: Colors.primarySubtle,
+    backgroundColor: isDark ? '#1e293b' : colors.primarySubtle,
     borderWidth: 1,
-    borderColor: '#fde68a',
+    borderColor: isDark ? '#334155' : '#fde68a',
     flexShrink: 0,
   },
   refreshActionText: {
     fontSize: 12,
     fontWeight: '700',
-    color: Colors.primaryDark,
+    color: isDark ? '#fbbf24' : colors.primaryDark,
   },
   container: {
     flex: 1,
@@ -556,8 +567,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: '#fefce8',
-    borderColor: '#fef08a',
+    backgroundColor: isDark ? '#1e293b' : '#fefce8',
+    borderColor: isDark ? '#334155' : '#fef08a',
     borderWidth: 1,
     borderRadius: 10,
     paddingVertical: 10,
@@ -566,11 +577,7 @@ const styles = StyleSheet.create({
   syncNoticeText: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#854d0e',
-  },
-  topBarDesktop: {
-    paddingHorizontal: 28,
-    paddingVertical: 14,
+    color: isDark ? '#fbbf24' : '#854d0e',
   },
   content: {
     padding: 16,
@@ -586,11 +593,11 @@ const styles = StyleSheet.create({
 
   // ─── RATES CARD ───
   goldRatesCard: {
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     borderRadius: 16,
     padding: 16,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
     marginBottom: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
@@ -623,7 +630,7 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: '#fef08a',
+    backgroundColor: isDark ? '#382504' : '#fef08a',
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
@@ -631,10 +638,10 @@ const styles = StyleSheet.create({
   cardSectionTitle: {
     fontSize: 14,
     fontWeight: '800',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
   cityPill: {
-    backgroundColor: '#fef08a',
+    backgroundColor: isDark ? '#382504' : '#fef08a',
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 6,
@@ -643,11 +650,11 @@ const styles = StyleSheet.create({
   cityPillText: {
     fontSize: 10,
     fontWeight: '700',
-    color: '#854d0e',
+    color: isDark ? '#fbbf24' : '#854d0e',
   },
   dateLabel: {
     fontSize: 11,
-    color: Colors.textMuted,
+    color: colors.textMuted,
     flexShrink: 0,
   },
 
@@ -665,23 +672,19 @@ const styles = StyleSheet.create({
   },
   rateBox: {
     flex: 1,
-    backgroundColor: '#f8fafc',
+    backgroundColor: isDark ? '#111827' : '#f8fafc',
     borderRadius: 12,
     padding: 12,
     borderWidth: 1,
-    borderColor: Colors.border,
-    alignItems: 'center',
-    minWidth: 0,
+    borderColor: colors.border,
   },
   rateBoxFeatured: {
-    backgroundColor: '#fffdf5',
-    borderColor: '#facc15',
+    backgroundColor: isDark ? '#1e1a06' : '#fffbeb',
+    borderColor: colors.primary,
     borderWidth: 1.5,
   },
   rateBoxHero: {
-    alignItems: 'stretch',
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+    padding: 14,
   },
   heroHeaderRow: {
     flexDirection: 'row',
@@ -691,34 +694,22 @@ const styles = StyleSheet.create({
     gap: 6,
     marginBottom: 8,
   },
-  heroAmountRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: 8,
-  },
-  rateUnitHero: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: Colors.textMuted,
-  },
   rateBoxHeader: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
     marginBottom: 4,
-    width: '100%',
   },
   rateKarat: {
-    fontSize: 11,
+    fontSize: 11.5,
     fontWeight: '700',
-    color: Colors.textSecondary,
-    flexShrink: 1,
+    color: colors.textSecondary,
+    flex: 1,
   },
   rateKaratFeatured: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '800',
-    color: Colors.primaryDark,
+    color: isDark ? '#fbbf24' : colors.primaryDark,
   },
   miniBadge: {
     paddingHorizontal: 5,
@@ -727,90 +718,89 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
   miniBadgeText: {
-    fontSize: 9,
-    fontWeight: '800',
+    fontSize: 9.5,
+    fontWeight: '700',
   },
   rateAmount: {
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: '800',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
+    letterSpacing: -0.3,
   },
   rateAmountFeatured: {
-    color: Colors.primaryDark,
-    fontSize: 22,
+    fontSize: 19,
+    color: isDark ? '#fbbf24' : colors.primaryDark,
   },
   rateUnit: {
-    fontSize: 10,
-    color: Colors.textMuted,
-    marginTop: 1,
+    fontSize: 10.5,
+    color: colors.textMuted,
+    marginBottom: 6,
+  },
+  rateUnitHero: {
+    fontSize: 13,
+    color: colors.textMuted,
+    marginBottom: 2,
+  },
+  heroAmountRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 6,
   },
   sovereignBox: {
-    marginTop: 8,
-    backgroundColor: '#f1f5f9',
-    paddingHorizontal: 8,
+    backgroundColor: isDark ? '#1e293b' : '#f1f5f9',
+    paddingHorizontal: 6,
     paddingVertical: 3,
-    borderRadius: 6,
-    maxWidth: '100%',
+    borderRadius: 5,
+    marginTop: 2,
   },
   sovereignText: {
     fontSize: 10,
     fontWeight: '600',
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
   },
 
-  // ─── HEADINGS ───
+  // ─── VALUATION ───
   sectionHeading: {
-    fontSize: 13,
+    fontSize: 15,
     fontWeight: '800',
-    color: Colors.textSecondary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    color: colors.textPrimary,
     marginBottom: 12,
-    marginTop: 4,
   },
-
-  // ─── VALUATION GRID ───
   valGrid: {
     gap: 12,
-    marginBottom: 24,
+    marginBottom: 20,
   },
   valGridRow: {
     flexDirection: 'row',
   },
   valCard: {
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     borderRadius: 14,
     padding: 16,
     borderWidth: 1,
-    borderColor: Colors.border,
-    shadowColor: '#000',
-    shadowOpacity: 0.03,
-    shadowRadius: 3,
-    elevation: 1,
-    minWidth: 0,
+    borderColor: colors.border,
   },
   valCardSuccess: {
-    backgroundColor: '#f0fdf4',
-    borderColor: '#bbf7d0',
+    backgroundColor: isDark ? '#052210' : '#f0fdf4',
+    borderColor: isDark ? '#14532d' : '#bbf7d0',
   },
   valCardTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 6,
+    marginBottom: 10,
   },
   valTitle: {
-    fontSize: 12,
+    fontSize: 11.5,
     fontWeight: '700',
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     textTransform: 'uppercase',
-    letterSpacing: 0.3,
+    letterSpacing: 0.4,
     flex: 1,
-    marginRight: 6,
   },
   valIconBox: {
-    width: 32,
-    height: 32,
+    width: 30,
+    height: 30,
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
@@ -819,11 +809,11 @@ const styles = StyleSheet.create({
   valAmount: {
     fontSize: 22,
     fontWeight: '800',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     marginBottom: 8,
   },
   valBadge: {
-    backgroundColor: '#fef3c7',
+    backgroundColor: isDark ? '#1e293b' : '#fef3c7',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 6,
@@ -833,7 +823,7 @@ const styles = StyleSheet.create({
   valBadgeText: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#92400e',
+    color: isDark ? '#fbbf24' : '#92400e',
   },
 
   // ─── METRICS GRID (2x2 on Mobile, 4 in a row on Desktop) ───
@@ -854,19 +844,19 @@ const styles = StyleSheet.create({
   metricCardDesktop: {
     flex: 1,
     minWidth: 0,
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     borderRadius: 14,
     padding: 14,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
   },
   metricCardMobile: {
     width: '48.5%',
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     borderRadius: 14,
     padding: 14,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
   },
   metricTop: {
     flexDirection: 'row',
@@ -878,7 +868,7 @@ const styles = StyleSheet.create({
     width: 34,
     height: 34,
     borderRadius: 10,
-    backgroundColor: '#fef08a',
+    backgroundColor: isDark ? '#382504' : '#fef08a',
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
@@ -886,28 +876,28 @@ const styles = StyleSheet.create({
   metricVal: {
     fontSize: 19,
     fontWeight: '800',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
   metricLabel: {
     fontSize: 12,
     fontWeight: '700',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     marginTop: 2,
     flex: 1,
   },
   metricHint: {
     fontSize: 10.5,
-    color: Colors.textMuted,
+    color: colors.textMuted,
     marginTop: 2,
   },
 
   // ─── BANK UTILIZATION ───
   bankUtilCard: {
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     borderRadius: 16,
     padding: 16,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
     marginBottom: 20,
   },
   bankUtilHeader: {
@@ -921,15 +911,15 @@ const styles = StyleSheet.create({
   bankUtilTitle: {
     fontSize: 14,
     fontWeight: '800',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
   bankUtilSubText: {
     fontSize: 11,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     marginTop: 2,
   },
   utilPill: {
-    backgroundColor: '#e0f2fe',
+    backgroundColor: isDark ? '#082f49' : '#e0f2fe',
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,
@@ -938,7 +928,7 @@ const styles = StyleSheet.create({
   utilPillText: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#0284c7',
+    color: isDark ? '#38bdf8' : '#0284c7',
   },
   utilAmountsRow: {
     flexDirection: 'row',
@@ -949,24 +939,24 @@ const styles = StyleSheet.create({
   },
   utilAmountLabel: {
     fontSize: 11,
-    color: Colors.textMuted,
+    color: colors.textMuted,
   },
   utilAmountVal: {
     fontSize: 15,
     fontWeight: '800',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     marginTop: 2,
   },
   barBg: {
     height: 10,
-    backgroundColor: '#f1f5f9',
+    backgroundColor: isDark ? '#1e293b' : '#f1f5f9',
     borderRadius: 5,
     overflow: 'hidden',
     marginBottom: 10,
   },
   barFill: {
     height: '100%',
-    backgroundColor: Colors.primaryDark,
+    backgroundColor: isDark ? '#f59e0b' : colors.primaryDark,
     borderRadius: 5,
   },
   utilFooter: {
@@ -976,11 +966,11 @@ const styles = StyleSheet.create({
   },
   bankUtilSub: {
     fontSize: 12,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     flex: 1,
   },
 
-  // ─── QUICK ACTIONS GRID (2x2 on Mobile, 4 in a row on Desktop) ───
+  // ─── QUICK ACTIONS GRID (4-IN-A-ROW ON DESKTOP, 2x2 ON MOBILE) ───
   quickActionsGridDesktop: {
     flexDirection: 'row',
     gap: 12,
@@ -996,19 +986,19 @@ const styles = StyleSheet.create({
   actionCardDesktop: {
     flex: 1,
     minWidth: 0,
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     borderRadius: 14,
     padding: 14,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
   },
   actionCardMobile: {
     width: '48.5%',
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     borderRadius: 14,
     padding: 14,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
   },
   actionIconBox: {
     width: 34,
@@ -1021,11 +1011,11 @@ const styles = StyleSheet.create({
   actionTitle: {
     fontSize: 12.5,
     fontWeight: '700',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
   actionSub: {
     fontSize: 10.5,
-    color: Colors.textMuted,
+    color: colors.textMuted,
     marginTop: 2,
   },
 });

@@ -4,13 +4,16 @@ import {
   ActivityIndicator, TextInput, Alert, SafeAreaView 
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Colors } from '../../constants/theme';
+import { Colors, ThemeColors } from '../../constants/theme';
+import { useTheme } from '../../context/ThemeContext';
 import { useAppStore } from '../../services/store';
 import { Loan, User, Ornament, Payment } from '../../types';
 import { Badge } from '../../components/Badge';
 import { Ionicons } from '@expo/vector-icons';
 
 export default function LoanDetailScreen() {
+  const { colors, isDark } = useTheme();
+  const styles = getStyles(colors, isDark);
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const store = useAppStore();
@@ -84,7 +87,7 @@ export default function LoanDetailScreen() {
   if (loading) {
     return (
       <View style={styles.centerBox}>
-        <ActivityIndicator size="large" color={Colors.primary} />
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
@@ -106,7 +109,7 @@ export default function LoanDetailScreen() {
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.iconBtn}>
-          <Ionicons name="arrow-back" size={22} color={Colors.textPrimary} />
+          <Ionicons name="arrow-back" size={22} color={colors.textPrimary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{loan.LoanNumber}</Text>
         <View style={{ width: 32 }} />
@@ -167,7 +170,7 @@ export default function LoanDetailScreen() {
             style={[styles.actionBtn, styles.actionBtnOutline]} 
             onPress={() => router.push('/loans/closure')}
           >
-            <Ionicons name="checkmark-done" size={18} color={Colors.primaryDark} />
+            <Ionicons name="checkmark-done" size={18} color={isDark ? '#fbbf24' : colors.primaryDark} />
             <Text style={styles.actionBtnOutlineText}>Close & Release</Text>
           </TouchableOpacity>
         </View>
@@ -194,7 +197,7 @@ export default function LoanDetailScreen() {
             <TextInput
               style={styles.payInput}
               placeholder="Amount Paid (₹)"
-              placeholderTextColor={Colors.textMuted}
+              placeholderTextColor={colors.placeholder}
               keyboardType="number-pad"
               value={payAmount}
               onChangeText={setPayAmount}
@@ -252,10 +255,10 @@ export default function LoanDetailScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
   },
   header: {
     flexDirection: 'row',
@@ -264,7 +267,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    borderBottomColor: colors.border,
   },
   iconBtn: {
     padding: 4,
@@ -272,11 +275,11 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: colors.background,
   },
   content: {
     padding: 16,
@@ -289,20 +292,20 @@ const styles = StyleSheet.create({
   },
   errorText: {
     fontSize: 15,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     marginBottom: 8,
   },
   linkText: {
-    color: Colors.primaryDark,
+    color: colors.primaryDark,
     fontWeight: '700',
   },
   card: {
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     borderRadius: 14,
     padding: 16,
     marginBottom: 14,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
   },
   topRow: {
     flexDirection: 'row',
@@ -313,11 +316,11 @@ const styles = StyleSheet.create({
   loanNumber: {
     fontSize: 18,
     fontWeight: '700',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
   borrowerName: {
     fontSize: 14,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     marginTop: 2,
   },
   grid2: {
@@ -330,19 +333,19 @@ const styles = StyleSheet.create({
   },
   metaLabel: {
     fontSize: 11,
-    color: Colors.textMuted,
+    color: colors.textMuted,
     textTransform: 'uppercase',
     marginBottom: 2,
   },
   metaVal: {
     fontSize: 13,
     fontWeight: '600',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
   metaValPrimary: {
     fontSize: 16,
     fontWeight: '700',
-    color: Colors.primaryDark,
+    color: colors.primaryDark,
   },
   btnRow: {
     flexDirection: 'row',
@@ -359,7 +362,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   actionBtnPrimary: {
-    backgroundColor: Colors.primaryDark,
+    backgroundColor: colors.primaryDark,
   },
   actionBtnPrimaryText: {
     color: '#ffffff',
@@ -367,27 +370,27 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   actionBtnOutline: {
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: Colors.primary,
+    borderColor: colors.primary,
   },
   actionBtnOutlineText: {
-    color: Colors.primaryDark,
+    color: colors.primaryDark,
     fontWeight: '700',
     fontSize: 13,
   },
   payBox: {
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     borderRadius: 12,
     padding: 14,
     marginBottom: 14,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
   },
   payBoxTitle: {
     fontSize: 13,
     fontWeight: '700',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     marginBottom: 10,
   },
   payTypeRow: {
@@ -400,9 +403,9 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     alignItems: 'center',
     borderRadius: 6,
-    backgroundColor: Colors.surfaceSubtle,
+    backgroundColor: colors.surfaceSubtle,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
   },
   payTypeBtnActive: {
     backgroundColor: '#fef08a',
@@ -411,26 +414,26 @@ const styles = StyleSheet.create({
   payTypeBtnText: {
     fontSize: 11,
     fontWeight: '600',
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
   },
   payTypeBtnTextActive: {
     color: '#854d0e',
     fontWeight: '700',
   },
   payInput: {
-    backgroundColor: Colors.surfaceSubtle,
+    backgroundColor: colors.surfaceSubtle,
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 15,
     fontWeight: '700',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
     marginBottom: 10,
   },
   confirmPayBtn: {
-    backgroundColor: Colors.success,
+    backgroundColor: colors.success,
     borderRadius: 8,
     paddingVertical: 11,
     alignItems: 'center',
@@ -444,14 +447,14 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontSize: 14,
     fontWeight: '700',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     marginBottom: 10,
   },
   emptyNotice: {
     fontSize: 13,
-    color: Colors.textMuted,
+    color: colors.textMuted,
   },
   ornRow: {
     flexDirection: 'row',
@@ -459,16 +462,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 8,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    borderBottomColor: colors.border,
   },
   ornTitle: {
     fontSize: 13,
     fontWeight: '600',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
   ornSub: {
     fontSize: 11,
-    color: Colors.textMuted,
+    color: colors.textMuted,
     marginTop: 2,
   },
 });

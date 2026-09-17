@@ -2,19 +2,27 @@ import React from 'react';
 import { TouchableOpacity, StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSidebar } from '../context/SidebarContext';
-import { Colors } from '../constants/theme';
+import { useTheme } from '../context/ThemeContext';
 
 export function SidebarTrigger() {
   const { toggleSidebar, isDesktop, collapsed, mobileDrawerOpen } = useSidebar();
+  const { colors, isDark } = useTheme();
 
   // If desktop: open when !collapsed, closed when collapsed
   // If mobile: open when mobileDrawerOpen, closed when !mobileDrawerOpen
   const isOpen = isDesktop ? !collapsed : mobileDrawerOpen;
+  const iconColor = isDark ? '#fbbf24' : colors.primaryDark;
 
   return (
     <TouchableOpacity
       onPress={toggleSidebar}
-      style={styles.btn}
+      style={[
+        styles.btn,
+        {
+          backgroundColor: isDark ? '#1e293b' : '#fffdf5',
+          borderColor: isDark ? '#334155' : '#fde68a',
+        },
+      ]}
       activeOpacity={0.7}
       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
       accessibilityLabel={isOpen ? "Collapse navigation sidebar (<<)" : "Expand navigation sidebar (>>)"}
@@ -23,14 +31,14 @@ export function SidebarTrigger() {
         {isOpen ? (
           // "<<" double arrow
           <View style={styles.doubleArrow}>
-            <Ionicons name="chevron-back" size={16} color={Colors.primaryDark} />
-            <Ionicons name="chevron-back" size={16} color={Colors.primaryDark} style={styles.overlap} />
+            <Ionicons name="chevron-back" size={16} color={iconColor} />
+            <Ionicons name="chevron-back" size={16} color={iconColor} style={styles.overlap} />
           </View>
         ) : (
           // ">>" double arrow
           <View style={styles.doubleArrow}>
-            <Ionicons name="chevron-forward" size={16} color={Colors.primaryDark} />
-            <Ionicons name="chevron-forward" size={16} color={Colors.primaryDark} style={styles.overlap} />
+            <Ionicons name="chevron-forward" size={16} color={iconColor} />
+            <Ionicons name="chevron-forward" size={16} color={iconColor} style={styles.overlap} />
           </View>
         )}
       </View>

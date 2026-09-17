@@ -4,13 +4,16 @@ import {
   ScrollView, Alert, ActivityIndicator, SafeAreaView 
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Colors } from '../../constants/theme';
+import { Colors, ThemeColors } from '../../constants/theme';
+import { useTheme } from '../../context/ThemeContext';
 import { useAppStore, calculateLoanPeriodInterest } from '../../services/store';
 import { User, BankAccount, Ornament } from '../../types';
 import { Badge } from '../../components/Badge';
 import { Ionicons } from '@expo/vector-icons';
 
 export default function NewLoanScreen() {
+  const { colors, isDark } = useTheme();
+  const styles = getStyles(colors, isDark);
   const router = useRouter();
   const store = useAppStore();
   const users = store.users;
@@ -117,7 +120,7 @@ export default function NewLoanScreen() {
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.navHeader}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Ionicons name="close" size={24} color={Colors.textPrimary} />
+          <Ionicons name="close" size={24} color={colors.textPrimary} />
         </TouchableOpacity>
         <Text style={styles.navTitle}>Originate Gold Loan</Text>
         <View style={{ width: 24 }} />
@@ -165,7 +168,7 @@ export default function NewLoanScreen() {
                     <Text style={styles.bankChoiceSub}>Acc: •••• {b.AccountNumber.slice(-4)}</Text>
                   </View>
                   <View style={{ alignItems: 'flex-end' }}>
-                    <Text style={[styles.bankChoiceAvail, { color: Colors.success }]}>
+                    <Text style={[styles.bankChoiceAvail, { color: colors.success }]}>
                       Avail: ₹{avail.toLocaleString()}
                     </Text>
                     <Text style={styles.bankChoiceMax}>Limit: ₹{maxL.toLocaleString()}</Text>
@@ -200,7 +203,7 @@ export default function NewLoanScreen() {
                   <Ionicons 
                     name={isPledged ? "checkbox" : "square-outline"} 
                     size={22} 
-                    color={isPledged ? Colors.primaryDark : Colors.textMuted} 
+                    color={isPledged ? colors.primaryDark : colors.textMuted} 
                   />
                   <View style={{ flex: 1, marginLeft: 10 }}>
                     <Text style={styles.ornChoiceTitle}>{o.OrnamentName}</Text>
@@ -221,7 +224,7 @@ export default function NewLoanScreen() {
           <View style={styles.fieldGroup}>
             <Text style={styles.label}>Loan Amount (₹) *</Text>
             <TextInput
-              style={[styles.input, { fontSize: 18, fontWeight: '700', color: Colors.primaryDark }]}
+              style={[styles.input, { fontSize: 18, fontWeight: '700', color: colors.primaryDark }]}
               placeholder="e.g. 150000"
               keyboardType="number-pad"
               value={form.LoanAmount}
@@ -292,10 +295,10 @@ export default function NewLoanScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
   },
   navHeader: {
     flexDirection: 'row',
@@ -304,7 +307,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    borderBottomColor: colors.border,
   },
   backBtn: {
     padding: 4,
@@ -312,28 +315,28 @@ const styles = StyleSheet.create({
   navTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: colors.background,
   },
   content: {
     padding: 16,
     paddingBottom: 40,
   },
   card: {
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     borderRadius: 14,
     padding: 16,
     marginBottom: 14,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
   },
   stepTitle: {
     fontSize: 14,
     fontWeight: '700',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     marginBottom: 10,
@@ -347,7 +350,7 @@ const styles = StyleSheet.create({
   ornTotalPledged: {
     fontSize: 12,
     fontWeight: '700',
-    color: Colors.primaryDark,
+    color: colors.primaryDark,
   },
   chipRow: {
     flexDirection: 'row',
@@ -356,19 +359,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 20,
-    backgroundColor: Colors.surfaceSubtle,
+    backgroundColor: colors.surfaceSubtle,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
     marginRight: 8,
   },
   chipActive: {
-    backgroundColor: Colors.primaryDark,
-    borderColor: Colors.primaryDark,
+    backgroundColor: colors.primaryDark,
+    borderColor: colors.primaryDark,
   },
   chipText: {
     fontSize: 13,
     fontWeight: '600',
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
   },
   chipTextActive: {
     color: '#ffffff',
@@ -379,22 +382,22 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
     marginBottom: 8,
-    backgroundColor: Colors.surfaceSubtle,
+    backgroundColor: colors.surfaceSubtle,
   },
   bankChoiceActive: {
-    borderColor: Colors.primary,
-    backgroundColor: '#fffbeb',
+    borderColor: colors.primary,
+    backgroundColor: isDark ? '#1e293b' : '#fffbeb',
   },
   bankChoiceTitle: {
     fontSize: 14,
     fontWeight: '700',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
   bankChoiceSub: {
     fontSize: 12,
-    color: Colors.textMuted,
+    color: colors.textMuted,
   },
   bankChoiceAvail: {
     fontSize: 13,
@@ -402,14 +405,14 @@ const styles = StyleSheet.create({
   },
   bankChoiceMax: {
     fontSize: 11,
-    color: Colors.textMuted,
+    color: colors.textMuted,
   },
   ornChoice: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    borderBottomColor: colors.border,
   },
   ornChoiceActive: {
     backgroundColor: '#fffdf5',
@@ -417,16 +420,16 @@ const styles = StyleSheet.create({
   ornChoiceTitle: {
     fontSize: 13,
     fontWeight: '600',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
   ornChoiceSub: {
     fontSize: 11,
-    color: Colors.textMuted,
+    color: colors.textMuted,
     marginTop: 2,
   },
   warnText: {
     fontSize: 12,
-    color: Colors.warning,
+    color: colors.warning,
     fontStyle: 'italic',
   },
   fieldGroup: {
@@ -439,21 +442,21 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 12,
     fontWeight: '600',
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     marginBottom: 6,
   },
   input: {
-    backgroundColor: Colors.surfaceSubtle,
+    backgroundColor: colors.surfaceSubtle,
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 14,
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
   },
   breakdownBox: {
-    backgroundColor: '#f8fafc',
+    backgroundColor: isDark ? '#090d16' : '#f8fafc',
     borderRadius: 10,
     padding: 12,
     marginTop: 6,
@@ -465,34 +468,34 @@ const styles = StyleSheet.create({
   },
   breakLabel: {
     fontSize: 12,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
   },
   breakVal: {
     fontSize: 12,
     fontWeight: '600',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
   breakTotalRow: {
     borderTopWidth: 1,
-    borderTopColor: Colors.border,
+    borderTopColor: colors.border,
     paddingTop: 8,
     marginTop: 4,
   },
   breakTotalLabel: {
     fontSize: 13,
     fontWeight: '700',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
   breakTotalVal: {
     fontSize: 15,
     fontWeight: '700',
-    color: Colors.primaryDark,
+    color: colors.primaryDark,
   },
   disburseBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Colors.primaryDark,
+    backgroundColor: colors.primaryDark,
     paddingVertical: 14,
     borderRadius: 12,
     marginTop: 8,

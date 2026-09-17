@@ -4,7 +4,8 @@ import {
   Modal, TextInput, Alert, SafeAreaView, Platform, RefreshControl 
 } from 'react-native';
 import { Image } from 'expo-image';
-import { Colors } from '../../constants/theme';
+import { Colors, ThemeColors } from '../../constants/theme';
+import { useTheme } from '../../context/ThemeContext';
 import { useAppStore } from '../../services/store';
 import { User } from '../../types';
 import { DataTable, Column } from '../../components/DataTable';
@@ -16,6 +17,8 @@ import { ImageViewModal } from '../../components/ImageViewModal';
 import { api, getDriveImageUrl } from '../../services/api';
 
 export default function UsersScreen() {
+  const { colors, isDark } = useTheme();
+  const styles = getStyles(colors, isDark);
   const store = useAppStore();
 
   // Modals state
@@ -212,10 +215,10 @@ export default function UsersScreen() {
             <Ionicons name="eye-outline" size={16} color="#0284c7" />
           </TouchableOpacity>
           <TouchableOpacity onPress={() => openEditModal(u)} style={styles.actionBtn}>
-            <Ionicons name="pencil-outline" size={16} color={Colors.primaryDark} />
+            <Ionicons name="pencil-outline" size={16} color={colors.primaryDark} />
           </TouchableOpacity>
           <TouchableOpacity onPress={() => handleDelete(u)} style={styles.actionBtn}>
-            <Ionicons name="trash-outline" size={16} color={Colors.danger} />
+            <Ionicons name="trash-outline" size={16} color={colors.danger} />
           </TouchableOpacity>
         </View>
       ),
@@ -227,7 +230,7 @@ export default function UsersScreen() {
       <ScrollView 
         style={styles.container} 
         contentContainerStyle={styles.content}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[Colors.primary]} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />}
       >
         <DataTable
           isLoading={store.isSyncing && store.users.length === 0}
@@ -259,7 +262,7 @@ export default function UsersScreen() {
                 {isEditing ? 'Edit Customer' : 'Add New Customer'}
               </Text>
               <TouchableOpacity onPress={() => setModalVisible(false)}>
-                <Ionicons name="close" size={22} color={Colors.textSecondary} />
+                <Ionicons name="close" size={22} color={colors.textSecondary} />
               </TouchableOpacity>
             </View>
 
@@ -504,7 +507,7 @@ export default function UsersScreen() {
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Customer Details</Text>
               <TouchableOpacity onPress={() => setDetailModalVisible(false)}>
-                <Ionicons name="close" size={22} color={Colors.textSecondary} />
+                <Ionicons name="close" size={22} color={colors.textSecondary} />
               </TouchableOpacity>
             </View>
 
@@ -515,12 +518,12 @@ export default function UsersScreen() {
                     {selectedUser.CustomerPhoto ? (
                       <Image
                         source={{ uri: getDriveImageUrl(selectedUser.CustomerPhoto) }}
-                        style={{ width: 64, height: 64, borderRadius: 32, borderWidth: 2, borderColor: Colors.primary }}
+                        style={{ width: 64, height: 64, borderRadius: 32, borderWidth: 2, borderColor: colors.primary }}
                         contentFit="cover"
                       />
                     ) : (
-                      <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: Colors.primarySubtle, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: Colors.primaryLight }}>
-                        <Text style={{ fontSize: 24, fontWeight: '700', color: Colors.primaryDark }}>{selectedUser.FullName.charAt(0) || 'U'}</Text>
+                      <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: isDark ? "#261a02" : colors.primarySubtle, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: colors.primaryLight }}>
+                        <Text style={{ fontSize: 24, fontWeight: '700', color: colors.primaryDark }}>{selectedUser.FullName.charAt(0) || 'U'}</Text>
                       </View>
                     )}
                   </TouchableOpacity>
@@ -585,35 +588,35 @@ export default function UsersScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
   tableAvatar: {
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#e2e8f0',
+    backgroundColor: isDark ? '#1e293b' : '#e2e8f0',
   },
   tableAvatarPlaceholder: {
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: Colors.primarySubtle,
+    backgroundColor: isDark ? "#261a02" : colors.primarySubtle,
     borderWidth: 1,
-    borderColor: Colors.primaryLight,
+    borderColor: colors.primaryLight,
     alignItems: 'center',
     justifyContent: 'center',
   },
   avatarInitials: {
     fontSize: 13,
     fontWeight: '700',
-    color: Colors.primaryDark,
+    color: colors.primaryDark,
   },
   safeArea: {
     flex: 1,
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
   },
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: colors.background,
   },
   content: {
     padding: 12,
@@ -622,21 +625,21 @@ const styles = StyleSheet.create({
   idText: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#64748b',
+    color: isDark ? '#94a3b8' : '#64748b',
   },
   primaryCellText: {
     fontSize: 13,
     fontWeight: '700',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
   subCellText: {
     fontSize: 11,
-    color: Colors.textMuted,
+    color: colors.textMuted,
     marginTop: 1,
   },
   cellText: {
     fontSize: 13,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
   },
   actionRow: {
     flexDirection: 'row',
@@ -647,7 +650,7 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 6,
-    backgroundColor: '#f1f5f9',
+    backgroundColor: isDark ? '#1e293b' : '#f1f5f9',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -659,7 +662,7 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   modalBox: {
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.surface,
     borderRadius: 16,
     width: Platform.select({ web: '55%', default: '94%' }),
     maxWidth: 650,
@@ -673,12 +676,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 14,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    borderBottomColor: colors.border,
   },
   modalTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
   modalBody: {
     padding: 16,
@@ -688,7 +691,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
     padding: 12,
     borderTopWidth: 1,
-    borderTopColor: Colors.border,
+    borderTopColor: colors.border,
     gap: 10,
   },
   field: {
@@ -701,18 +704,18 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 12,
     fontWeight: '600',
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     marginBottom: 4,
   },
   input: {
-    backgroundColor: '#f8fafc',
+    backgroundColor: isDark ? '#090d16' : '#f8fafc',
     borderRadius: 8,
     paddingHorizontal: 10,
     paddingVertical: 8,
     fontSize: 13,
     borderWidth: 1,
-    borderColor: Colors.border,
-    color: Colors.textPrimary,
+    borderColor: colors.border,
+    color: colors.textPrimary,
   },
   statusToggleRow: {
     flexDirection: 'row',
@@ -723,15 +726,15 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     alignItems: 'center',
     borderRadius: 6,
-    backgroundColor: '#f1f5f9',
+    backgroundColor: isDark ? '#1e293b' : '#f1f5f9',
   },
   statusBtnActive: {
-    backgroundColor: Colors.primaryDark,
+    backgroundColor: colors.primaryDark,
   },
   statusBtnText: {
     fontSize: 11,
     fontWeight: '600',
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
   },
   statusBtnTextActive: {
     color: '#ffffff',
@@ -741,15 +744,15 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
   },
   cancelBtnText: {
     fontSize: 13,
     fontWeight: '600',
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
   },
   saveBtn: {
-    backgroundColor: Colors.primaryDark,
+    backgroundColor: colors.primaryDark,
     paddingHorizontal: 18,
     paddingVertical: 10,
     borderRadius: 8,
@@ -760,60 +763,60 @@ const styles = StyleSheet.create({
     color: '#ffffff',
   },
   detailCard: {
-    backgroundColor: '#fffbeb',
+    backgroundColor: isDark ? '#1e293b' : '#fffbeb',
     borderRadius: 10,
     padding: 12,
     borderWidth: 1,
-    borderColor: '#fef08a',
+    borderColor: isDark ? '#334155' : '#fef08a',
     marginBottom: 14,
   },
   detailName: {
     fontSize: 18,
     fontWeight: '800',
-    color: '#713f12',
+    color: isDark ? '#fbbf24' : '#713f12',
   },
   detailCode: {
     fontSize: 12,
-    color: '#a16207',
+    color: isDark ? '#facc15' : '#a16207',
     marginTop: 2,
   },
   detailSubCode: {
     fontSize: 11,
-    color: '#92400e',
+    color: isDark ? '#fbbf24' : '#92400e',
     marginTop: 1,
     fontStyle: 'italic',
   },
   sectionDivider: {
     fontSize: 11,
     fontWeight: '700',
-    color: Colors.primary,
+    color: colors.primary,
     textTransform: 'uppercase',
     letterSpacing: 0.8,
     marginTop: 8,
     marginBottom: 4,
     paddingBottom: 4,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    borderBottomColor: colors.border,
   },
   detailSection: {
     marginBottom: 14,
-    backgroundColor: '#f8fafc',
+    backgroundColor: isDark ? '#090d16' : '#f8fafc',
     borderRadius: 10,
     padding: 12,
   },
   detailSecTitle: {
     fontSize: 13,
     fontWeight: '700',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     marginBottom: 8,
   },
   detailRowText: {
     fontSize: 12,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     marginBottom: 4,
   },
   bold: {
     fontWeight: '700',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
 });

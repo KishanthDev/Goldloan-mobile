@@ -4,7 +4,8 @@ import {
   Modal, TextInput, Alert, SafeAreaView, Platform, RefreshControl 
 } from 'react-native';
 import { Image } from 'expo-image';
-import { Colors } from '../../constants/theme';
+import { Colors, ThemeColors } from '../../constants/theme';
+import { useTheme } from '../../context/ThemeContext';
 import { useAppStore } from '../../services/store';
 import { BankAccount } from '../../types';
 import { DataTable, Column } from '../../components/DataTable';
@@ -16,6 +17,8 @@ import { ImageViewModal } from '../../components/ImageViewModal';
 import { api, getDriveImageUrl } from '../../services/api';
 
 export default function BankAccountsScreen() {
+  const { colors, isDark } = useTheme();
+  const styles = getStyles(colors, isDark);
   const store = useAppStore();
 
   const [modalVisible, setModalVisible] = useState(false);
@@ -178,7 +181,7 @@ export default function BankAccountsScreen() {
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
             {b.PassbookImage ? (
               <TouchableOpacity onPress={() => b.PassbookImage && setPreviewImageUrl(b.PassbookImage)}>
-                <Image source={{ uri: directUrl || b.PassbookImage }} style={{ width: 24, height: 24, borderRadius: 4, backgroundColor: '#e2e8f0' }} contentFit="cover" />
+                <Image source={{ uri: directUrl || b.PassbookImage }} style={{ width: 24, height: 24, borderRadius: 4, backgroundColor: isDark ? '#1e293b' : '#e2e8f0' }} contentFit="cover" />
               </TouchableOpacity>
             ) : null}
             <Text style={[styles.cellText, { fontWeight: '600', flex: 1 }]} numberOfLines={1}>{b.BankName}</Text>
@@ -205,7 +208,7 @@ export default function BankAccountsScreen() {
       width: 115,
       align: 'right',
       render: (b) => (
-        <Text style={[styles.cellText, { color: (b.UtilizedLoanAmount || 0) > 0 ? Colors.danger : Colors.textSecondary }]}>
+        <Text style={[styles.cellText, { color: (b.UtilizedLoanAmount || 0) > 0 ? colors.danger : colors.textSecondary }]}>
           ₹{(b.UtilizedLoanAmount || 0).toLocaleString()}
         </Text>
       ),
@@ -216,7 +219,7 @@ export default function BankAccountsScreen() {
       width: 115,
       align: 'right',
       render: (b) => (
-        <Text style={[styles.cellText, { fontWeight: '700', color: Colors.success }]}>
+        <Text style={[styles.cellText, { fontWeight: '700', color: colors.success }]}>
           ₹{(b.AvailableLoanAmount || Math.max(0, (b.MaxLoanAmount || 0) - (b.UtilizedLoanAmount || 0))).toLocaleString()}
         </Text>
       ),
@@ -245,10 +248,10 @@ export default function BankAccountsScreen() {
             <Ionicons name="eye-outline" size={16} color="#0284c7" />
           </TouchableOpacity>
           <TouchableOpacity onPress={() => openEditModal(b)} style={styles.actionBtn}>
-            <Ionicons name="pencil-outline" size={16} color={Colors.primaryDark} />
+            <Ionicons name="pencil-outline" size={16} color={colors.primaryDark} />
           </TouchableOpacity>
           <TouchableOpacity onPress={() => handleDelete(b)} style={styles.actionBtn}>
-            <Ionicons name="trash-outline" size={16} color={Colors.danger} />
+            <Ionicons name="trash-outline" size={16} color={colors.danger} />
           </TouchableOpacity>
         </View>
       ),
@@ -260,7 +263,7 @@ export default function BankAccountsScreen() {
       <ScrollView 
         style={styles.container} 
         contentContainerStyle={styles.content}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[Colors.primary]} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />}
       >
         <DataTable
           isLoading={store.isSyncing && store.bankAccounts.length === 0}
@@ -293,7 +296,7 @@ export default function BankAccountsScreen() {
                 {isEditing ? 'Edit Bank Account' : 'Add Bank Account'}
               </Text>
               <TouchableOpacity onPress={() => setModalVisible(false)}>
-                <Ionicons name="close" size={22} color={Colors.textSecondary} />
+                <Ionicons name="close" size={22} color={colors.textSecondary} />
               </TouchableOpacity>
             </View>
 
@@ -302,8 +305,8 @@ export default function BankAccountsScreen() {
               <View style={styles.field}>
                 <Text style={styles.label}>Select Borrower *</Text>
                 {store.users.length === 0 ? (
-                  <View style={{ backgroundColor: Colors.warningBg, padding: 10, borderRadius: 8, marginTop: 4 }}>
-                    <Text style={{ fontSize: 13, color: Colors.warning, fontWeight: '500' }}>
+                  <View style={{ backgroundColor: colors.warningBg, padding: 10, borderRadius: 8, marginTop: 4 }}>
+                    <Text style={{ fontSize: 13, color: colors.warning, fontWeight: '500' }}>
                       ⚠️ No borrowers registered yet. Please add a customer in the Users tab first.
                     </Text>
                   </View>
@@ -494,7 +497,7 @@ export default function BankAccountsScreen() {
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Bank Account Details</Text>
               <TouchableOpacity onPress={() => setDetailModalVisible(false)}>
-                <Ionicons name="close" size={22} color={Colors.textSecondary} />
+                <Ionicons name="close" size={22} color={colors.textSecondary} />
               </TouchableOpacity>
             </View>
 
@@ -520,7 +523,7 @@ export default function BankAccountsScreen() {
                   <Text style={styles.detailSecTitle}>Limit Utilization</Text>
                   <Text style={styles.detailRowText}><Text style={styles.bold}>Max Limit:</Text> ₹{(selectedAcc.MaxLoanAmount || 0).toLocaleString()}</Text>
                   <Text style={styles.detailRowText}><Text style={styles.bold}>Utilized:</Text> ₹{(selectedAcc.UtilizedLoanAmount || 0).toLocaleString()}</Text>
-                  <Text style={[styles.detailRowText, { color: Colors.success, fontWeight: '700' }]}>
+                  <Text style={[styles.detailRowText, { color: colors.success, fontWeight: '700' }]}>
                     Available: ₹{(selectedAcc.AvailableLoanAmount || Math.max(0, (selectedAcc.MaxLoanAmount || 0) - (selectedAcc.UtilizedLoanAmount || 0))).toLocaleString()}
                   </Text>
                 </View>
@@ -530,7 +533,7 @@ export default function BankAccountsScreen() {
                     <Text style={styles.detailSecTitle}>Passbook / Cheque Leaf Document</Text>
                     <TouchableOpacity
                       onPress={() => selectedAcc.PassbookImage && setPreviewImageUrl(selectedAcc.PassbookImage)}
-                      style={{ borderRadius: 10, overflow: 'hidden', borderWidth: 1, borderColor: Colors.border, backgroundColor: '#f1f5f9', marginTop: 4 }}
+                      style={{ borderRadius: 10, overflow: 'hidden', borderWidth: 1, borderColor: colors.border, backgroundColor: isDark ? '#1e293b' : '#f1f5f9', marginTop: 4 }}
                     >
                       <Image
                         source={{ uri: getDriveImageUrl(selectedAcc.PassbookImage) }}
@@ -566,14 +569,14 @@ export default function BankAccountsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
   },
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: colors.background,
   },
   content: {
     padding: 12,
@@ -582,16 +585,16 @@ const styles = StyleSheet.create({
   idText: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#64748b',
+    color: isDark ? '#94a3b8' : '#64748b',
   },
   primaryCellText: {
     fontSize: 13,
     fontWeight: '700',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
   cellText: {
     fontSize: 13,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
   },
   actionRow: {
     flexDirection: 'row',
@@ -602,7 +605,7 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 6,
-    backgroundColor: '#f1f5f9',
+    backgroundColor: isDark ? '#1e293b' : '#f1f5f9',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -614,7 +617,7 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   modalBox: {
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.surface,
     borderRadius: 16,
     width: Platform.select({ web: '55%', default: '94%' }),
     maxWidth: 650,
@@ -628,12 +631,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 14,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    borderBottomColor: colors.border,
   },
   modalTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
   modalBody: {
     padding: 16,
@@ -643,7 +646,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
     padding: 12,
     borderTopWidth: 1,
-    borderTopColor: Colors.border,
+    borderTopColor: colors.border,
     gap: 10,
   },
   field: {
@@ -656,52 +659,52 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 12,
     fontWeight: '600',
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     marginBottom: 4,
   },
   input: {
-    backgroundColor: '#f8fafc',
+    backgroundColor: isDark ? '#090d16' : '#f8fafc',
     borderRadius: 8,
     paddingHorizontal: 10,
     paddingVertical: 8,
     fontSize: 13,
     borderWidth: 1,
-    borderColor: Colors.border,
-    color: Colors.textPrimary,
+    borderColor: colors.border,
+    color: colors.textPrimary,
   },
   userChip: {
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 16,
-    backgroundColor: '#f1f5f9',
+    backgroundColor: isDark ? '#1e293b' : '#f1f5f9',
     marginRight: 6,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
   },
   userChipActive: {
-    backgroundColor: Colors.primaryDark,
-    borderColor: Colors.primaryDark,
+    backgroundColor: colors.primaryDark,
+    borderColor: colors.primaryDark,
   },
   userChipText: {
     fontSize: 12,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     fontWeight: '600',
   },
   userChipTextActive: {
     color: '#ffffff',
   },
   calcBox: {
-    backgroundColor: '#fefce8',
+    backgroundColor: isDark ? '#261a02' : '#fefce8',
     borderRadius: 10,
     padding: 12,
     borderWidth: 1,
-    borderColor: '#fef08a',
+    borderColor: isDark ? '#334155' : '#fef08a',
     marginTop: 4,
   },
   calcBoxTitle: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#854d0e',
+    color: isDark ? '#fbbf24' : '#854d0e',
     textTransform: 'uppercase',
     marginBottom: 8,
   },
@@ -716,28 +719,28 @@ const styles = StyleSheet.create({
   },
   calcResultLabel: {
     fontSize: 12,
-    color: '#854d0e',
+    color: isDark ? '#fbbf24' : '#854d0e',
     fontWeight: '600',
   },
   calcResultVal: {
     fontSize: 16,
     fontWeight: '800',
-    color: Colors.success,
+    color: colors.success,
   },
   cancelBtn: {
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
   },
   cancelBtnText: {
     fontSize: 13,
     fontWeight: '600',
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
   },
   saveBtn: {
-    backgroundColor: Colors.primaryDark,
+    backgroundColor: colors.primaryDark,
     paddingHorizontal: 18,
     paddingVertical: 10,
     borderRadius: 8,
@@ -748,43 +751,43 @@ const styles = StyleSheet.create({
     color: '#ffffff',
   },
   detailCard: {
-    backgroundColor: '#fffbeb',
+    backgroundColor: isDark ? '#1e293b' : '#fffbeb',
     borderRadius: 10,
     padding: 12,
     borderWidth: 1,
-    borderColor: '#fef08a',
+    borderColor: isDark ? '#334155' : '#fef08a',
     marginBottom: 14,
   },
   detailName: {
     fontSize: 18,
     fontWeight: '800',
-    color: '#713f12',
+    color: isDark ? '#fbbf24' : '#713f12',
   },
   detailCode: {
     fontSize: 12,
-    color: '#a16207',
+    color: isDark ? '#facc15' : '#a16207',
     marginTop: 2,
   },
   detailSection: {
     marginBottom: 14,
-    backgroundColor: '#f8fafc',
+    backgroundColor: isDark ? '#090d16' : '#f8fafc',
     borderRadius: 10,
     padding: 12,
   },
   detailSecTitle: {
     fontSize: 13,
     fontWeight: '700',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     marginBottom: 8,
   },
   detailRowText: {
     fontSize: 12,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     marginBottom: 4,
   },
   bold: {
     fontWeight: '700',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
   statusToggleRow: {
     flexDirection: 'row',
@@ -795,15 +798,15 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     alignItems: 'center',
     borderRadius: 6,
-    backgroundColor: '#f1f5f9',
+    backgroundColor: isDark ? '#1e293b' : '#f1f5f9',
   },
   statusBtnActive: {
-    backgroundColor: Colors.primaryDark,
+    backgroundColor: colors.primaryDark,
   },
   statusBtnText: {
     fontSize: 11,
     fontWeight: '600',
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
   },
   statusBtnTextActive: {
     color: '#ffffff',

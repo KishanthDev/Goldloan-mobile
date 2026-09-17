@@ -4,12 +4,15 @@ import {
   ScrollView, Alert, ActivityIndicator, SafeAreaView 
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Colors } from '../../constants/theme';
+import { Colors, ThemeColors } from '../../constants/theme';
+import { useTheme } from '../../context/ThemeContext';
 import { useAppStore } from '../../services/store';
 import { User, GoldRateData } from '../../types';
 import { Ionicons } from '@expo/vector-icons';
 
 export default function NewOrnamentScreen() {
+  const { colors, isDark } = useTheme();
+  const styles = getStyles(colors, isDark);
   const router = useRouter();
   const store = useAppStore();
   const users = store.users;
@@ -80,7 +83,7 @@ export default function NewOrnamentScreen() {
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.navHeader}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Ionicons name="close" size={24} color={Colors.textPrimary} />
+          <Ionicons name="close" size={24} color={colors.textPrimary} />
         </TouchableOpacity>
         <Text style={styles.navTitle}>Register Gold Ornament</Text>
         <View style={{ width: 24 }} />
@@ -111,7 +114,7 @@ export default function NewOrnamentScreen() {
           <TextInput
             style={styles.input}
             placeholder="e.g. 22K Traditional Antique Gold Necklace"
-            placeholderTextColor={Colors.textMuted}
+            placeholderTextColor={colors.placeholder}
             value={form.OrnamentName}
             onChangeText={v => setForm(p => ({ ...p, OrnamentName: v }))}
           />
@@ -184,7 +187,7 @@ export default function NewOrnamentScreen() {
           </View>
           <View style={styles.calcRow}>
             <Text style={styles.calcLabel}>Estimated Market Value (@ ₹{curRate}/g):</Text>
-            <Text style={[styles.calcValue, { color: Colors.success }]}>₹{marketVal.toLocaleString()}</Text>
+            <Text style={[styles.calcValue, { color: colors.success }]}>₹{marketVal.toLocaleString()}</Text>
           </View>
         </View>
 
@@ -263,10 +266,10 @@ export default function NewOrnamentScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
   },
   navHeader: {
     flexDirection: 'row',
@@ -275,7 +278,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    borderBottomColor: colors.border,
   },
   backBtn: {
     padding: 4,
@@ -283,11 +286,11 @@ const styles = StyleSheet.create({
   navTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: colors.background,
   },
   content: {
     padding: 16,
@@ -303,18 +306,18 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 12,
     fontWeight: '600',
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     marginBottom: 6,
   },
   input: {
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 14,
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
   },
   chipRow: {
     flexDirection: 'row',
@@ -324,19 +327,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 20,
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
     marginRight: 6,
   },
   userChipActive: {
-    backgroundColor: Colors.primaryDark,
-    borderColor: Colors.primaryDark,
+    backgroundColor: colors.primaryDark,
+    borderColor: colors.primaryDark,
   },
   userChipText: {
     fontSize: 12,
     fontWeight: '600',
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
   },
   userChipTextActive: {
     color: '#ffffff',
@@ -350,9 +353,9 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     alignItems: 'center',
     borderRadius: 8,
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
   },
   purityBtnActive: {
     backgroundColor: '#fef08a',
@@ -361,17 +364,17 @@ const styles = StyleSheet.create({
   purityBtnText: {
     fontSize: 12,
     fontWeight: '700',
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
   },
   purityBtnTextActive: {
     color: '#854d0e',
   },
   calcBox: {
-    backgroundColor: '#fefce8',
+    backgroundColor: isDark ? '#261a02' : '#fefce8',
     borderRadius: 10,
     padding: 12,
     borderWidth: 1,
-    borderColor: '#fef08a',
+    borderColor: isDark ? '#334155' : '#fef08a',
     marginBottom: 14,
     gap: 6,
   },
@@ -386,13 +389,13 @@ const styles = StyleSheet.create({
   calcValue: {
     fontSize: 13,
     fontWeight: '700',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
   submitBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Colors.primaryDark,
+    backgroundColor: colors.primaryDark,
     paddingVertical: 14,
     borderRadius: 10,
     marginTop: 10,

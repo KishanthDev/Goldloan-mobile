@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { Colors } from '../constants/theme';
+import { useTheme } from '../context/ThemeContext';
+import { ThemeColors } from '../constants/theme';
 import { Ionicons } from '@expo/vector-icons';
 import { GoldRateData } from '../types';
 
@@ -11,17 +12,20 @@ interface GoldRateTickerProps {
 }
 
 export const GoldRateTicker: React.FC<GoldRateTickerProps> = ({ rates, onRefresh, isLoading }) => {
+  const { colors, isDark } = useTheme();
+  const styles = getStyles(colors, isDark);
+
   if (!rates) return null;
 
   return (
     <View style={styles.container}>
       <View style={styles.header}>
         <View style={styles.titleRow}>
-          <Ionicons name="trending-up" size={16} color={Colors.primary} />
+          <Ionicons name="trending-up" size={16} color={colors.primary} />
           <Text style={styles.headerTitle}>Live Gold Rates ({rates.location})</Text>
         </View>
         <TouchableOpacity onPress={onRefresh} disabled={isLoading} style={styles.refreshBtn}>
-          <Ionicons name="refresh" size={14} color={Colors.textSecondary} />
+          <Ionicons name="refresh" size={14} color={colors.textSecondary} />
           <Text style={styles.refreshText}>{isLoading ? 'Updating...' : rates.displayDate}</Text>
         </TouchableOpacity>
       </View>
@@ -38,9 +42,9 @@ export const GoldRateTicker: React.FC<GoldRateTickerProps> = ({ rates, onRefresh
             <Ionicons 
               name={rates.gold24k.direction === 'up' ? 'arrow-up' : rates.gold24k.direction === 'down' ? 'arrow-down' : 'remove'} 
               size={12} 
-              color={rates.gold24k.direction === 'up' ? Colors.success : Colors.danger} 
+              color={rates.gold24k.direction === 'up' ? colors.success : colors.danger} 
             />
-            <Text style={[styles.changeText, { color: rates.gold24k.direction === 'up' ? Colors.success : Colors.danger }]}>
+            <Text style={[styles.changeText, { color: rates.gold24k.direction === 'up' ? colors.success : colors.danger }]}>
               {rates.gold24k.change >= 0 ? `+₹${rates.gold24k.change}` : `-₹${Math.abs(rates.gold24k.change)}`}
             </Text>
           </View>
@@ -57,9 +61,9 @@ export const GoldRateTicker: React.FC<GoldRateTickerProps> = ({ rates, onRefresh
             <Ionicons 
               name={rates.gold22k.direction === 'up' ? 'arrow-up' : rates.gold22k.direction === 'down' ? 'arrow-down' : 'remove'} 
               size={12} 
-              color={rates.gold22k.direction === 'up' ? Colors.success : Colors.danger} 
+              color={rates.gold22k.direction === 'up' ? colors.success : colors.danger} 
             />
-            <Text style={[styles.changeText, { color: rates.gold22k.direction === 'up' ? Colors.success : Colors.danger }]}>
+            <Text style={[styles.changeText, { color: rates.gold22k.direction === 'up' ? colors.success : colors.danger }]}>
               {rates.gold22k.change >= 0 ? `+₹${rates.gold22k.change}` : `-₹${Math.abs(rates.gold22k.change)}`}
             </Text>
           </View>
@@ -76,9 +80,9 @@ export const GoldRateTicker: React.FC<GoldRateTickerProps> = ({ rates, onRefresh
             <Ionicons 
               name={rates.gold18k.direction === 'up' ? 'arrow-up' : rates.gold18k.direction === 'down' ? 'arrow-down' : 'remove'} 
               size={12} 
-              color={rates.gold18k.direction === 'up' ? Colors.success : Colors.danger} 
+              color={rates.gold18k.direction === 'up' ? colors.success : colors.danger} 
             />
-            <Text style={[styles.changeText, { color: rates.gold18k.direction === 'up' ? Colors.success : Colors.danger }]}>
+            <Text style={[styles.changeText, { color: rates.gold18k.direction === 'up' ? colors.success : colors.danger }]}>
               {rates.gold18k.change >= 0 ? `+₹${rates.gold18k.change}` : `-₹${Math.abs(rates.gold18k.change)}`}
             </Text>
           </View>
@@ -88,13 +92,13 @@ export const GoldRateTicker: React.FC<GoldRateTickerProps> = ({ rates, onRefresh
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
   container: {
-    backgroundColor: '#fffbeb',
+    backgroundColor: isDark ? '#111827' : '#fffbeb',
     borderRadius: 14,
     padding: 12,
     borderWidth: 1,
-    borderColor: '#fde68a',
+    borderColor: isDark ? '#1e293b' : '#fde68a',
     marginBottom: 16,
   },
   header: {
@@ -111,7 +115,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#854d0e',
+    color: isDark ? '#fbbf24' : '#854d0e',
   },
   refreshBtn: {
     flexDirection: 'row',
@@ -120,7 +124,7 @@ const styles = StyleSheet.create({
   },
   refreshText: {
     fontSize: 11,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
   },
   ratesRow: {
     flexDirection: 'row',
@@ -128,38 +132,38 @@ const styles = StyleSheet.create({
   },
   rateCard: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: isDark ? '#1e293b' : '#ffffff',
     borderRadius: 10,
     padding: 10,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#fef08a',
+    borderColor: isDark ? '#334155' : '#fef08a',
   },
   rateCardFeatured: {
-    borderColor: Colors.primary,
-    backgroundColor: '#fffdf5',
+    borderColor: colors.primary,
+    backgroundColor: isDark ? '#261a02' : '#fffdf5',
     elevation: 2,
-    shadowColor: Colors.primary,
+    shadowColor: colors.primary,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
   },
   purityBadge24k: {
-    backgroundColor: '#fef08a',
+    backgroundColor: isDark ? '#382504' : '#fef08a',
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 4,
     marginBottom: 4,
   },
   purityBadge22k: {
-    backgroundColor: Colors.primary,
+    backgroundColor: colors.primary,
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 4,
     marginBottom: 4,
   },
   purityBadge18k: {
-    backgroundColor: '#fed7aa',
+    backgroundColor: isDark ? '#3d1d05' : '#fed7aa',
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 4,
@@ -168,7 +172,7 @@ const styles = StyleSheet.create({
   purityText: {
     fontSize: 10,
     fontWeight: '700',
-    color: '#713f12',
+    color: isDark ? '#facc15' : '#713f12',
   },
   purityTextFeatured: {
     fontSize: 10,
@@ -178,15 +182,15 @@ const styles = StyleSheet.create({
   ratePrice: {
     fontSize: 15,
     fontWeight: '700',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
   ratePriceFeatured: {
-    color: Colors.primaryDark,
+    color: colors.primaryDark,
     fontSize: 16,
   },
   rateUnit: {
     fontSize: 10,
-    color: Colors.textMuted,
+    color: colors.textMuted,
   },
   changeRow: {
     flexDirection: 'row',

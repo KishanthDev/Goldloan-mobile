@@ -3,6 +3,7 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ApiConfig } from '../config/api';
+import { ThemeProvider, useTheme } from '../context/ThemeContext';
 
 export default function RootLayout() {
   useEffect(() => {
@@ -11,7 +12,19 @@ export default function RootLayout() {
 
   return (
     <SafeAreaProvider>
-      <StatusBar style="dark" />
+      <ThemeProvider>
+        <RootLayoutInner />
+      </ThemeProvider>
+    </SafeAreaProvider>
+  );
+}
+
+function RootLayoutInner() {
+  const { isDark } = useTheme();
+
+  return (
+    <>
+      <StatusBar style={isDark ? 'light' : 'dark'} />
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen 
@@ -39,6 +52,6 @@ export default function RootLayout() {
           options={{ presentation: 'modal', headerShown: false }} 
         />
       </Stack>
-    </SafeAreaProvider>
+    </>
   );
 }

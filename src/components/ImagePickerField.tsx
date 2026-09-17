@@ -3,7 +3,8 @@ import { View, Text, StyleSheet, TouchableOpacity, Alert, Platform } from 'react
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors } from '../constants/theme';
+import { Colors, ThemeColors } from '../constants/theme';
+import { useTheme } from '../context/ThemeContext';
 import { getDriveImageUrl } from '../services/api';
 import { ImageViewModal } from './ImageViewModal';
 
@@ -30,6 +31,8 @@ export function ImagePickerField({
   helperText,
   multiple = false,
 }: ImagePickerFieldProps) {
+  const { colors, isDark } = useTheme();
+  const styles = getStyles(colors, isDark);
   const [previewModalVisible, setPreviewModalVisible] = useState(false);
   const [selectedPreviewUrl, setSelectedPreviewUrl] = useState<string | null>(null);
 
@@ -194,7 +197,7 @@ export function ImagePickerField({
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
   avatarContainer: {
     marginBottom: 16,
   },
@@ -210,7 +213,7 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 13,
     fontWeight: '600',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     marginBottom: 6,
   },
   avatarRow: {
@@ -223,10 +226,10 @@ const styles = StyleSheet.create({
     height: 76,
     borderRadius: 38,
     borderWidth: 2,
-    borderColor: Colors.primary,
+    borderColor: colors.primary,
     overflow: 'hidden',
     position: 'relative',
-    backgroundColor: '#f1f5f9',
+    backgroundColor: isDark ? '#1e293b' : '#f1f5f9',
   },
   avatarImage: {
     width: '100%',
@@ -237,7 +240,7 @@ const styles = StyleSheet.create({
     height: '100%',
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f1f5f9',
+    backgroundColor: isDark ? '#1e293b' : '#f1f5f9',
   },
   avatarBadge: {
     position: 'absolute',
@@ -259,15 +262,15 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     paddingHorizontal: 12,
     borderRadius: 8,
-    backgroundColor: Colors.primarySubtle,
+    backgroundColor: isDark ? '#261a02' : colors.primarySubtle,
     alignSelf: 'flex-start',
     borderWidth: 1,
-    borderColor: Colors.primaryLight,
+    borderColor: isDark ? '#784e08' : colors.primaryLight,
   },
   uploadBtnText: {
     fontSize: 12,
     fontWeight: '600',
-    color: Colors.primaryDark,
+    color: isDark ? '#fbbf24' : colors.primaryDark,
   },
   removeBtn: {
     flexDirection: 'row',
@@ -278,12 +281,12 @@ const styles = StyleSheet.create({
   },
   removeBtnText: {
     fontSize: 11,
-    color: Colors.danger,
+    color: colors.danger,
     fontWeight: '500',
   },
   helperText: {
     fontSize: 11,
-    color: Colors.textMuted,
+    color: colors.textMuted,
   },
   uploadCardBtn: {
     flexDirection: 'row',
@@ -293,22 +296,22 @@ const styles = StyleSheet.create({
   uploadCardBtnText: {
     fontSize: 12,
     fontWeight: '600',
-    color: Colors.primaryDark,
+    color: isDark ? '#fbbf24' : colors.primaryDark,
   },
   emptyCard: {
     borderWidth: 1.5,
     borderStyle: 'dashed',
-    borderColor: Colors.borderDark,
+    borderColor: isDark ? '#334155' : colors.borderDark,
     borderRadius: 12,
     padding: 18,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#fafafa',
+    backgroundColor: isDark ? '#111827' : '#fafafa',
     gap: 4,
   },
   emptyCardText: {
     fontSize: 12,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     textAlign: 'center',
   },
   galleryGrid: {
@@ -324,8 +327,8 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: Colors.border,
-    backgroundColor: '#f1f5f9',
+    borderColor: colors.border,
+    backgroundColor: isDark ? '#1e293b' : '#f1f5f9',
   },
   thumbnail: {
     width: '100%',
@@ -335,7 +338,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 2,
     right: 2,
-    backgroundColor: '#ffffff',
+    backgroundColor: isDark ? '#0f172a' : '#ffffff',
     borderRadius: 10,
   },
 });

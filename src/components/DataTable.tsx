@@ -4,7 +4,8 @@ import {
   View, Text, StyleSheet, TextInput, TouchableOpacity, 
   ScrollView, LayoutChangeEvent 
 } from 'react-native';
-import { Colors } from '../constants/theme';
+import { Colors, ThemeColors } from '../constants/theme';
+import { useTheme } from '../context/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 
 export interface Column<T> {
@@ -42,6 +43,8 @@ export function DataTable<T>({
   headerLeft,
   isLoading = false,
 }: DataTableProps<T>) {
+  const { colors, isDark } = useTheme();
+  const styles = getStyles(colors, isDark);
   const [search, setSearch] = useState('');
   const [pageSize, setPageSize] = useState(10);
   const [page, setPage] = useState(1);
@@ -139,13 +142,13 @@ export function DataTable<T>({
           <TextInput
             style={styles.searchInput}
             placeholder={searchPlaceholder}
-            placeholderTextColor={Colors.textMuted}
+            placeholderTextColor={colors.placeholder}
             value={search}
             onChangeText={t => { setSearch(t); setPage(1); }}
           />
           {search ? (
             <TouchableOpacity onPress={() => setSearch('')}>
-              <Ionicons name="close-circle" size={16} color={Colors.textMuted} />
+              <Ionicons name="close-circle" size={16} color={colors.textMuted} />
             </TouchableOpacity>
           ) : null}
         </View>
@@ -267,7 +270,7 @@ export function DataTable<T>({
             disabled={currentPage === 1}
             onPress={() => setPage(p => Math.max(1, p - 1))}
           >
-            <Ionicons name="chevron-back" size={16} color={currentPage === 1 ? Colors.textMuted : Colors.textPrimary} />
+            <Ionicons name="chevron-back" size={16} color={currentPage === 1 ? colors.textMuted : colors.textPrimary} />
           </TouchableOpacity>
 
           <Text style={styles.pageCurText}>{currentPage} / {totalPages}</Text>
@@ -277,7 +280,7 @@ export function DataTable<T>({
             disabled={currentPage === totalPages}
             onPress={() => setPage(p => Math.min(totalPages, p + 1))}
           >
-            <Ionicons name="chevron-forward" size={16} color={currentPage === totalPages ? Colors.textMuted : Colors.textPrimary} />
+            <Ionicons name="chevron-forward" size={16} color={currentPage === totalPages ? colors.textMuted : colors.textPrimary} />
           </TouchableOpacity>
         </View>
       </View>
@@ -285,14 +288,14 @@ export function DataTable<T>({
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
   container: {
     width: '100%',
     alignSelf: 'stretch',
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
     overflow: 'hidden',
     marginBottom: 16,
   },
@@ -312,17 +315,17 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
   sectionSub: {
     fontSize: 12,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     marginTop: 2,
   },
   addBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.primaryDark,
+    backgroundColor: colors.primaryDark,
     paddingHorizontal: 12,
     paddingVertical: 7,
     borderRadius: 9,
@@ -340,10 +343,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 12,
     paddingVertical: 10,
-    backgroundColor: '#f8fafc',
+    backgroundColor: isDark ? '#090d16' : '#f8fafc',
     borderTopWidth: 1,
     borderBottomWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
     flexWrap: 'wrap',
     gap: 8,
   },
@@ -354,24 +357,24 @@ const styles = StyleSheet.create({
   },
   toolLabel: {
     fontSize: 12,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
   },
   sizeBtn: {
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 6,
-    backgroundColor: Colors.surface,
+    backgroundColor: isDark ? '#1e293b' : colors.surface,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: isDark ? '#334155' : colors.border,
   },
   sizeBtnActive: {
-    backgroundColor: Colors.primaryDark,
-    borderColor: Colors.primaryDark,
+    backgroundColor: colors.primaryDark,
+    borderColor: colors.primaryDark,
   },
   sizeBtnText: {
     fontSize: 11,
     fontWeight: '600',
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
   },
   sizeBtnTextActive: {
     color: '#ffffff',
@@ -379,34 +382,40 @@ const styles = StyleSheet.create({
   searchBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.surface,
+    backgroundColor: isDark ? '#090d16' : colors.surface,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: isDark ? '#334155' : colors.border,
     paddingHorizontal: 10,
     paddingVertical: 6,
     flex: 1,
     minWidth: 160,
   },
+  searchIcon: {
+    marginRight: 6,
+  },
   searchInput: {
     fontSize: 12,
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     padding: 0,
     flex: 1,
+  },
+  clearBtn: {
+    padding: 2,
   },
   scrollHintBar: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: '#eff6ff',
+    backgroundColor: isDark ? '#082f49' : '#eff6ff',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderBottomWidth: 1,
-    borderBottomColor: '#dbeafe',
+    borderBottomColor: isDark ? '#075985' : '#dbeafe',
   },
   scrollHintText: {
     fontSize: 11,
-    color: Colors.primaryDark,
+    color: isDark ? '#38bdf8' : colors.primaryDark,
     fontWeight: '600',
   },
   tableWrapper: {
@@ -416,9 +425,9 @@ const styles = StyleSheet.create({
   },
   headerRow: {
     flexDirection: 'row',
-    backgroundColor: '#f1f5f9',
+    backgroundColor: isDark ? '#1e293b' : '#f1f5f9',
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    borderBottomColor: colors.border,
   },
   th: {
     paddingHorizontal: 10,
@@ -428,18 +437,18 @@ const styles = StyleSheet.create({
   thText: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#475569',
+    color: isDark ? '#cbd5e1' : '#475569',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
   tr: {
     flexDirection: 'row',
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-    backgroundColor: '#ffffff',
+    borderBottomColor: colors.border,
+    backgroundColor: colors.surface,
   },
   trAlt: {
-    backgroundColor: '#fafbfc',
+    backgroundColor: isDark ? '#0a0f1d' : '#fafbfc',
   },
   td: {
     paddingHorizontal: 10,
@@ -448,7 +457,7 @@ const styles = StyleSheet.create({
   },
   tdText: {
     fontSize: 12.5,
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
   emptyRow: {
     padding: 30,
@@ -457,7 +466,7 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 13,
-    color: Colors.textMuted,
+    color: colors.textMuted,
   },
   paginationRow: {
     flexDirection: 'row',
@@ -465,15 +474,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 12,
     paddingVertical: 10,
-    backgroundColor: '#f8fafc',
+    backgroundColor: isDark ? '#090d16' : '#f8fafc',
     borderTopWidth: 1,
-    borderTopColor: Colors.border,
+    borderTopColor: colors.border,
     flexWrap: 'wrap',
     gap: 8,
   },
   pageInfoText: {
     fontSize: 12,
-    color: Colors.textMuted,
+    color: colors.textMuted,
   },
   pageBtns: {
     flexDirection: 'row',
@@ -483,9 +492,9 @@ const styles = StyleSheet.create({
   pageBtn: {
     padding: 6,
     borderRadius: 6,
-    backgroundColor: Colors.surface,
+    backgroundColor: isDark ? '#1e293b' : colors.surface,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: isDark ? '#334155' : colors.border,
   },
   pageBtnDisabled: {
     opacity: 0.4,
@@ -493,6 +502,6 @@ const styles = StyleSheet.create({
   pageCurText: {
     fontSize: 12,
     fontWeight: '600',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
 });

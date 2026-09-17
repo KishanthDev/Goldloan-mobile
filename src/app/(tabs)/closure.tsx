@@ -3,7 +3,8 @@ import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, 
   Modal, TextInput, Alert, SafeAreaView, Platform, RefreshControl 
 } from 'react-native';
-import { Colors } from '../../constants/theme';
+import { Colors, ThemeColors } from '../../constants/theme';
+import { useTheme } from '../../context/ThemeContext';
 import { useAppStore } from '../../services/store';
 import { Loan } from '../../types';
 import { DataTable, Column } from '../../components/DataTable';
@@ -11,6 +12,8 @@ import { SidebarTrigger } from '../../components/SidebarTrigger';
 import { Ionicons } from '@expo/vector-icons';
 
 export default function ClosureScreen() {
+  const { colors, isDark } = useTheme();
+  const styles = getStyles(colors, isDark);
   const store = useAppStore();
 
   const [confirmModalVisible, setConfirmModalVisible] = useState(false);
@@ -169,11 +172,11 @@ export default function ClosureScreen() {
       <ScrollView 
         style={styles.container} 
         contentContainerStyle={styles.content}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[Colors.primary]} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />}
       >
         {/* Informational Banner */}
         <View style={styles.infoBanner}>
-          <Ionicons name="information-circle-outline" size={20} color={Colors.brand[700]} style={styles.infoIcon} />
+          <Ionicons name="information-circle-outline" size={20} color={isDark ? '#fbbf24' : colors.primaryDark} style={styles.infoIcon} />
           <Text style={styles.infoText}>
             Closing a loan updates its status to <Text style={{fontWeight: '700'}}>Closed</Text>, automatically releases attached gold ornaments back to <Text style={{fontWeight: '700'}}>Available</Text> in vault, and restores the bank limit.
           </Text>
@@ -210,7 +213,7 @@ export default function ClosureScreen() {
             <View style={styles.modalHeader}>
               <View style={styles.modalTitleContainer}>
                 <View style={styles.modalIconWrapper}>
-                  <Ionicons name="lock-closed" size={20} color={Colors.brand[700]} />
+                  <Ionicons name="lock-closed" size={20} color={isDark ? '#fbbf24' : colors.primaryDark} />
                 </View>
                 <View>
                   <Text style={styles.modalTitle}>Close Loan & Release</Text>
@@ -221,7 +224,7 @@ export default function ClosureScreen() {
                 style={styles.modalCloseBtn}
                 onPress={() => setConfirmModalVisible(false)}
               >
-                <Ionicons name="close" size={20} color={Colors.textSecondary} />
+                <Ionicons name="close" size={20} color={colors.textSecondary} />
               </TouchableOpacity>
             </View>
 
@@ -238,7 +241,7 @@ export default function ClosureScreen() {
                 </View>
                 <View style={styles.summaryRow}>
                   <Text style={styles.summaryLabel}>Principal Amount</Text>
-                  <Text style={[styles.summaryValue, { color: Colors.brand[700], fontWeight: '700' }]}>
+                  <Text style={[styles.summaryValue, { color: isDark ? '#fbbf24' : colors.primaryDark, fontWeight: '700' }]}>
                     ₹{selectedLoan?.LoanAmount.toLocaleString('en-IN')}
                   </Text>
                 </View>
@@ -296,7 +299,7 @@ export default function ClosureScreen() {
                 <TextInput
                   style={styles.textArea}
                   placeholder={`Enter remarks for ${selectedUser?.FullName || 'customer'}'s loan closure...`}
-                  placeholderTextColor={Colors.textMuted}
+                  placeholderTextColor={colors.placeholder}
                   value={remarks}
                   onChangeText={setRemarks}
                   multiline
@@ -328,14 +331,14 @@ export default function ClosureScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
   },
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: colors.background,
   },
   content: {
     padding: 12,
@@ -344,12 +347,14 @@ const styles = StyleSheet.create({
   infoBanner: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    backgroundColor: Colors.brand[50],
+    backgroundColor: isDark ? '#1a1608' : Colors.brand[50],
     padding: 12,
     borderRadius: 12,
     marginBottom: 16,
     borderLeftWidth: 4,
-    borderLeftColor: Colors.brand[600],
+    borderLeftColor: colors.primary,
+    borderWidth: isDark ? 1 : 0,
+    borderColor: isDark ? '#382504' : 'transparent',
     gap: 10,
   },
   infoIcon: {
@@ -358,7 +363,7 @@ const styles = StyleSheet.create({
   infoText: {
     flex: 1,
     fontSize: 12,
-    color: Colors.brand[900],
+    color: isDark ? '#fef08a' : Colors.brand[900],
     lineHeight: 18,
   },
   loanNumberCell: {
@@ -369,10 +374,10 @@ const styles = StyleSheet.create({
   loanNumberText: {
     fontSize: 13,
     fontWeight: '700',
-    color: Colors.textDark,
+    color: isDark ? '#fbbf24' : colors.primaryDark,
   },
   overdueBadge: {
-    backgroundColor: '#fee2e2',
+    backgroundColor: isDark ? '#450a0a' : '#fee2e2',
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 4,
@@ -380,28 +385,28 @@ const styles = StyleSheet.create({
   overdueText: {
     fontSize: 9,
     fontWeight: '800',
-    color: '#b91c1c',
+    color: isDark ? '#f87171' : '#b91c1c',
   },
   customerText: {
     fontSize: 13,
     fontWeight: '600',
-    color: Colors.textDark,
+    color: colors.textPrimary,
   },
   cellText: {
     fontSize: 13,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
   },
   amountText: {
     fontSize: 13,
     fontWeight: '700',
-    color: Colors.brand[700],
+    color: isDark ? '#34d399' : '#16a34a',
   },
   overdueDueText: {
-    color: '#dc2626',
+    color: isDark ? '#f87171' : '#dc2626',
     fontWeight: '700',
   },
   ornamentBadge: {
-    backgroundColor: Colors.bgSecondary,
+    backgroundColor: isDark ? colors.surfaceSubtle : Colors.bgSecondary,
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
@@ -410,7 +415,7 @@ const styles = StyleSheet.create({
   ornamentBadgeText: {
     fontSize: 11,
     fontWeight: '600',
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
   },
   closeBtn: {
     flexDirection: 'row',
@@ -434,13 +439,13 @@ const styles = StyleSheet.create({
   // Modal Styles
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.65)',
+    backgroundColor: isDark ? 'rgba(0, 0, 0, 0.85)' : 'rgba(15, 23, 42, 0.65)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 16,
   },
   modalContent: {
-    backgroundColor: '#fff',
+    backgroundColor: colors.card,
     borderRadius: 18,
     width: Platform.select({ web: '55%', default: '94%' }),
     maxWidth: 650,
@@ -450,6 +455,8 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 16,
     elevation: 10,
+    borderWidth: isDark ? 1 : 0,
+    borderColor: colors.border,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -457,8 +464,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.borderLight,
-    backgroundColor: '#fafafa',
+    borderBottomColor: colors.borderLight,
+    backgroundColor: isDark ? colors.surface : '#fafafa',
   },
   modalTitleContainer: {
     flexDirection: 'row',
@@ -469,18 +476,19 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 10,
-    backgroundColor: Colors.brand[100],
+    backgroundColor: isDark ? '#271d07' : Colors.brand[100],
     justifyContent: 'center',
     alignItems: 'center',
   },
   modalTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: Colors.textDark,
+    color: colors.textPrimary,
   },
   modalSubtitle: {
     fontSize: 12,
-    color: Colors.textSecondary,
+    color: isDark ? '#fbbf24' : colors.primaryDark,
+    fontWeight: '600',
   },
   modalCloseBtn: {
     padding: 4,
@@ -489,10 +497,10 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   summaryCard: {
-    backgroundColor: '#f8fafc',
+    backgroundColor: isDark ? colors.surface : '#f8fafc',
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: colors.borderLight,
     padding: 12,
     marginBottom: 16,
   },
@@ -501,27 +509,27 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: 6,
     borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
+    borderBottomColor: colors.borderLight,
   },
   summaryLabel: {
     fontSize: 12,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
   },
   summaryValue: {
     fontSize: 12,
     fontWeight: '600',
-    color: Colors.textDark,
+    color: colors.textPrimary,
   },
   sectionHeading: {
     fontSize: 13,
     fontWeight: '700',
-    color: Colors.textDark,
+    color: colors.textPrimary,
     marginBottom: 8,
   },
   ornamentList: {
-    backgroundColor: '#fff',
+    backgroundColor: isDark ? colors.surface : '#fff',
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: colors.borderLight,
     borderRadius: 12,
     marginBottom: 16,
     overflow: 'hidden',
@@ -532,7 +540,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 10,
     borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
+    borderBottomColor: colors.borderLight,
   },
   ornamentItemLeft: {
     flexDirection: 'row',
@@ -546,18 +554,18 @@ const styles = StyleSheet.create({
   ornamentItemName: {
     fontSize: 12,
     fontWeight: '600',
-    color: Colors.textDark,
+    color: colors.textPrimary,
   },
   ornamentItemDetail: {
     fontSize: 11,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     marginTop: 1,
   },
   releaseTag: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: '#dcfce7',
+    backgroundColor: isDark ? '#052e16' : '#dcfce7',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 6,
@@ -565,11 +573,11 @@ const styles = StyleSheet.create({
   releaseTagText: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#15803d',
+    color: isDark ? '#4ade80' : '#15803d',
   },
   noOrnamentsText: {
     fontSize: 12,
-    color: Colors.textMuted,
+    color: colors.textMuted,
     fontStyle: 'italic',
     marginBottom: 16,
   },
@@ -579,19 +587,19 @@ const styles = StyleSheet.create({
   inputLabel: {
     fontSize: 12,
     fontWeight: '600',
-    color: Colors.textDark,
+    color: colors.textPrimary,
     marginBottom: 6,
   },
   textArea: {
     borderWidth: 1,
-    borderColor: '#cbd5e1',
+    borderColor: colors.border,
     borderRadius: 10,
     padding: 10,
     fontSize: 13,
-    color: Colors.textDark,
+    color: colors.textPrimary,
     textAlignVertical: 'top',
     minHeight: 70,
-    backgroundColor: '#fff',
+    backgroundColor: isDark ? colors.surfaceSubtle : '#fff',
   },
   modalFooter: {
     flexDirection: 'row',
@@ -600,21 +608,21 @@ const styles = StyleSheet.create({
     gap: 10,
     padding: 14,
     borderTopWidth: 1,
-    borderTopColor: Colors.borderLight,
-    backgroundColor: '#fafafa',
+    borderTopColor: colors.borderLight,
+    backgroundColor: isDark ? colors.surface : '#fafafa',
   },
   cancelBtn: {
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#cbd5e1',
-    backgroundColor: '#fff',
+    borderColor: colors.borderDark,
+    backgroundColor: isDark ? colors.surface : '#fff',
   },
   cancelBtnText: {
     fontSize: 13,
     fontWeight: '600',
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
   },
   confirmReleaseBtn: {
     flexDirection: 'row',

@@ -4,11 +4,14 @@ import {
   ScrollView, Alert, ActivityIndicator, SafeAreaView 
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Colors } from '../../constants/theme';
+import { Colors, ThemeColors } from '../../constants/theme';
+import { useTheme } from '../../context/ThemeContext';
 import { useAppStore } from '../../services/store';
 import { Ionicons } from '@expo/vector-icons';
 
 export default function NewCustomerScreen() {
+  const { colors, isDark } = useTheme();
+  const styles = getStyles(colors, isDark);
   const router = useRouter();
   const store = useAppStore();
   const [submitting, setSubmitting] = useState(false);
@@ -58,7 +61,7 @@ export default function NewCustomerScreen() {
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.navHeader}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Ionicons name="close" size={24} color={Colors.textPrimary} />
+          <Ionicons name="close" size={24} color={colors.textPrimary} />
         </TouchableOpacity>
         <Text style={styles.navTitle}>Register Customer</Text>
         <View style={{ width: 24 }} />
@@ -70,7 +73,7 @@ export default function NewCustomerScreen() {
           <TextInput
             style={styles.input}
             placeholder="e.g. Ramesh Kumar"
-            placeholderTextColor={Colors.textMuted}
+            placeholderTextColor={colors.placeholder}
             value={form.FullName}
             onChangeText={v => updateField('FullName', v)}
           />
@@ -81,7 +84,7 @@ export default function NewCustomerScreen() {
           <TextInput
             style={styles.input}
             placeholder="e.g. Suresh Kumar"
-            placeholderTextColor={Colors.textMuted}
+            placeholderTextColor={colors.placeholder}
             value={form.FatherHusbandName}
             onChangeText={v => updateField('FatherHusbandName', v)}
           />
@@ -93,7 +96,7 @@ export default function NewCustomerScreen() {
             <TextInput
               style={styles.input}
               placeholder="10-digit number"
-              placeholderTextColor={Colors.textMuted}
+              placeholderTextColor={colors.placeholder}
               keyboardType="phone-pad"
               maxLength={10}
               value={form.MobileNumber}
@@ -106,7 +109,7 @@ export default function NewCustomerScreen() {
             <TextInput
               style={styles.input}
               placeholder="customer@email.com"
-              placeholderTextColor={Colors.textMuted}
+              placeholderTextColor={colors.placeholder}
               keyboardType="email-address"
               autoCapitalize="none"
               value={form.Email}
@@ -121,7 +124,7 @@ export default function NewCustomerScreen() {
             <TextInput
               style={styles.input}
               placeholder="12-digit UIDAI"
-              placeholderTextColor={Colors.textMuted}
+              placeholderTextColor={colors.placeholder}
               keyboardType="number-pad"
               maxLength={14}
               value={form.AadhaarNumber}
@@ -134,7 +137,7 @@ export default function NewCustomerScreen() {
             <TextInput
               style={styles.input}
               placeholder="ABCDE1234F"
-              placeholderTextColor={Colors.textMuted}
+              placeholderTextColor={colors.placeholder}
               autoCapitalize="characters"
               maxLength={10}
               value={form.PANNumber}
@@ -148,7 +151,7 @@ export default function NewCustomerScreen() {
           <TextInput
             style={styles.input}
             placeholder="Door #, Street, Area"
-            placeholderTextColor={Colors.textMuted}
+            placeholderTextColor={colors.placeholder}
             value={form.AddressLine1}
             onChangeText={v => updateField('AddressLine1', v)}
           />
@@ -181,7 +184,7 @@ export default function NewCustomerScreen() {
           <TextInput
             style={styles.input}
             placeholder="e.g. Business, Salaried, Trader"
-            placeholderTextColor={Colors.textMuted}
+            placeholderTextColor={colors.placeholder}
             value={form.Occupation}
             onChangeText={v => updateField('Occupation', v)}
           />
@@ -206,10 +209,10 @@ export default function NewCustomerScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
   },
   navHeader: {
     flexDirection: 'row',
@@ -218,7 +221,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    borderBottomColor: colors.border,
   },
   backBtn: {
     padding: 4,
@@ -226,11 +229,11 @@ const styles = StyleSheet.create({
   navTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: colors.background,
   },
   content: {
     padding: 16,
@@ -246,24 +249,24 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 12,
     fontWeight: '600',
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     marginBottom: 6,
   },
   input: {
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 14,
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
   },
   submitBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Colors.primaryDark,
+    backgroundColor: colors.primaryDark,
     paddingVertical: 14,
     borderRadius: 10,
     marginTop: 10,

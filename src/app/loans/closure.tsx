@@ -4,13 +4,16 @@ import {
   ScrollView, Alert, ActivityIndicator, SafeAreaView 
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Colors } from '../../constants/theme';
+import { Colors, ThemeColors } from '../../constants/theme';
+import { useTheme } from '../../context/ThemeContext';
 import { useAppStore } from '../../services/store';
 import { Loan, User, Ornament } from '../../types';
 import { Badge } from '../../components/Badge';
 import { Ionicons } from '@expo/vector-icons';
 
 export default function LoanClosureScreen() {
+  const { colors, isDark } = useTheme();
+  const styles = getStyles(colors, isDark);
   const router = useRouter();
   const store = useAppStore();
   const [activeLoans, setActiveLoans] = useState<Loan[]>([]);
@@ -78,7 +81,7 @@ export default function LoanClosureScreen() {
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.navHeader}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Ionicons name="close" size={24} color={Colors.textPrimary} />
+          <Ionicons name="close" size={24} color={colors.textPrimary} />
         </TouchableOpacity>
         <Text style={styles.navTitle}>Close & Release Gold Loan</Text>
         <View style={{ width: 24 }} />
@@ -164,7 +167,7 @@ export default function LoanClosureScreen() {
               <TextInput
                 style={styles.remarksInput}
                 placeholder="e.g. Full settlement received via RTGS. Ornaments handed over in presence of branch manager."
-                placeholderTextColor={Colors.textMuted}
+                placeholderTextColor={colors.placeholder}
                 multiline
                 numberOfLines={3}
                 value={remarks}
@@ -193,10 +196,10 @@ export default function LoanClosureScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
   },
   navHeader: {
     flexDirection: 'row',
@@ -205,7 +208,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    borderBottomColor: colors.border,
   },
   backBtn: {
     padding: 4,
@@ -213,28 +216,28 @@ const styles = StyleSheet.create({
   navTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: colors.background,
   },
   content: {
     padding: 16,
     paddingBottom: 40,
   },
   card: {
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     borderRadius: 14,
     padding: 16,
     marginBottom: 14,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
   },
   cardTitle: {
     fontSize: 14,
     fontWeight: '700',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     marginBottom: 10,
@@ -246,54 +249,54 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: 10,
-    backgroundColor: Colors.surfaceSubtle,
+    backgroundColor: colors.surfaceSubtle,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
     marginRight: 10,
     minWidth: 140,
   },
   loanChipActive: {
-    backgroundColor: '#fffbeb',
-    borderColor: Colors.primary,
+    backgroundColor: isDark ? '#1e293b' : '#fffbeb',
+    borderColor: colors.primary,
   },
   loanChipNum: {
     fontSize: 14,
     fontWeight: '700',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     marginBottom: 2,
   },
   loanChipNumActive: {
-    color: Colors.primaryDark,
+    color: colors.primaryDark,
   },
   loanChipCust: {
     fontSize: 12,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     marginBottom: 4,
   },
   loanChipAmt: {
     fontSize: 13,
     fontWeight: '700',
-    color: Colors.success,
+    color: colors.success,
   },
   emptyText: {
     fontSize: 13,
-    color: Colors.textMuted,
+    color: colors.textMuted,
   },
   detailRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     paddingVertical: 6,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    borderBottomColor: colors.border,
   },
   detailLabel: {
     fontSize: 13,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
   },
   detailVal: {
     fontSize: 13,
     fontWeight: '600',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
   ornItem: {
     flexDirection: 'row',
@@ -301,26 +304,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 8,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    borderBottomColor: colors.border,
   },
   ornTitle: {
     fontSize: 13,
     fontWeight: '600',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
   ornSub: {
     fontSize: 11,
-    color: Colors.textMuted,
+    color: colors.textMuted,
     marginTop: 2,
   },
   remarksInput: {
-    backgroundColor: Colors.surfaceSubtle,
+    backgroundColor: colors.surfaceSubtle,
     borderRadius: 8,
     padding: 10,
     fontSize: 13,
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
     textAlignVertical: 'top',
     minHeight: 70,
   },
@@ -328,7 +331,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Colors.success,
+    backgroundColor: colors.success,
     paddingVertical: 14,
     borderRadius: 12,
     marginTop: 6,

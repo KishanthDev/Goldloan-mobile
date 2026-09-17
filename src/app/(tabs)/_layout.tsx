@@ -12,6 +12,9 @@ import { useAppStore } from '../../services/store';
 import { ApiConfig } from '../../config/api';
 import { Env } from '../../config/env';
 import { SidebarProvider, useSidebar } from '../../context/SidebarContext';
+import { useTheme } from '../../context/ThemeContext';
+import { ThemeColors } from '../../constants/theme';
+import { ThemeToggleBtn } from '../../components/ThemeToggleBtn';
 
 interface NavItem {
   name: string;
@@ -81,6 +84,8 @@ function TabLayoutInner() {
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const { collapsed, setCollapsed, mobileDrawerOpen, setMobileDrawerOpen, isDesktop } = useSidebar();
+  const { colors, isDark } = useTheme();
+  const styles = getStyles(colors, isDark);
 
   const isLive = !ApiConfig.isMockMode();
   const live22kRate = store.goldRates?.gold22k?.rate1g;
@@ -211,7 +216,7 @@ function TabLayoutInner() {
                       <Ionicons
                         name={active ? item.activeIcon : item.icon}
                         size={20}
-                        color={active ? Colors.primaryDark : Colors.textSecondary}
+                        color={active ? (isDark ? '#fbbf24' : colors.primaryDark) : colors.textSecondary}
                       />
                     </View>
                     <Animated.View style={[styles.desktopNavTextWrapper, { opacity: textOpacity }]}>
@@ -239,6 +244,9 @@ function TabLayoutInner() {
                     <Text style={styles.tickerRate}>₹{live22kRate.toLocaleString()} <Text style={styles.tickerUnit}>/g</Text></Text>
                   </View>
                 ) : null}
+                <View style={{ paddingHorizontal: 12, marginBottom: 8 }}>
+                  <ThemeToggleBtn showLabel size={15} />
+                </View>
                 <TouchableOpacity 
                   onPress={() => setCollapsed(true)} 
                   style={styles.collapseFooterBtn}
@@ -251,16 +259,21 @@ function TabLayoutInner() {
                 </TouchableOpacity>
               </Animated.View>
             ) : (
-              <TouchableOpacity 
-                onPress={() => setCollapsed(false)} 
-                style={styles.expandRailBtn}
-                accessibilityLabel="Expand sidebar"
-              >
-                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  <Ionicons name="chevron-forward" size={16} color={Colors.primaryDark} />
-                  <Ionicons name="chevron-forward" size={16} color={Colors.primaryDark} style={{ marginLeft: -8 }} />
+              <>
+                <View style={{ alignItems: 'center', paddingVertical: 10, borderTopWidth: 1, borderTopColor: colors.border }}>
+                  <ThemeToggleBtn size={15} />
                 </View>
-              </TouchableOpacity>
+                <TouchableOpacity 
+                  onPress={() => setCollapsed(false)} 
+                  style={styles.expandRailBtn}
+                  accessibilityLabel="Expand sidebar"
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <Ionicons name="chevron-forward" size={16} color={isDark ? '#fbbf24' : colors.primaryDark} />
+                    <Ionicons name="chevron-forward" size={16} color={isDark ? '#fbbf24' : colors.primaryDark} style={{ marginLeft: -8 }} />
+                  </View>
+                </TouchableOpacity>
+              </>
             )}
           </Animated.View>
         )}
@@ -324,6 +337,9 @@ function TabLayoutInner() {
                   </Text>
                 </View>
               </View>
+              <View style={{ marginRight: 8 }}>
+                <ThemeToggleBtn size={16} />
+              </View>
               <TouchableOpacity 
                 onPress={() => setMobileDrawerOpen(false)}
                 style={styles.drawerCloseBtn}
@@ -351,7 +367,7 @@ function TabLayoutInner() {
                     <Ionicons
                       name={active ? item.activeIcon : item.icon}
                       size={22}
-                      color={active ? Colors.primaryDark : Colors.textSecondary}
+                      color={active ? (isDark ? '#fbbf24' : colors.primaryDark) : colors.textSecondary}
                     />
                     <Text style={[styles.navText, active && styles.navTextActive, { fontSize: 14 }]} numberOfLines={1}>
                       {item.title}
@@ -379,10 +395,10 @@ function TabLayoutInner() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: colors.background,
   },
   mainContainer: {
     flex: 1,
@@ -390,14 +406,14 @@ const styles = StyleSheet.create({
   },
   screensWrapper: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: colors.background,
   },
 
   // ─── DESKTOP SIDEBAR ───
   desktopSidebar: {
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     borderRightWidth: 1,
-    borderRightColor: Colors.border,
+    borderRightColor: colors.border,
     height: '100%',
     flexDirection: 'column',
     overflow: 'hidden',
@@ -406,7 +422,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 18,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    borderBottomColor: colors.border,
     overflow: 'hidden',
   },
   desktopBrandRow: {
@@ -444,48 +460,20 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     paddingRight: 8,
   },
-  sidebarHeader: {
-    paddingHorizontal: 14,
-    paddingVertical: 18,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-    overflow: 'hidden',
-  },
-  sidebarHeaderCollapsed: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 0,
-  },
-  brandRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    overflow: 'hidden',
-  },
-  brandRowCollapsed: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    width: '100%',
-    gap: 0,
-  },
   brandLogo: {
     width: 36,
     height: 36,
     borderRadius: 8,
     flexShrink: 0,
   },
-  brandTextWrapper: {
-    flex: 1,
-    overflow: 'hidden',
-  },
   brandTitle: {
     fontSize: 14,
     fontWeight: '800',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
   brandSub: {
     fontSize: 10,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
   },
 
   // ─── NAV ITEMS ───
@@ -507,13 +495,8 @@ const styles = StyleSheet.create({
     position: 'relative',
     minHeight: 42,
   },
-  navItemCollapsed: {
-    justifyContent: 'center',
-    paddingHorizontal: 0,
-    paddingVertical: 12,
-  },
   navItemActive: {
-    backgroundColor: Colors.primarySubtle,
+    backgroundColor: isDark ? '#261a02' : colors.primarySubtle,
   },
   activePillIndicator: {
     position: 'absolute',
@@ -522,50 +505,47 @@ const styles = StyleSheet.create({
     bottom: 8,
     width: 3,
     borderRadius: 2,
-    backgroundColor: Colors.primaryDark,
+    backgroundColor: isDark ? '#f59e0b' : colors.primaryDark,
   },
   navText: {
     fontSize: 13,
     fontWeight: '600',
-    color: Colors.textSecondary,
-    flex: 1,
+    color: colors.textSecondary,
   },
   navTextActive: {
-    color: Colors.primaryDark,
-    fontWeight: '700',
+    color: isDark ? '#fbbf24' : colors.primaryDark,
+    fontWeight: '800',
   },
 
   // ─── SIDEBAR FOOTER ───
   sidebarFooter: {
     padding: 12,
     borderTopWidth: 1,
-    borderTopColor: Colors.border,
-    backgroundColor: Colors.surface,
-    gap: 8,
-    overflow: 'hidden',
+    borderTopColor: colors.border,
+    backgroundColor: colors.surface,
   },
   goldTickerCard: {
-    backgroundColor: '#fffdf5',
+    backgroundColor: isDark ? '#1e293b' : '#fefce8',
+    borderRadius: 10,
     padding: 10,
-    borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#fef08a',
+    borderColor: isDark ? '#334155' : '#fef08a',
+    marginBottom: 10,
   },
   tickerTitle: {
     fontSize: 11,
     fontWeight: '700',
-    color: Colors.primaryDark,
+    color: isDark ? '#fbbf24' : colors.primaryDark,
   },
   tickerRate: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '800',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     marginTop: 2,
   },
   tickerUnit: {
     fontSize: 10,
-    fontWeight: '500',
-    color: Colors.textMuted,
+    color: colors.textMuted,
   },
   collapseFooterBtn: {
     flexDirection: 'row',
@@ -576,7 +556,7 @@ const styles = StyleSheet.create({
   },
   collapseFooterText: {
     fontSize: 11,
-    color: Colors.textMuted,
+    color: colors.textMuted,
     fontWeight: '600',
   },
   expandRailBtn: {
@@ -584,7 +564,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderTopWidth: 1,
-    borderTopColor: Colors.border,
+    borderTopColor: colors.border,
   },
 
   // ─── MOBILE DRAWER OVERLAY ───
@@ -603,17 +583,17 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
   },
   mobileDrawer: {
     height: '100%',
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     borderRightWidth: 1,
-    borderRightColor: Colors.border,
+    borderRightColor: colors.border,
     zIndex: 10000,
     shadowColor: '#000',
-    shadowOpacity: 0.25,
-    shadowRadius: 10,
+    shadowOpacity: 0.35,
+    shadowRadius: 12,
     elevation: 10,
     overflow: 'hidden',
   },
@@ -624,7 +604,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 14,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    borderBottomColor: colors.border,
   },
   drawerBrandGroup: {
     flex: 1,
@@ -643,14 +623,14 @@ const styles = StyleSheet.create({
     flexShrink: 0,
     padding: 8,
     borderRadius: 8,
-    backgroundColor: '#f1f5f9',
+    backgroundColor: isDark ? '#1e293b' : '#f1f5f9',
     alignItems: 'center',
     justifyContent: 'center',
   },
   mobileDrawerFooter: {
     padding: 14,
     borderTopWidth: 1,
-    borderTopColor: Colors.border,
-    backgroundColor: Colors.surface,
+    borderTopColor: colors.border,
+    backgroundColor: colors.surface,
   },
 });

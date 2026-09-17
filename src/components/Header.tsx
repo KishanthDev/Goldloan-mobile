@@ -1,8 +1,9 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { Colors } from '../constants/theme';
+import { useTheme } from '../context/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import { ApiConfig } from '../config/api';
+import { ThemeToggleBtn } from './ThemeToggleBtn';
 
 interface HeaderProps {
   title: string;
@@ -17,34 +18,37 @@ export const Header: React.FC<HeaderProps> = ({
   onRefresh,
   isRefreshing,
 }) => {
+  const { colors, isDark } = useTheme();
   const isMock = ApiConfig.isMockMode();
 
   return (
-    <View style={styles.container}>
-      <View>
-        <Text style={styles.title}>{title}</Text>
-        {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
+    <View style={[styles.container, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <Text style={[styles.title, { color: colors.textPrimary }]} numberOfLines={1}>{title}</Text>
+        {subtitle ? <Text style={[styles.subtitle, { color: colors.textSecondary }]} numberOfLines={1}>{subtitle}</Text> : null}
       </View>
 
       <View style={styles.rightGroup}>
-        <View style={[styles.statusTag, isMock ? styles.mockTag : styles.liveTag]}>
+        <View style={[styles.statusTag, isMock ? (isDark ? styles.mockTagDark : styles.mockTag) : (isDark ? styles.liveTagDark : styles.liveTag)]}>
           <View style={[styles.statusDot, isMock ? styles.mockDot : styles.liveDot]} />
-          <Text style={[styles.statusText, isMock ? styles.mockText : styles.liveText]}>
-            {isMock ? 'Demo Mode' : 'Live Sheets'}
+          <Text style={[styles.statusText, isMock ? (isDark ? styles.mockTextDark : styles.mockText) : (isDark ? styles.liveTextDark : styles.liveText)]}>
+            {isMock ? 'Demo' : 'Live'}
           </Text>
         </View>
+
+        <ThemeToggleBtn size={16} />
 
         {onRefresh ? (
           <TouchableOpacity 
             onPress={onRefresh} 
             disabled={isRefreshing}
-            style={styles.refreshBtn}
+            style={[styles.refreshBtn, { backgroundColor: colors.surfaceSubtle }]}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
             <Ionicons 
               name="sync" 
-              size={18} 
-              color={Colors.primary} 
+              size={16} 
+              color={colors.primaryDark} 
               style={isRefreshing ? styles.spinning : undefined} 
             />
           </TouchableOpacity>
@@ -61,25 +65,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingTop: 12,
-    paddingBottom: 8,
-    backgroundColor: Colors.surface,
+    paddingBottom: 10,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    gap: 10,
   },
   title: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '700',
-    color: Colors.textPrimary,
   },
   subtitle: {
-    fontSize: 12,
-    color: Colors.textSecondary,
-    marginTop: 2,
+    fontSize: 11,
+    marginTop: 1,
   },
   rightGroup: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    flexShrink: 0,
   },
   statusTag: {
     flexDirection: 'row',
@@ -92,8 +94,14 @@ const styles = StyleSheet.create({
   mockTag: {
     backgroundColor: '#fef3c7',
   },
+  mockTagDark: {
+    backgroundColor: '#3d2605',
+  },
   liveTag: {
     backgroundColor: '#dcfce7',
+  },
+  liveTagDark: {
+    backgroundColor: '#052e16',
   },
   statusDot: {
     width: 6,
@@ -113,14 +121,19 @@ const styles = StyleSheet.create({
   mockText: {
     color: '#92400e',
   },
+  mockTextDark: {
+    color: '#fbbf24',
+  },
   liveText: {
     color: '#166534',
+  },
+  liveTextDark: {
+    color: '#4ade80',
   },
   refreshBtn: {
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: Colors.surfaceSubtle,
     alignItems: 'center',
     justifyContent: 'center',
   },

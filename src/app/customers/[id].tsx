@@ -4,13 +4,16 @@ import {
   ActivityIndicator, TextInput, Alert, SafeAreaView 
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Colors } from '../../constants/theme';
+import { Colors, ThemeColors } from '../../constants/theme';
+import { useTheme } from '../../context/ThemeContext';
 import { useAppStore } from '../../services/store';
 import { User, BankAccount, Ornament, Loan } from '../../types';
 import { Badge } from '../../components/Badge';
 import { Ionicons } from '@expo/vector-icons';
 
 export default function CustomerDetailScreen() {
+  const { colors, isDark } = useTheme();
+  const styles = getStyles(colors, isDark);
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const store = useAppStore();
@@ -81,7 +84,7 @@ export default function CustomerDetailScreen() {
   if (loading) {
     return (
       <View style={styles.centerBox}>
-        <ActivityIndicator size="large" color={Colors.primary} />
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
@@ -103,7 +106,7 @@ export default function CustomerDetailScreen() {
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.iconBtn}>
-          <Ionicons name="arrow-back" size={22} color={Colors.textPrimary} />
+          <Ionicons name="arrow-back" size={22} color={colors.textPrimary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Customer Profile</Text>
         <View style={{ width: 32 }} />
@@ -122,23 +125,23 @@ export default function CustomerDetailScreen() {
 
           <View style={styles.profileInfoList}>
             <View style={styles.infoRow}>
-              <Ionicons name="call" size={14} color={Colors.primaryDark} />
+              <Ionicons name="call" size={14} color={isDark ? '#fbbf24' : colors.primaryDark} />
               <Text style={styles.infoText}>{user.MobileNumber}</Text>
             </View>
             {user.Email ? (
               <View style={styles.infoRow}>
-                <Ionicons name="mail" size={14} color={Colors.textSecondary} />
+                <Ionicons name="mail" size={14} color={colors.textSecondary} />
                 <Text style={styles.infoText}>{user.Email}</Text>
               </View>
             ) : null}
             {user.AddressLine1 ? (
               <View style={styles.infoRow}>
-                <Ionicons name="location" size={14} color={Colors.textSecondary} />
+                <Ionicons name="location" size={14} color={colors.textSecondary} />
                 <Text style={styles.infoText}>{user.AddressLine1}, {user.City} {user.Pincode}</Text>
               </View>
             ) : null}
             <View style={styles.infoRow}>
-              <Ionicons name="card" size={14} color={Colors.textSecondary} />
+              <Ionicons name="card" size={14} color={colors.textSecondary} />
               <Text style={styles.infoText}>Aadhaar: {user.AadhaarNumber || 'N/A'} • PAN: {user.PANNumber || 'N/A'}</Text>
             </View>
           </View>
@@ -215,14 +218,14 @@ export default function CustomerDetailScreen() {
 
                   <View style={styles.utilRow}>
                     <Text style={styles.utilText}>Utilized: ₹{util.toLocaleString()} / ₹{maxL.toLocaleString()}</Text>
-                    <Text style={[styles.utilText, { fontWeight: '700', color: Colors.success }]}>
+                    <Text style={[styles.utilText, { fontWeight: '700', color: colors.success }]}>
                       Avail: ₹{avail.toLocaleString()}
                     </Text>
                   </View>
 
                   {/* Progress bar */}
                   <View style={styles.progressBarBg}>
-                    <View style={[styles.progressBarFill, { width: `${pct}%`, backgroundColor: pct > 80 ? Colors.danger : Colors.primary }]} />
+                    <View style={[styles.progressBarFill, { width: `${pct}%`, backgroundColor: pct > 80 ? colors.danger : colors.primary }]} />
                   </View>
                 </View>
               );
@@ -276,10 +279,10 @@ export default function CustomerDetailScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
   },
   header: {
     flexDirection: 'row',
@@ -288,7 +291,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    borderBottomColor: colors.border,
   },
   iconBtn: {
     padding: 4,
@@ -296,11 +299,11 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: colors.background,
   },
   content: {
     padding: 16,
@@ -313,23 +316,23 @@ const styles = StyleSheet.create({
   },
   notFoundText: {
     fontSize: 16,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     marginBottom: 8,
   },
   backLink: {
     padding: 8,
   },
   backLinkText: {
-    color: Colors.primaryDark,
+    color: colors.primaryDark,
     fontWeight: '700',
   },
   profileCard: {
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     borderRadius: 14,
     padding: 18,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
     marginBottom: 16,
   },
   avatarLarge: {
@@ -351,7 +354,7 @@ const styles = StyleSheet.create({
   nameLarge: {
     fontSize: 18,
     fontWeight: '700',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     marginBottom: 6,
   },
   profileInfoList: {
@@ -359,7 +362,7 @@ const styles = StyleSheet.create({
     marginTop: 14,
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: Colors.border,
+    borderTopColor: colors.border,
     gap: 8,
   },
   infoRow: {
@@ -369,15 +372,15 @@ const styles = StyleSheet.create({
   },
   infoText: {
     fontSize: 13,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     flex: 1,
   },
   sectionCard: {
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     borderRadius: 14,
     padding: 16,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
     marginBottom: 14,
   },
   sectionHeaderRow: {
@@ -389,22 +392,22 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 14,
     fontWeight: '700',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
   addBtnText: {
     fontSize: 13,
     fontWeight: '700',
-    color: Colors.primaryDark,
+    color: colors.primaryDark,
   },
   emptyNotice: {
     fontSize: 13,
-    color: Colors.textMuted,
+    color: colors.textMuted,
     marginVertical: 6,
   },
   addBankBox: {
-    backgroundColor: Colors.surfaceSubtle,
+    backgroundColor: colors.surfaceSubtle,
     borderRadius: 8,
     padding: 12,
     marginBottom: 12,
@@ -412,7 +415,7 @@ const styles = StyleSheet.create({
   formSubtitle: {
     fontSize: 12,
     fontWeight: '700',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     marginBottom: 8,
   },
   formInput: {
@@ -422,11 +425,11 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     fontSize: 13,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
     marginBottom: 8,
   },
   saveBankBtn: {
-    backgroundColor: Colors.primaryDark,
+    backgroundColor: colors.primaryDark,
     borderRadius: 6,
     paddingVertical: 10,
     alignItems: 'center',
@@ -440,7 +443,7 @@ const styles = StyleSheet.create({
   bankItem: {
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    borderBottomColor: colors.border,
   },
   bankTop: {
     flexDirection: 'row',
@@ -450,11 +453,11 @@ const styles = StyleSheet.create({
   bankTitle: {
     fontSize: 14,
     fontWeight: '700',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
   accNum: {
     fontSize: 12,
-    color: Colors.textMuted,
+    color: colors.textMuted,
   },
   utilRow: {
     flexDirection: 'row',
@@ -463,11 +466,11 @@ const styles = StyleSheet.create({
   },
   utilText: {
     fontSize: 12,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
   },
   progressBarBg: {
     height: 6,
-    backgroundColor: Colors.border,
+    backgroundColor: colors.border,
     borderRadius: 3,
     overflow: 'hidden',
   },
@@ -481,16 +484,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    borderBottomColor: colors.border,
   },
   loanItemNumber: {
     fontSize: 13,
     fontWeight: '700',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
   loanItemBank: {
     fontSize: 12,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     marginTop: 2,
   },
   ornItem: {
@@ -499,16 +502,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 8,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    borderBottomColor: colors.border,
   },
   ornTitle: {
     fontSize: 13,
     fontWeight: '600',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
   ornSub: {
     fontSize: 11,
-    color: Colors.textMuted,
+    color: colors.textMuted,
     marginTop: 2,
   },
 });
