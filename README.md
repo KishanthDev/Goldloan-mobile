@@ -1,6 +1,40 @@
-# 🪙 Goldora - Mobile App (Expo & React Native)
+<p align="center">
+  <img src="./assets/Logo.png" alt="Goldora Logo" width="100" height="100" style="border-radius: 20%;" />
+</p>
 
-A cross-platform mobile application for tracking and managing Gold Loans, built with **Expo (React Native)** on the frontend and backed by **Google Sheets** (database) and **Google Drive** (file & photo storage) via a **Google Apps Script REST API** with multi-tier caching.
+<h1 align="center">🪙 Goldora</h1>
+
+<p align="center">
+  <strong>Next-Generation Serverless Gold Loan Origination & Vault Valuation Management System</strong>
+</p>
+
+<p align="center">
+  <a href="https://expo.dev"><img src="https://img.shields.io/badge/Expo-SDK_52-black?style=for-the-badge&logo=expo&logoColor=white" alt="Expo" /></a>
+  <a href="https://reactnative.dev"><img src="https://img.shields.io/badge/React_Native-0.76-20232a?style=for-the-badge&logo=react&logoColor=61DAFB" alt="React Native" /></a>
+  <a href="https://www.typescriptlang.org/"><img src="https://img.shields.io/badge/TypeScript-5.3-3178c6?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript" /></a>
+  <a href="https://workspace.google.com/"><img src="https://img.shields.io/badge/Backend-Google_Sheets_%2B_Drive-34A853?style=for-the-badge&logo=googlesheets&logoColor=white" alt="Google Sheets" /></a>
+  <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-blue?style=for-the-badge" alt="License: MIT" /></a>
+</p>
+
+<p align="center">
+  <a href="#-features">Features</a> •
+  <a href="#-architecture--highlights">Architecture</a> •
+  <a href="#-quick-start-running-on-mobile--web">Quick Start</a> •
+  <a href="#-connecting-your-google-sheet--drive-backend">Backend Setup</a>
+</p>
+
+---
+
+## 🌟 About Goldora
+
+> **Goldora** is an enterprise-grade, zero-cloud-cost financial mobile & web system built for pawn brokers, jewelers, and non-banking financial companies (NBFCs). It eliminates costly relational database servers by running entirely on **Google Workspace infrastructure (Google Sheets + Google Apps Script + Google Drive)** as a secure, reactive serverless database.
+
+### 💡 Why Goldora?
+- **Zero Infrastructure Cost**: Free database hosting on Google Sheets with automatic backups and multi-user concurrency.
+- **Real-Time Bullion Valuation**: Automated live web scrapers track 24K, 22K, and 18K gold market rates with dynamic loan-to-value (LTV) margin limits.
+- **Triple-Tier Micro-Cache**: Sub-millisecond instant screen renders with RAM caching, persistent local offline SQLite/AsyncStorage, and Google Server Cache.
+- **Role-Based Access Control**: Granular SuperAdmin mutations and read-only Staff directory access with secure SHA-256 password hashing.
+- **Cross-Platform**: Run seamlessly on iOS, Android, and Desktop Web with responsive fluid layouts.
 
 ---
 
