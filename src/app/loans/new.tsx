@@ -7,6 +7,7 @@ import { useRouter } from 'expo-router';
 import { Colors, ThemeColors } from '../../constants/theme';
 import { useTheme } from '../../context/ThemeContext';
 import { useAppStore, calculateLoanPeriodInterest } from '../../services/store';
+import { useAuth } from '../../context/AuthContext';
 import { User, BankAccount, Ornament } from '../../types';
 import { Badge } from '../../components/Badge';
 import { Ionicons } from '@expo/vector-icons';
@@ -15,6 +16,7 @@ export default function NewLoanScreen() {
   const { colors, isDark } = useTheme();
   const styles = getStyles(colors, isDark);
   const router = useRouter();
+  const { isSuperAdmin } = useAuth();
   const store = useAppStore();
   const users = store.users;
   const bankAccounts = store.bankAccounts.filter(bank => bank.UserId === form.UserId && bank.Status === 'Active');
@@ -115,6 +117,23 @@ export default function NewLoanScreen() {
       setSubmitting(false);
     }
   };
+
+  if (!isSuperAdmin) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 }}>
+          <Ionicons name="lock-closed" size={48} color={colors.warning} style={{ marginBottom: 16 }} />
+          <Text style={{ fontSize: 18, fontWeight: '700', color: colors.textPrimary, marginBottom: 8 }}>Read-Only Access</Text>
+          <Text style={{ fontSize: 13, color: colors.textSecondary, textAlign: 'center', marginBottom: 20 }}>
+            You are logged in with read-only permissions. Creating and disbursing new loans requires SuperAdmin privileges.
+          </Text>
+          <TouchableOpacity onPress={() => router.back()} style={[styles.disburseBtn, { alignSelf: 'center', paddingHorizontal: 24 }]}>
+            <Text style={styles.disburseBtnText}>Return Back</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safeArea}>

@@ -9,12 +9,14 @@ import { useTheme } from '../../context/ThemeContext';
 import { useAppStore } from '../../services/store';
 import { BankAccount } from '../../types';
 import { DataTable, Column } from '../../components/DataTable';
+import { MobileCard } from '../../components/MobileCard';
 import { Badge } from '../../components/Badge';
 import { Ionicons } from '@expo/vector-icons';
 import { ImagePickerField, FilePayload } from '../../components/ImagePickerField';
 import { ImageViewModal } from '../../components/ImageViewModal';
 import { ConfirmModal } from '../../components/ConfirmModal';
 import { useToast } from '../../context/ToastContext';
+import { useAuth } from '../../context/AuthContext';
 import { api, getDriveImageUrl } from '../../services/api';
 
 export default function BankAccountsScreen() {
@@ -22,6 +24,7 @@ export default function BankAccountsScreen() {
   const styles = getStyles(colors, isDark);
   const store = useAppStore();
   const toast = useToast();
+  const { isSuperAdmin } = useAuth();
 
   const [modalVisible, setModalVisible] = useState(false);
   const [detailModalVisible, setDetailModalVisible] = useState(false);
@@ -247,19 +250,36 @@ export default function BankAccountsScreen() {
       align: 'center',
       render: (b) => (
         <View style={styles.actionRow}>
-          <TouchableOpacity onPress={() => openDetailModal(b)} style={styles.actionBtn}>
+          <TouchableOpacity onPress={() => openDetailModal(b)} style={styles.actionBtn} accessibilityLabel="View Details">
             <Ionicons name="eye-outline" size={16} color="#0284c7" />
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => openEditModal(b)} style={styles.actionBtn}>
-            <Ionicons name="pencil-outline" size={16} color={colors.primaryDark} />
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => handleDelete(b)} style={styles.actionBtn}>
-            <Ionicons name="trash-outline" size={16} color={colors.danger} />
-          </TouchableOpacity>
+          {isSuperAdmin && (
+            <>
+              <TouchableOpacity onPress={() => openEditModal(b)} style={styles.actionBtn} accessibilityLabel="Edit">
+                <Ionicons name="pencil-outline" size={16} color={colors.primaryDark} />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => handleDelete(b)} style={styles.actionBtn} accessibilityLabel="Delete">
+                <Ionicons name="trash-outline" size={16} color={colors.danger} />
+              </TouchableOpacity>
+            </>
+          )}
         </View>
       ),
     },
   ];
+
+  const activeCount = store.bankAccounts.filter(b => b.Status === 'Active').length;
+  const inactiveCount = store.bankAccounts.filter(b => b.Status === 'Inactive').length;
+  const bankFilterChips = [
+    { label: 'All', value: 'All', count: store.bankAccounts.length },
+    { label: 'Active', value: 'Active', count: activeCount },
+    { label: 'Inactive', value: 'Inactive', count: inactiveCount },
+  ];
+
+  const customFilterPredicate = (b: BankAccount, filterVal: string) => {
+    if (filterVal === 'All') return true;
+    return b.Status === filterVal;
+  };
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -269,21 +289,147 @@ export default function BankAccountsScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />}
       >
         <DataTable
+          forceTableView={true}
           isLoading={store.isSyncing && store.bankAccounts.length === 0}
           addButtonLabel="Add Account"
-          onAddPress={openAddModal}
+          onAddPress={isSuperAdmin ? openAddModal : undefined}
           columns={columns}
           data={store.bankAccounts}
           keyExtractor={(b) => b.BankAccountId}
-          searchPlaceholder="Search bank, account, holder..."
-          searchFilter={(b, q) => 
-            Boolean(
-              b.AccountHolderName.toLowerCase().includes(q) ||
-              b.AccountNumber.includes(q) ||
-              b.BankName.toLowerCase().includes(q) ||
-              (b.City && b.City.toLowerCase().includes(q))
-            )
-          }
+          filterChips={bankFilterChips}
+          customFilterPredicate={customFilterPredicate}
+          searchPlaceholder="Search bank, account, holder, city, status..."
+          searchFilter={(b, q) => {
+            const normQuery = (q || '').trim().toLowerCase();
+            if (!normQuery) return true;
+            const holder = (b.AccountHolderName || '').toLowerCase();
+            const accNo = (b.AccountNumber || '').toLowerCase();
+            const bank = (b.BankName || '').toLowerCase();
+            const branch = (b.BranchName || '').toLowerCase();
+            const city = (b.City || '').toLowerCase();
+            const ifsc = (b.IFSCCode || '').toLowerCase();
+            const id = (b.BankAccountId || '').toLowerCase();
+            const status = (b.Status || '').toLowerCase();
+            const upi = (b.UPI_ID || '').toLowerCase();
+            const lastFour = accNo.length >= 4 ? accNo.slice(-4) : '';
+
+            return (
+              holder.includes(normQuery) ||
+              accNo.includes(normQuery) ||
+              lastFour.includes(normQuery) ||
+              bank.includes(normQuery) ||
+              branch.includes(normQuery) ||
+              city.includes(normQuery) ||
+              ifsc.includes(normQuery) ||
+              id.includes(normQuery) ||
+              status.includes(normQuery) ||
+              upi.includes(normQuery)
+            );
+          }}
+          renderMobileCard={(b) => {
+            const directUrl = getDriveImageUrl(b.PassbookImage);
+            const availAmt = b.AvailableLoanAmount !== undefined 
+              ? b.AvailableLoanAmount 
+              : Math.max(0, (b.MaxLoanAmount || 0) - (b.UtilizedLoanAmount || 0));
+            const maskedAcc = b.AccountNumber && b.AccountNumber.length >= 4 
+              ? `•••• ${b.AccountNumber.slice(-4)}` 
+              : (b.AccountNumber || '—');
+
+            return (
+              <MobileCard
+                onPress={() => openDetailModal(b)}
+                identifier={
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                    <Ionicons name="business-outline" size={14} color={colors.primaryDark} />
+                    <Text style={[styles.cellText, { fontWeight: '700', color: colors.primaryDark, fontSize: 13 }]} numberOfLines={1}>
+                      {b.BankName}
+                    </Text>
+                    {b.BankAccountId ? (
+                      <Text style={{ color: colors.textMuted, fontSize: 11 }}> (#{b.BankAccountId})</Text>
+                    ) : null}
+                  </View>
+                }
+                badges={
+                  <Badge 
+                    label={b.Status} 
+                    variant={b.Status === 'Active' ? 'success' : 'default'} 
+                    size="sm" 
+                  />
+                }
+                avatar={
+                  b.PassbookImage ? (
+                    <TouchableOpacity onPress={() => b.PassbookImage && setPreviewImageUrl(b.PassbookImage)}>
+                      <Image
+                        source={{ uri: directUrl || b.PassbookImage }}
+                        style={styles.cardThumb}
+                        contentFit="cover"
+                      />
+                    </TouchableOpacity>
+                  ) : (
+                    <View style={styles.miniAvatar}>
+                      <Ionicons name="card" size={16} color={colors.primaryDark} />
+                    </View>
+                  )
+                }
+                title={b.AccountHolderName}
+                subtitle={b.City ? `${b.BankName} • ${b.City}` : b.BankName}
+                metrics={[
+                  {
+                    label: 'Account Number',
+                    value: b.AccountNumber || '—',
+                    highlighted: true,
+                  },
+                  {
+                    label: 'Available Limit',
+                    value: `₹${availAmt.toLocaleString('en-IN')}`,
+                    highlighted: true,
+                    color: colors.success,
+                  },
+                  {
+                    label: 'Max Loan Limit',
+                    value: `₹${(b.MaxLoanAmount || 0).toLocaleString('en-IN')}`,
+                  },
+                  {
+                    label: 'Utilized Amount',
+                    value: `₹${(b.UtilizedLoanAmount || 0).toLocaleString('en-IN')}`,
+                    color: (b.UtilizedLoanAmount || 0) > 0 ? colors.danger : undefined,
+                  },
+                  {
+                    label: 'City / Location',
+                    value: b.City || '—',
+                  },
+                  {
+                    label: 'Branch Name',
+                    value: b.BranchName || '—',
+                  },
+                  {
+                    label: 'IFSC Code',
+                    value: b.IFSCCode || '—',
+                  },
+                  {
+                    label: 'Account Status',
+                    value: b.Status || 'Active',
+                    color: b.Status === 'Active' ? colors.success : colors.textMuted,
+                  },
+                ]}
+                viewLabel="View details"
+                onViewPress={() => openDetailModal(b)}
+                menuActions={isSuperAdmin ? [
+                  {
+                    label: 'Edit Bank Account',
+                    icon: 'pencil-outline',
+                    onPress: () => openEditModal(b),
+                  },
+                  {
+                    label: 'Delete Bank Account',
+                    icon: 'trash-outline',
+                    isDestructive: true,
+                    onPress: () => handleDelete(b),
+                  },
+                ] : undefined}
+              />
+            );
+          }}
         />
       </ScrollView>
 
@@ -825,5 +971,19 @@ const getStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
   },
   statusBtnTextActive: {
     color: '#ffffff',
+  },
+  cardThumb: {
+    width: 36,
+    height: 36,
+    borderRadius: 6,
+    backgroundColor: isDark ? '#1e293b' : '#e2e8f0',
+  },
+  miniAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 6,
+    backgroundColor: isDark ? '#1e293b' : '#f1f5f9',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

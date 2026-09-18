@@ -7,6 +7,7 @@ import { useRouter } from 'expo-router';
 import { Colors, ThemeColors } from '../../constants/theme';
 import { useTheme } from '../../context/ThemeContext';
 import { useAppStore } from '../../services/store';
+import { useAuth } from '../../context/AuthContext';
 import { User, GoldRateData } from '../../types';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -14,6 +15,7 @@ export default function NewOrnamentScreen() {
   const { colors, isDark } = useTheme();
   const styles = getStyles(colors, isDark);
   const router = useRouter();
+  const { isSuperAdmin } = useAuth();
   const store = useAppStore();
   const users = store.users;
   const [submitting, setSubmitting] = useState(false);
@@ -78,6 +80,23 @@ export default function NewOrnamentScreen() {
       setSubmitting(false);
     }
   };
+
+  if (!isSuperAdmin) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 }}>
+          <Ionicons name="lock-closed" size={48} color={colors.warning} style={{ marginBottom: 16 }} />
+          <Text style={{ fontSize: 18, fontWeight: '700', color: colors.textPrimary, marginBottom: 8 }}>Read-Only Access</Text>
+          <Text style={{ fontSize: 13, color: colors.textSecondary, textAlign: 'center', marginBottom: 20 }}>
+            You are logged in with read-only permissions. Pledging and adding ornaments to the vault requires SuperAdmin privileges.
+          </Text>
+          <TouchableOpacity onPress={() => router.back()} style={[styles.submitBtn, { alignSelf: 'center', paddingHorizontal: 24 }]}>
+            <Text style={styles.submitBtnText}>Return Back</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safeArea}>

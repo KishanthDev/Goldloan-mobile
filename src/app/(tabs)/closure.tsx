@@ -8,14 +8,18 @@ import { useTheme } from '../../context/ThemeContext';
 import { useAppStore } from '../../services/store';
 import { Loan } from '../../types';
 import { DataTable, Column } from '../../components/DataTable';
+import { MobileCard } from '../../components/MobileCard';
+import { Badge } from '../../components/Badge';
 import { Ionicons } from '@expo/vector-icons';
 import { useToast } from '../../context/ToastContext';
+import { useAuth } from '../../context/AuthContext';
 
 export default function ClosureScreen() {
   const { colors, isDark } = useTheme();
   const styles = getStyles(colors, isDark);
   const store = useAppStore();
   const toast = useToast();
+  const { isSuperAdmin } = useAuth();
 
   const [confirmModalVisible, setConfirmModalVisible] = useState(false);
   const [selectedLoan, setSelectedLoan] = useState<Loan | null>(null);
@@ -157,7 +161,7 @@ export default function ClosureScreen() {
       key: 'Actions',
       width: 125,
       align: 'center',
-      render: (loan) => (
+      render: (loan) => isSuperAdmin ? (
         <TouchableOpacity 
           style={styles.closeBtn}
           onPress={() => openCloseModal(loan)}
@@ -165,9 +169,48 @@ export default function ClosureScreen() {
           <Ionicons name="lock-closed-outline" size={14} color="#fff" />
           <Text style={styles.closeBtnText}>Close & Release</Text>
         </TouchableOpacity>
+      ) : (
+        <View style={styles.viewOnlyBadge}>
+          <Text style={styles.viewOnlyText}>View Only</Text>
+        </View>
       ),
     },
   ];
+
+  const isLoanOverdue = (loan: Loan) => {
+    if (loan.LoanStatus === 'Overdue') return true;
+    if (loan.DueDate) {
+      const dueDate = new Date(loan.DueDate);
+      return dueDate < today;
+    }
+    return false;
+  };
+
+  const isLoanDueSoon = (loan: Loan) => {
+    if (isLoanOverdue(loan)) return false;
+    if (loan.DueDate) {
+      const dueDate = new Date(loan.DueDate);
+      const diffTime = dueDate.getTime() - today.getTime();
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      return diffDays >= 0 && diffDays <= 30;
+    }
+    return false;
+  };
+
+  const overdueCount = activeLoans.filter(isLoanOverdue).length;
+  const dueSoonCount = activeLoans.filter(isLoanDueSoon).length;
+  const closureFilterChips = [
+    { label: 'All', value: 'All', count: activeLoans.length },
+    { label: 'Due soon', value: 'Due soon', count: dueSoonCount },
+    { label: 'Overdue', value: 'Overdue', count: overdueCount },
+  ];
+
+  const customFilterPredicate = (loan: Loan, filterVal: string) => {
+    if (filterVal === 'All') return true;
+    if (filterVal === 'Overdue') return isLoanOverdue(loan);
+    if (filterVal === 'Due soon') return isLoanDueSoon(loan);
+    return true;
+  };
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -186,16 +229,125 @@ export default function ClosureScreen() {
 
         {/* DataTable */}
         <DataTable
+          forceTableView={true}
           isLoading={store.isSyncing && store.loans.length === 0}
           columns={columns}
           data={activeLoans}
-          searchPlaceholder="Search by Loan No, Customer, Mobile..."
+          filterChips={closureFilterChips}
+          customFilterPredicate={customFilterPredicate}
+          searchPlaceholder="Search loan #, customer, mobile, bank..."
           searchFilter={(loan, query) => {
+            const normQuery = (query || '').trim().toLowerCase();
+            if (!normQuery) return true;
             const u = store.users.find(user => user.UserId === loan.UserId);
-            const term = `${loan.LoanNumber} ${u?.FullName || ''} ${u?.MobileNumber || ''} ${loan.BankName}`.toLowerCase();
-            return term.includes(query.toLowerCase());
+            const loanNo = (loan.LoanNumber || '').toLowerCase();
+            const loanId = (loan.LoanId || '').toLowerCase();
+            const custName = (u?.FullName || '').toLowerCase();
+            const custMobile = (u?.MobileNumber || '').toLowerCase();
+            const bank = (loan.BankName || '').toLowerCase();
+            const amount = (loan.LoanAmount || '').toString();
+            const loanDate = (loan.LoanDate || '').toLowerCase();
+            const dueDate = (loan.DueDate || '').toLowerCase();
+
+            return (
+              loanNo.includes(normQuery) ||
+              loanId.includes(normQuery) ||
+              custName.includes(normQuery) ||
+              custMobile.includes(normQuery) ||
+              bank.includes(normQuery) ||
+              amount.includes(normQuery) ||
+              loanDate.includes(normQuery) ||
+              dueDate.includes(normQuery)
+            );
           }}
           keyExtractor={(loan) => loan.LoanId}
+          renderMobileCard={(loan) => {
+            const u = store.users.find(user => user.UserId === loan.UserId);
+            const overdue = isLoanOverdue(loan);
+            const dueSoon = isLoanDueSoon(loan);
+            const count = loan.ornamentIds ? loan.ornamentIds.length : 0;
+            const dueDateStr = loan.DueDate ? new Date(loan.DueDate).toLocaleDateString('en-GB') : '—';
+
+            return (
+              <MobileCard
+                onPress={() => openCloseModal(loan)}
+                identifier={
+                  <Text style={styles.loanNumberText} numberOfLines={1}>
+                    <Text style={{ fontWeight: '700', color: colors.primaryDark, fontSize: 13 }}>{loan.LoanNumber}</Text>
+                    {loan.LoanId ? <Text style={{ color: colors.textMuted, fontSize: 11 }}> (#{loan.LoanId})</Text> : null}
+                  </Text>
+                }
+                badges={
+                  overdue ? (
+                    <View style={styles.overdueBadge}>
+                      <Text style={styles.overdueText}>OVERDUE</Text>
+                    </View>
+                  ) : dueSoon ? (
+                    <View style={styles.dueSoonBadge}>
+                      <Text style={styles.dueSoonText}>DUE SOON</Text>
+                    </View>
+                  ) : (
+                    <Badge label="Active" variant="success" size="sm" />
+                  )
+                }
+                avatar={
+                  <View style={styles.closureAvatar}>
+                    <Ionicons name="lock-closed" size={16} color={isDark ? '#fbbf24' : colors.primaryDark} />
+                  </View>
+                }
+                title={u ? u.FullName : 'Unknown Customer'}
+                subtitle={u?.MobileNumber ? `${u.MobileNumber} • ${loan.BankName}` : loan.BankName}
+                metrics={[
+                  {
+                    label: 'Loan Amount',
+                    value: `₹${loan.LoanAmount.toLocaleString('en-IN')}`,
+                    highlighted: true,
+                    color: isDark ? '#fbbf24' : colors.primaryDark,
+                  },
+                  {
+                    label: 'Due Date',
+                    value: dueDateStr,
+                    color: overdue ? colors.danger : undefined,
+                  },
+                  {
+                    label: 'Origination Date',
+                    value: loan.LoanDate ? new Date(loan.LoanDate).toLocaleDateString('en-GB') : '—',
+                  },
+                  {
+                    label: 'Pledged Items',
+                    value: `${count} item(s)`,
+                    highlighted: true,
+                  },
+                  {
+                    label: 'Customer Mobile',
+                    value: u?.MobileNumber || '—',
+                  },
+                  {
+                    label: 'Lending Bank',
+                    value: loan.BankName || '—',
+                  },
+                ]}
+                viewLabel="View details"
+                onViewPress={() => openCloseModal(loan)}
+                primaryAction={
+                  isSuperAdmin ? (
+                    <TouchableOpacity
+                      style={styles.closeCardBtn}
+                      onPress={() => openCloseModal(loan)}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons name="lock-closed-outline" size={13} color="#ffffff" />
+                      <Text style={styles.closeCardBtnText}>Close & Release</Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <View style={styles.viewOnlyBadge}>
+                      <Text style={styles.viewOnlyText}>View Only</Text>
+                    </View>
+                  )
+                }
+              />
+            );
+          }}
         />
       </ScrollView>
 
@@ -434,6 +586,22 @@ const getStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
   },
+  viewOnlyBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    backgroundColor: isDark ? colors.surfaceSubtle : '#f1f5f9',
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'center',
+  },
+  viewOnlyText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: colors.textMuted,
+  },
 
   // Modal Styles
   modalOverlay: {
@@ -640,5 +808,45 @@ const getStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
     color: '#fff',
+  },
+  dueSoonBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+    backgroundColor: isDark ? '#78350f' : '#fef3c7',
+    borderWidth: 1,
+    borderColor: isDark ? '#b45309' : '#fde68a',
+  },
+  dueSoonText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: isDark ? '#fde68a' : '#92400e',
+    letterSpacing: 0.5,
+  },
+  closureAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    backgroundColor: isDark ? '#1e293b' : '#fef3c7',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  closeCardBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#16a34a',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
+    gap: 4,
+    shadowColor: '#16a34a',
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  closeCardBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#ffffff',
   },
 });

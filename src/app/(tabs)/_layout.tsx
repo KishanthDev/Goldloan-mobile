@@ -16,6 +16,8 @@ import { SidebarTrigger } from '../../components/SidebarTrigger';
 import { useTheme } from '../../context/ThemeContext';
 import { ThemeColors } from '../../constants/theme';
 import { ThemeToggleBtn } from '../../components/ThemeToggleBtn';
+import { useAuth } from '../../context/AuthContext';
+import { ProfileModal } from '../../components/ProfileModal';
 
 interface NavItem {
   name: string;
@@ -102,6 +104,10 @@ const TAB_METADATA: Record<string, { title: string; subtitle: string }> = {
     title: 'Loan Closure & Settlements',
     subtitle: 'Settle active loans & release vault collateral',
   },
+  'admin-users': {
+    title: 'Staff & Admin Accounts',
+    subtitle: 'Configure staff roles, read-only permissions & access credentials',
+  },
 };
 
 export default function TabLayout() {
@@ -117,6 +123,22 @@ function TabLayoutInner() {
   const pathname = usePathname();
   const store = useAppStore();
   const { width } = useWindowDimensions();
+  const { user, isSuperAdmin } = useAuth();
+  const [profileModalVisible, setProfileModalVisible] = useState(false);
+
+  const desktopNavItems = React.useMemo(() => {
+    return [
+      ...NAV_ITEMS,
+      {
+        name: 'admin-users',
+        route: '/(tabs)/admin-users',
+        title: isSuperAdmin ? 'Admin Users' : 'Staff Accounts',
+        shortTitle: isSuperAdmin ? 'Admins' : 'Staff',
+        icon: 'shield-checkmark-outline' as const,
+        activeIcon: 'shield-checkmark' as const,
+      },
+    ];
+  }, [isSuperAdmin]);
 
   const currentTabKey = (() => {
     if (pathname === '/' || pathname === '/(tabs)' || pathname === '/(tabs)/') return 'index';
@@ -126,7 +148,17 @@ function TabLayoutInner() {
     return 'index';
   })();
 
-  const activeTabMeta = TAB_METADATA[currentTabKey] || TAB_METADATA.index;
+  const activeTabMeta = React.useMemo(() => {
+    if (currentTabKey === 'admin-users') {
+      return {
+        title: isSuperAdmin ? 'Admin User Management' : 'Staff & Admin Accounts',
+        subtitle: isSuperAdmin
+          ? 'Configure staff roles, read-only permissions & access credentials'
+          : 'Staff account directory and assigned permissions',
+      };
+    }
+    return TAB_METADATA[currentTabKey] || TAB_METADATA.index;
+  }, [currentTabKey, isSuperAdmin]);
   const insets = useSafeAreaInsets();
   const { collapsed, setCollapsed, isDesktop } = useSidebar();
   const { colors, isDark } = useTheme();
@@ -200,7 +232,7 @@ function TabLayoutInner() {
 
             {/* Navigation Menu Links */}
             <ScrollView style={styles.navScroll} contentContainerStyle={styles.navContent}>
-              {NAV_ITEMS.map((item) => {
+              {desktopNavItems.map((item) => {
                 const active = isRouteActive(item);
                 return (
                   <TouchableOpacity
@@ -330,6 +362,31 @@ function TabLayoutInner() {
                   {store.isSyncing ? 'Syncing...' : isDesktop ? 'Sync Rates & Data' : 'Sync'}
                 </Text>
               </TouchableOpacity>
+
+              {/* Profile Avatar / Menu Button */}
+              <TouchableOpacity
+                onPress={() => setProfileModalVisible(true)}
+                style={styles.profileActionBtn}
+                activeOpacity={0.7}
+                accessibilityLabel="Open user profile menu"
+              >
+                <View style={[styles.profileAvatar, isSuperAdmin ? styles.profileAvatarSuper : styles.profileAvatarUser]}>
+                  <Text style={[styles.profileAvatarText, isSuperAdmin ? styles.profileAvatarTextSuper : styles.profileAvatarTextUser]}>
+                    {(user?.username || 'U').charAt(0).toUpperCase()}
+                  </Text>
+                </View>
+                {isDesktop && (
+                  <View style={styles.profileTextWrapper}>
+                    <Text style={styles.profileUsername} numberOfLines={1}>
+                      {user?.username || 'Account'}
+                    </Text>
+                    <Text style={[styles.profileRoleTag, isSuperAdmin ? styles.roleSuperText : styles.roleUserText]} numberOfLines={1}>
+                      {isSuperAdmin ? 'SuperAdmin' : 'Read-Only'}
+                    </Text>
+                  </View>
+                )}
+                <Ionicons name="chevron-down" size={13} color={colors.textSecondary} />
+              </TouchableOpacity>
             </View>
           </View>
 
@@ -347,6 +404,7 @@ function TabLayoutInner() {
               <Tabs.Screen name="ornaments" options={{ title: 'Vault' }} />
               <Tabs.Screen name="loans" options={{ title: 'Loans' }} />
               <Tabs.Screen name="closure" options={{ title: 'Closure' }} />
+              <Tabs.Screen name="admin-users" options={{ title: 'Admins' }} />
             </Tabs>
           </View>
 
@@ -385,6 +443,12 @@ function TabLayoutInner() {
           )}
         </View>
       </View>
+
+      {/* Profile & Account Modal */}
+      <ProfileModal
+        visible={profileModalVisible}
+        onClose={() => setProfileModalVisible(false)}
+      />
     </View>
   );
 }
@@ -493,6 +557,62 @@ const getStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     color: isDark ? '#fbbf24' : colors.primaryDark,
+  },
+  profileActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 10,
+    backgroundColor: colors.surfaceSubtle,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  profileAvatar: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  profileAvatarSuper: {
+    backgroundColor: isDark ? 'rgba(5, 150, 105, 0.25)' : '#ecfdf5',
+    borderWidth: 1,
+    borderColor: isDark ? '#059669' : '#10b981',
+  },
+  profileAvatarUser: {
+    backgroundColor: isDark ? 'rgba(217, 119, 6, 0.25)' : '#fffbeb',
+    borderWidth: 1,
+    borderColor: isDark ? '#d97706' : '#f59e0b',
+  },
+  profileAvatarText: {
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  profileAvatarTextSuper: {
+    color: isDark ? '#34d399' : '#059669',
+  },
+  profileAvatarTextUser: {
+    color: isDark ? '#fbbf24' : '#b45309',
+  },
+  profileTextWrapper: {
+    marginRight: 4,
+  },
+  profileUsername: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.textPrimary,
+  },
+  profileRoleTag: {
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  roleSuperText: {
+    color: isDark ? '#34d399' : '#059669',
+  },
+  roleUserText: {
+    color: isDark ? '#fbbf24' : '#b45309',
   },
 
   // ─── DESKTOP SIDEBAR ───

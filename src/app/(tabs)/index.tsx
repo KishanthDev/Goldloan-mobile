@@ -11,6 +11,8 @@ import { useAppStore } from '../../services/store';
 import { ApiConfig } from '../../config/api';
 import { Env } from '../../config/env';
 import { Ionicons } from '@expo/vector-icons';
+import { useAuth } from '../../context/AuthContext';
+import { useToast } from '../../context/ToastContext';
 
 export default function DashboardScreen() {
   const router = useRouter();
@@ -18,6 +20,8 @@ export default function DashboardScreen() {
   const { width } = useWindowDimensions();
   const { colors, isDark } = useTheme();
   const styles = getStyles(colors, isDark);
+  const { isSuperAdmin, isReadOnly } = useAuth();
+  const toast = useToast();
   const [refreshing, setRefreshing] = useState(false);
 
   const isDesktop = width >= 1024;
@@ -48,6 +52,14 @@ export default function DashboardScreen() {
     ? Math.min(100, Math.round((dash.totalLoanAmount / dash.totalEligibleLoanAmount) * 100)) 
     : 0;
 
+  const handleActionPress = (route: string) => {
+    if (isReadOnly) {
+      toast.warning('Read-Only Mode: SuperAdmin privileges required to create or modify records.');
+      return;
+    }
+    router.push(route as any);
+  };
+
   return (
     <View style={styles.screenRoot}>
       <ScrollView 
@@ -55,6 +67,16 @@ export default function DashboardScreen() {
         contentContainerStyle={[styles.content, isDesktop && styles.contentDesktop]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />}
       >
+        {/* ─── READ-ONLY ROLE BANNER ─── */}
+        {isReadOnly && (
+          <View style={styles.readOnlyNoticeBanner}>
+            <Ionicons name="eye" size={16} color={isDark ? '#fbbf24' : '#b45309'} />
+            <Text style={styles.readOnlyNoticeText}>
+              Viewing in <Text style={{ fontWeight: '700' }}>Read-Only Mode</Text>. Adding loans, customers, gold or settling requires SuperAdmin privileges.
+            </Text>
+          </View>
+        )}
+
         {/* ─── OFFLINE CACHE NOTICE BANNER (When showing cached data offline) ─── */}
         {store.syncError && (store.users.length > 0 || store.loans.length > 0) ? (
           <View style={styles.offlineNoticeBanner}>
@@ -65,7 +87,7 @@ export default function DashboardScreen() {
               </Text>
             </View>
             <TouchableOpacity 
-              onPress={() => store.syncFromBackend(true)}
+              onPress={() => store.syncFromBackend(true)} 
               style={styles.offlineRetryPill}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
@@ -461,39 +483,39 @@ export default function DashboardScreen() {
         <Text style={styles.sectionHeading}>Quick Actions</Text>
         <View style={isDesktop ? styles.quickActionsGridDesktop : styles.quickActionsGridMobile}>
           <TouchableOpacity 
-            style={isDesktop ? styles.actionCardDesktop : styles.actionCardMobile} 
-            onPress={() => router.push('/loans/new' as any)} 
+            style={[isDesktop ? styles.actionCardDesktop : styles.actionCardMobile, isReadOnly && styles.actionCardDisabled]} 
+            onPress={() => handleActionPress('/loans/new')} 
             activeOpacity={0.7}
           >
             <View style={[styles.actionIconBox, { backgroundColor: '#fef08a' }]}>
-              <Ionicons name="add-circle" size={20} color={isDark ? '#fbbf24' : colors.primaryDark} />
+              <Ionicons name={isReadOnly ? "lock-closed" : "add-circle"} size={20} color={isDark ? '#fbbf24' : colors.primaryDark} />
             </View>
             <Text style={styles.actionTitle} numberOfLines={1}>New Loan</Text>
-            <Text style={styles.actionSub} numberOfLines={1}>Disburse collateral</Text>
+            <Text style={styles.actionSub} numberOfLines={1}>{isReadOnly ? 'Admin only' : 'Disburse collateral'}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity 
-            style={isDesktop ? styles.actionCardDesktop : styles.actionCardMobile} 
-            onPress={() => router.push('/customers/new' as any)} 
+            style={[isDesktop ? styles.actionCardDesktop : styles.actionCardMobile, isReadOnly && styles.actionCardDisabled]} 
+            onPress={() => handleActionPress('/customers/new')} 
             activeOpacity={0.7}
           >
             <View style={[styles.actionIconBox, { backgroundColor: '#e0f2fe' }]}>
-              <Ionicons name="person-add" size={20} color="#0284c7" />
+              <Ionicons name={isReadOnly ? "lock-closed" : "person-add"} size={20} color="#0284c7" />
             </View>
             <Text style={styles.actionTitle} numberOfLines={1}>Add Customer</Text>
-            <Text style={styles.actionSub} numberOfLines={1}>Register borrower</Text>
+            <Text style={styles.actionSub} numberOfLines={1}>{isReadOnly ? 'Admin only' : 'Register borrower'}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity 
-            style={isDesktop ? styles.actionCardDesktop : styles.actionCardMobile} 
-            onPress={() => router.push('/ornaments/new' as any)} 
+            style={[isDesktop ? styles.actionCardDesktop : styles.actionCardMobile, isReadOnly && styles.actionCardDisabled]} 
+            onPress={() => handleActionPress('/ornaments/new')} 
             activeOpacity={0.7}
           >
             <View style={[styles.actionIconBox, { backgroundColor: '#fef3c7' }]}>
-              <Ionicons name="diamond" size={20} color="#b45309" />
+              <Ionicons name={isReadOnly ? "lock-closed" : "diamond"} size={20} color="#b45309" />
             </View>
             <Text style={styles.actionTitle} numberOfLines={1}>Pledge Gold</Text>
-            <Text style={styles.actionSub} numberOfLines={1}>Deposit vault item</Text>
+            <Text style={styles.actionSub} numberOfLines={1}>{isReadOnly ? 'Admin only' : 'Deposit vault item'}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity 
@@ -504,8 +526,8 @@ export default function DashboardScreen() {
             <View style={[styles.actionIconBox, { backgroundColor: '#dcfce7' }]}>
               <Ionicons name="receipt" size={20} color="#16a34a" />
             </View>
-            <Text style={styles.actionTitle} numberOfLines={1}>Repayment</Text>
-            <Text style={styles.actionSub} numberOfLines={1}>Record settlement</Text>
+            <Text style={styles.actionTitle} numberOfLines={1}>Settlements</Text>
+            <Text style={styles.actionSub} numberOfLines={1}>{isReadOnly ? 'View closures' : 'Record settlement'}</Text>
           </TouchableOpacity>
         </View>
           </>
@@ -539,6 +561,27 @@ const getStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     color: isDark ? '#fbbf24' : '#854d0e',
+  },
+  readOnlyNoticeBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: isDark ? 'rgba(217, 119, 6, 0.15)' : '#fffbeb',
+    borderColor: isDark ? 'rgba(217, 119, 6, 0.4)' : '#fde68a',
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    marginBottom: 8,
+  },
+  readOnlyNoticeText: {
+    flex: 1,
+    fontSize: 12,
+    color: isDark ? '#fde68a' : '#92400e',
+    lineHeight: 16,
+  },
+  actionCardDisabled: {
+    opacity: 0.75,
   },
   offlineNoticeBanner: {
     flexDirection: 'row',

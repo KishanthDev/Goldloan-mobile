@@ -172,3 +172,18 @@ export interface InitialSyncData {
   timestamp?: string;
 }
 
+export type UserRole = 'SuperAdmin' | 'User';
+
+export interface AdminUser {
+  AdminId: string;
+  Username: string;
+  Role: UserRole;
+  Status: 'Active' | 'Inactive' | 'Deleted';
+}
+
+export interface AuthSession {
+  username: string;
+  role: UserRole;
+  token: string;
+}
+

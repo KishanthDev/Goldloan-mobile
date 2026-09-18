@@ -7,6 +7,7 @@ import { useRouter } from 'expo-router';
 import { Colors, ThemeColors } from '../../constants/theme';
 import { useTheme } from '../../context/ThemeContext';
 import { useAppStore } from '../../services/store';
+import { useAuth } from '../../context/AuthContext';
 import { Loan, User, Ornament } from '../../types';
 import { Badge } from '../../components/Badge';
 import { Ionicons } from '@expo/vector-icons';
@@ -15,6 +16,7 @@ export default function LoanClosureScreen() {
   const { colors, isDark } = useTheme();
   const styles = getStyles(colors, isDark);
   const router = useRouter();
+  const { isSuperAdmin } = useAuth();
   const store = useAppStore();
   const [activeLoans, setActiveLoans] = useState<Loan[]>([]);
   const [users, setUsers] = useState<Record<string, string>>({});
@@ -76,6 +78,23 @@ export default function LoanClosureScreen() {
       ]
     );
   };
+
+  if (!isSuperAdmin) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 }}>
+          <Ionicons name="lock-closed" size={48} color={colors.warning} style={{ marginBottom: 16 }} />
+          <Text style={{ fontSize: 18, fontWeight: '700', color: colors.textPrimary, marginBottom: 8 }}>Read-Only Access</Text>
+          <Text style={{ fontSize: 13, color: colors.textSecondary, textAlign: 'center', marginBottom: 20 }}>
+            You are logged in with read-only permissions. Closing loans and releasing vault collateral requires SuperAdmin privileges.
+          </Text>
+          <TouchableOpacity onPress={() => router.back()} style={[styles.closeBtn, { alignSelf: 'center', paddingHorizontal: 24 }]}>
+            <Text style={styles.closeBtnText}>Return Back</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safeArea}>

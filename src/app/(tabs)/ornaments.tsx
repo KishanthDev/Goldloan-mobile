@@ -11,18 +11,21 @@ import { getDriveImageUrl, api } from '../../services/api';
 import { Env } from '../../config/env';
 import { Ornament } from '../../types';
 import { DataTable, Column } from '../../components/DataTable';
+import { MobileCard } from '../../components/MobileCard';
 import { Badge } from '../../components/Badge';
 import { Ionicons } from '@expo/vector-icons';
 import { ImagePickerField, FilePayload } from '../../components/ImagePickerField';
 import { ImageViewModal } from '../../components/ImageViewModal';
 import { ConfirmModal } from '../../components/ConfirmModal';
 import { useToast } from '../../context/ToastContext';
+import { useAuth } from '../../context/AuthContext';
 
 export default function OrnamentsScreen() {
   const { colors, isDark } = useTheme();
   const styles = getStyles(colors, isDark);
   const store = useAppStore();
   const toast = useToast();
+  const { isSuperAdmin } = useAuth();
 
   const [modalVisible, setModalVisible] = useState(false);
   const [detailModalVisible, setDetailModalVisible] = useState(false);
@@ -327,19 +330,38 @@ export default function OrnamentsScreen() {
       align: 'center',
       render: (o) => (
         <View style={styles.actionRow}>
-          <TouchableOpacity onPress={() => openDetailModal(o)} style={styles.actionBtn}>
+          <TouchableOpacity onPress={() => openDetailModal(o)} style={styles.actionBtn} accessibilityLabel="View Details">
             <Ionicons name="eye-outline" size={16} color="#0284c7" />
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => openEditModal(o)} style={styles.actionBtn}>
-            <Ionicons name="pencil-outline" size={16} color={colors.primaryDark} />
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => handleDelete(o)} style={styles.actionBtn}>
-            <Ionicons name="trash-outline" size={16} color={colors.danger} />
-          </TouchableOpacity>
+          {isSuperAdmin && (
+            <>
+              <TouchableOpacity onPress={() => openEditModal(o)} style={styles.actionBtn} accessibilityLabel="Edit">
+                <Ionicons name="pencil-outline" size={16} color={colors.primaryDark} />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => handleDelete(o)} style={styles.actionBtn} accessibilityLabel="Delete">
+                <Ionicons name="trash-outline" size={16} color={colors.danger} />
+              </TouchableOpacity>
+            </>
+          )}
         </View>
       ),
     },
   ];
+
+  const availableCount = store.ornaments.filter(o => o.Status === 'Available').length;
+  const pledgedCount = store.ornaments.filter(o => o.Status === 'Pledged').length;
+  const releasedCount = store.ornaments.filter(o => o.Status === 'Released').length;
+  const ornamentFilterChips = [
+    { label: 'All', value: 'All', count: store.ornaments.length },
+    { label: 'Available', value: 'Available', count: availableCount },
+    { label: 'Pledged', value: 'Pledged', count: pledgedCount },
+    { label: 'Released', value: 'Released', count: releasedCount },
+  ];
+
+  const customFilterPredicate = (o: Ornament, filterVal: string) => {
+    if (filterVal === 'All') return true;
+    return o.Status === filterVal;
+  };
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -349,21 +371,135 @@ export default function OrnamentsScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />}
       >
         <DataTable
+          forceTableView={true}
           isLoading={store.isSyncing && store.ornaments.length === 0}
           addButtonLabel="Add Ornament"
-          onAddPress={openAddModal}
+          onAddPress={isSuperAdmin ? openAddModal : undefined}
           columns={columns}
           data={store.ornaments}
           keyExtractor={(o) => o.OrnamentId}
-          searchPlaceholder="Search ornament, hallmark, maker..."
-          searchFilter={(o, q) => 
-            Boolean(
-              o.OrnamentName.toLowerCase().includes(q) ||
-              (o.OrnamentType && o.OrnamentType.toLowerCase().includes(q)) ||
-              (o.HallmarkNumber && o.HallmarkNumber.toLowerCase().includes(q)) ||
-              (o.MakerName && o.MakerName.toLowerCase().includes(q))
-            )
-          }
+          filterChips={ornamentFilterChips}
+          customFilterPredicate={customFilterPredicate}
+          searchPlaceholder="Search ornament, hallmark, maker, status..."
+          searchFilter={(o, q) => {
+            const normQuery = (q || '').trim().toLowerCase();
+            if (!normQuery) return true;
+            const name = (o.OrnamentName || '').toLowerCase();
+            const id = (o.OrnamentId || '').toLowerCase();
+            const type = (o.OrnamentType || '').toLowerCase();
+            const category = (o.OrnamentCategory || '').toLowerCase();
+            const hallmark = (o.HallmarkNumber || '').toLowerCase();
+            const maker = (o.MakerName || '').toLowerCase();
+            const status = (o.Status || '').toLowerCase();
+            const purity = (o.Purity || '').toLowerCase();
+            const gross = (o.GrossWeight || '').toString();
+            const net = (o.NetWeight || o.MetalWeight || '').toString();
+            const price = (o.BuyingCost || o.TotalPrice || '').toString();
+            const desc = (o.Description || '').toLowerCase();
+
+            return (
+              name.includes(normQuery) ||
+              id.includes(normQuery) ||
+              type.includes(normQuery) ||
+              category.includes(normQuery) ||
+              hallmark.includes(normQuery) ||
+              maker.includes(normQuery) ||
+              status.includes(normQuery) ||
+              purity.includes(normQuery) ||
+              gross.includes(normQuery) ||
+              net.includes(normQuery) ||
+              price.includes(normQuery) ||
+              desc.includes(normQuery)
+            );
+          }}
+          renderMobileCard={(o) => {
+            const firstImg = o.OrnamentImages ? o.OrnamentImages.split(' | ').filter(Boolean)[0] : '';
+            const directUrl = firstImg ? getDriveImageUrl(firstImg) : '';
+            const netWeightVal = Number(o.NetWeight || o.MetalWeight || 0).toFixed(2);
+            const totalPriceVal = Number(o.BuyingCost || o.TotalPrice || 0).toLocaleString('en-IN');
+
+            return (
+              <MobileCard
+                onPress={() => openDetailModal(o)}
+                identifier={`#${o.OrnamentId}`}
+                badges={
+                  <>
+                    <Badge label={o.Purity || '22K'} variant="gold" size="sm" />
+                    <Badge label={o.Status} variant={getStatusVariant(o.Status)} size="sm" />
+                  </>
+                }
+                avatar={
+                  firstImg ? (
+                    <TouchableOpacity onPress={() => setPreviewImageUrl(firstImg)}>
+                      <Image
+                        source={{ uri: directUrl || firstImg }}
+                        style={styles.cardThumb}
+                        contentFit="cover"
+                      />
+                    </TouchableOpacity>
+                  ) : (
+                    <View style={styles.miniAvatar}>
+                      <Ionicons name="sparkles" size={16} color="#d97706" />
+                    </View>
+                  )
+                }
+                title={o.OrnamentName}
+                subtitle={o.HallmarkNumber ? `HM: ${o.HallmarkNumber}` : (o.OrnamentType || 'Jewelry')}
+                metrics={[
+                  {
+                    label: 'Net / Metal Wt',
+                    value: `${netWeightVal}g`,
+                    highlighted: true,
+                    color: colors.primaryDark,
+                  },
+                  {
+                    label: 'Total Price',
+                    value: `₹${totalPriceVal}`,
+                    highlighted: true,
+                  },
+                  {
+                    label: 'Gross Wt',
+                    value: `${Number(o.GrossWeight || 0).toFixed(2)}g`,
+                  },
+                  {
+                    label: 'Stone Wt',
+                    value: `${Number(o.StoneWeight || 0).toFixed(2)}g`,
+                  },
+                  {
+                    label: 'Buy Rate/g',
+                    value: `₹${(o.BuyingPricePerGram || 0).toLocaleString('en-IN')}`,
+                  },
+                  {
+                    label: 'Type',
+                    value: o.OrnamentType || 'Jewelry',
+                  },
+                  {
+                    label: 'Hallmark No.',
+                    value: o.HallmarkNumber || '—',
+                  },
+                  {
+                    label: 'Maker Name',
+                    value: o.MakerName || '—',
+                  },
+                ]}
+                viewLabel="View details"
+                onViewPress={() => openDetailModal(o)}
+                menuActions={isSuperAdmin ? [
+                  {
+                    label: 'Edit Ornament',
+                    icon: 'pencil-outline',
+                    onPress: () => openEditModal(o),
+                  },
+                  {
+                    label: 'Delete Ornament',
+                    icon: 'trash-outline',
+                    isDestructive: true,
+                    onPress: () => handleDelete(o),
+                  },
+                ] : undefined}
+              />
+            );
+          }}
         />
       </ScrollView>
 
@@ -1047,5 +1183,19 @@ const getStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
   bold: {
     fontWeight: '700',
     color: colors.textPrimary,
+  },
+  cardThumb: {
+    width: 38,
+    height: 38,
+    borderRadius: 8,
+    backgroundColor: isDark ? '#1e293b' : '#f1f5f9',
+  },
+  miniAvatar: {
+    width: 38,
+    height: 38,
+    borderRadius: 8,
+    backgroundColor: isDark ? '#1e293b' : '#fef3c7',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

@@ -9,12 +9,14 @@ import { useTheme } from '../../context/ThemeContext';
 import { useAppStore } from '../../services/store';
 import { User } from '../../types';
 import { DataTable, Column } from '../../components/DataTable';
+import { MobileCard } from '../../components/MobileCard';
 import { Badge } from '../../components/Badge';
 import { Ionicons } from '@expo/vector-icons';
 import { ImagePickerField, FilePayload } from '../../components/ImagePickerField';
 import { ImageViewModal } from '../../components/ImageViewModal';
 import { ConfirmModal } from '../../components/ConfirmModal';
 import { useToast } from '../../context/ToastContext';
+import { useAuth } from '../../context/AuthContext';
 import { api, getDriveImageUrl } from '../../services/api';
 
 export default function UsersScreen() {
@@ -22,6 +24,7 @@ export default function UsersScreen() {
   const styles = getStyles(colors, isDark);
   const store = useAppStore();
   const toast = useToast();
+  const { isSuperAdmin } = useAuth();
 
   // Modals state
   const [modalVisible, setModalVisible] = useState(false);
@@ -214,19 +217,36 @@ export default function UsersScreen() {
       align: 'center',
       render: (u) => (
         <View style={styles.actionRow}>
-          <TouchableOpacity onPress={() => openDetailModal(u)} style={styles.actionBtn}>
+          <TouchableOpacity onPress={() => openDetailModal(u)} style={styles.actionBtn} accessibilityLabel="View Details">
             <Ionicons name="eye-outline" size={16} color="#0284c7" />
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => openEditModal(u)} style={styles.actionBtn}>
-            <Ionicons name="pencil-outline" size={16} color={colors.primaryDark} />
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => handleDelete(u)} style={styles.actionBtn}>
-            <Ionicons name="trash-outline" size={16} color={colors.danger} />
-          </TouchableOpacity>
+          {isSuperAdmin && (
+            <>
+              <TouchableOpacity onPress={() => openEditModal(u)} style={styles.actionBtn} accessibilityLabel="Edit">
+                <Ionicons name="pencil-outline" size={16} color={colors.primaryDark} />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => handleDelete(u)} style={styles.actionBtn} accessibilityLabel="Delete">
+                <Ionicons name="trash-outline" size={16} color={colors.danger} />
+              </TouchableOpacity>
+            </>
+          )}
         </View>
       ),
     },
   ];
+
+  const activeCount = store.users.filter(u => u.Status === 'Active').length;
+  const inactiveCount = store.users.filter(u => u.Status === 'Inactive').length;
+  const userFilterChips = [
+    { label: 'All', value: 'All', count: store.users.length },
+    { label: 'Active', value: 'Active', count: activeCount },
+    { label: 'Inactive', value: 'Inactive', count: inactiveCount },
+  ];
+
+  const customFilterPredicate = (u: User, filterVal: string) => {
+    if (filterVal === 'All') return true;
+    return u.Status === filterVal;
+  };
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -236,20 +256,130 @@ export default function UsersScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />}
       >
         <DataTable
+          forceTableView={true}
           isLoading={store.isSyncing && store.users.length === 0}
           addButtonLabel="Add User"
-          onAddPress={openAddModal}
+          onAddPress={isSuperAdmin ? openAddModal : undefined}
           columns={columns}
           data={store.users}
           keyExtractor={(u) => u.UserId}
-          searchPlaceholder="Search name, mobile, code..."
-          searchFilter={(u, q) => 
-            Boolean(
-              u.FullName.toLowerCase().includes(q) ||
-              u.MobileNumber.includes(q) ||
-              (u.CustomerCode && u.CustomerCode.toLowerCase().includes(q))
-            )
-          }
+          filterChips={userFilterChips}
+          customFilterPredicate={customFilterPredicate}
+          searchPlaceholder="Search name, mobile, code, city, status..."
+          searchFilter={(u, q) => {
+            const normQuery = (q || '').trim().toLowerCase();
+            if (!normQuery) return true;
+            const name = (u.FullName || '').toLowerCase();
+            const id = (u.UserId || '').toLowerCase();
+            const code = (u.CustomerCode || '').toLowerCase();
+            const mobile = (u.MobileNumber || '').toLowerCase();
+            const altMobile = (u.AlternateMobileNumber || '').toLowerCase();
+            const email = (u.Email || '').toLowerCase();
+            const aadhaar = (u.AadhaarNumber || '').toLowerCase();
+            const pan = (u.PANNumber || '').toLowerCase();
+            const city = (u.City || '').toLowerCase();
+            const state = (u.State || '').toLowerCase();
+            const status = (u.Status || '').toLowerCase();
+
+            return (
+              name.includes(normQuery) ||
+              id.includes(normQuery) ||
+              code.includes(normQuery) ||
+              mobile.includes(normQuery) ||
+              altMobile.includes(normQuery) ||
+              email.includes(normQuery) ||
+              aadhaar.includes(normQuery) ||
+              pan.includes(normQuery) ||
+              city.includes(normQuery) ||
+              state.includes(normQuery) ||
+              status.includes(normQuery)
+            );
+          }}
+          renderMobileCard={(u) => {
+            const directUrl = getDriveImageUrl(u.CustomerPhoto);
+            const initials = (u.FullName || 'U').charAt(0).toUpperCase();
+
+            return (
+              <MobileCard
+                onPress={() => openDetailModal(u)}
+                identifier={`#${u.UserId}`}
+                badges={
+                  <Badge 
+                    label={u.Status} 
+                    variant={u.Status === 'Active' ? 'success' : 'default'} 
+                    size="sm" 
+                  />
+                }
+                avatar={
+                  u.CustomerPhoto ? (
+                    <TouchableOpacity onPress={() => u.CustomerPhoto && setPreviewImageUrl(u.CustomerPhoto)}>
+                      <Image
+                        source={{ uri: directUrl || u.CustomerPhoto }}
+                        style={styles.cardAvatar}
+                        contentFit="cover"
+                      />
+                    </TouchableOpacity>
+                  ) : (
+                    <View style={styles.cardAvatarPlaceholder}>
+                      <Text style={styles.avatarInitials}>{initials}</Text>
+                    </View>
+                  )
+                }
+                title={u.FullName}
+                subtitle={u.MobileNumber}
+                codeBadge={u.CustomerCode || undefined}
+                metrics={[
+                  {
+                    label: 'Mobile Number',
+                    value: u.MobileNumber || '—',
+                    highlighted: true,
+                    color: colors.primaryDark,
+                  },
+                  {
+                    label: 'Customer Status',
+                    value: u.Status || 'Active',
+                    color: u.Status === 'Active' ? colors.success : colors.textMuted,
+                    highlighted: true,
+                  },
+                  {
+                    label: 'Customer Code',
+                    value: u.CustomerCode || '—',
+                  },
+                  {
+                    label: 'City / State',
+                    value: u.City ? `${u.City}${u.State ? `, ${u.State}` : ''}` : '—',
+                  },
+                  {
+                    label: 'Alt Mobile',
+                    value: u.AlternateMobileNumber || '—',
+                  },
+                  {
+                    label: 'Email',
+                    value: u.Email || '—',
+                  },
+                  {
+                    label: 'Aadhaar / PAN',
+                    value: u.AadhaarNumber ? `•••• ${u.AadhaarNumber.slice(-4)}` : (u.PANNumber || '—'),
+                  },
+                ]}
+                viewLabel="View details"
+                onViewPress={() => openDetailModal(u)}
+                menuActions={isSuperAdmin ? [
+                  {
+                    label: 'Edit Customer',
+                    icon: 'pencil-outline',
+                    onPress: () => openEditModal(u),
+                  },
+                  {
+                    label: 'Delete Customer',
+                    icon: 'trash-outline',
+                    isDestructive: true,
+                    onPress: () => handleDelete(u),
+                  },
+                ] : undefined}
+              />
+            );
+          }}
         />
       </ScrollView>
 
@@ -833,5 +963,19 @@ const getStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
   bold: {
     fontWeight: '700',
     color: colors.textPrimary,
+  },
+  cardAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: isDark ? '#1e293b' : '#f1f5f9',
+  },
+  cardAvatarPlaceholder: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.primaryDark,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

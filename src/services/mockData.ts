@@ -1,4 +1,4 @@
-import { User, BankAccount, Ornament, Loan, Payment, DashboardData, GoldRateData } from '../types';
+import { User, BankAccount, Ornament, Loan, Payment, DashboardData, GoldRateData, AdminUser } from '../types';
 
 export const mockGoldRates: GoldRateData = {
   location: "Bangalore",
@@ -16,6 +16,11 @@ export const mockOrnaments: Ornament[] = [];
 
 export const mockLoans: Loan[] = [];
 export const mockPayments: Payment[] = [];
+
+export const mockAdminUsers: AdminUser[] = [
+  { AdminId: 'ADM-001', Username: 'admin', Role: 'SuperAdmin', Status: 'Active' },
+  { AdminId: 'ADM-002', Username: 'staff', Role: 'User', Status: 'Active' },
+];
 
 export const mockDashboardData: DashboardData = {
   totalUsers: 0,

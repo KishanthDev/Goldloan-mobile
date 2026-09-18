@@ -114,6 +114,11 @@ export async function syncFromBackend(force: boolean = false) {
   if (isSyncing && !force) return;
   if (ApiConfig.isMockMode()) return;
 
+  // Prevent unauthenticated background calls if session token is not set yet
+  if (!api.getSessionToken()) {
+    return;
+  }
+
   const now = Date.now();
   // Prevent spamming requests within 10 seconds unless user explicitly requested (e.g. pull-to-refresh)
   if (!force && now - lastSyncTimestamp < 10000) return;

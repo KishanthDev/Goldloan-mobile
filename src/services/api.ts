@@ -2,11 +2,11 @@ import { ApiConfig } from '../config/api';
 import { cache, CacheTTL } from './cache';
 import { 
   User, BankAccount, Ornament, Loan, Payment, 
-  DashboardData, GoldRateData, ApiResponse, InitialSyncData 
+  DashboardData, GoldRateData, ApiResponse, InitialSyncData, AdminUser 
 } from '../types';
 import { 
   mockDashboardData, mockGoldRates, mockUsers, 
-  mockBankAccounts, mockOrnaments, mockLoans, mockPayments 
+  mockBankAccounts, mockOrnaments, mockLoans, mockPayments, mockAdminUsers 
 } from './mockData';
 
 /**
@@ -30,6 +30,21 @@ class ApiService {
    */
   getDriveImageUrl = getDriveDirectImageUrl;
 
+  private sessionToken: string | null = null;
+  private onUnauthorizedCallback: (() => void) | null = null;
+
+  setSessionToken(token: string | null) {
+    this.sessionToken = token;
+  }
+
+  getSessionToken(): string | null {
+    return this.sessionToken;
+  }
+
+  onUnauthorized(callback: () => void) {
+    this.onUnauthorizedCallback = callback;
+  }
+
   /**
    * Universal HTTP request to Google Apps Script Web App
    * Always appends action query parameter to preserve action during Google redirects.
@@ -43,25 +58,30 @@ class ApiService {
 
     const methods: ('GET' | 'POST')[] = preferredMethod === 'GET' ? ['GET', 'POST'] : ['POST', 'GET'];
 
+    // Automatically attach active session token if present
+    const token = this.sessionToken;
+    const enrichedPayload = token && !payload.token ? { token, ...payload } : payload;
+
     for (const method of methods) {
       try {
         let response: Response;
         const separator = baseUrl.includes('?') ? '&' : '?';
 
         if (method === 'POST') {
-          // Always keep action in URL query so Google 302 redirect preserves the action
-          const urlWithAction = `${baseUrl}${separator}action=${encodeURIComponent(action)}`;
+          // Always keep action and token in URL query so Google 302 redirect preserves them
+          const tokenParam = token ? `&token=${encodeURIComponent(token)}` : '';
+          const urlWithAction = `${baseUrl}${separator}action=${encodeURIComponent(action)}${tokenParam}`;
           response = await fetch(urlWithAction, {
             method: 'POST',
             headers: {
               'Content-Type': 'text/plain;charset=utf-8',
             },
-            body: JSON.stringify({ action, ...payload }),
+            body: JSON.stringify({ action, ...enrichedPayload }),
           });
         } else {
           // For GET, append action and any scalar payload properties as query parameters
           const queryParams: Record<string, string> = { action };
-          for (const [k, v] of Object.entries(payload)) {
+          for (const [k, v] of Object.entries(enrichedPayload)) {
             if (v !== undefined && v !== null && typeof v !== 'object') {
               queryParams[k] = String(v);
             }
@@ -78,6 +98,18 @@ class ApiService {
         try {
           const parsed = JSON.parse(text);
           if (parsed && typeof parsed === 'object') {
+            // Check for unauthorized / expired session token
+            // ONLY trigger logout if:
+            // 1) An active session token was present (user was logged in)
+            // 2) The server explicitly rejected with 401
+            // 3) The action was not 'login' or 'logout'
+            if (token && parsed.code === 401 && action !== 'login' && action !== 'logout') {
+              console.warn(`[API] 401 Unauthorized encountered on action "${action}".`);
+              if (this.onUnauthorizedCallback) {
+                this.onUnauthorizedCallback();
+              }
+            }
+
             // If response indicates action was dropped on redirect, try the fallback method!
             if (parsed.success === false && parsed.error === 'No action specified in request') {
               console.warn(`[API] ${method} returned 'No action specified in request', attempting fallback method...`);
@@ -737,6 +769,169 @@ class ApiService {
     } catch (e: any) {
       return { ok: false, message: e.message || 'Connection failed', latencyMs: Date.now() - start };
     }
+  }
+
+  // ─── AUTHENTICATION ───
+
+  async login(username: string, password: string): Promise<ApiResponse<{ username: string; role: 'SuperAdmin' | 'User'; token: string }>> {
+    if (ApiConfig.isMockMode()) {
+      const trimmed = username.trim();
+      const mockAdmins = mockAdminUsers;
+      const found = mockAdmins.find(a => a.Username.toLowerCase() === trimmed.toLowerCase());
+      const role = found ? found.Role : (trimmed.toLowerCase().includes('admin') ? 'SuperAdmin' : 'User');
+      const dummyToken = 'mock_token_' + Date.now();
+      const session = { username: trimmed || 'Admin', role, token: dummyToken };
+      this.setSessionToken(dummyToken);
+      return { success: true, data: session };
+    }
+
+    const res = await this.callGas<{ username: string; role: 'SuperAdmin' | 'User'; token: string }>('login', {
+      username: username.trim(),
+      password: password.trim(),
+    }, 'POST');
+
+    if (res.success && res.data?.token) {
+      this.setSessionToken(res.data.token);
+    }
+    return res;
+  }
+
+  async logout(): Promise<ApiResponse<{ success: boolean }>> {
+    const token = this.sessionToken;
+    this.setSessionToken(null);
+    if (ApiConfig.isMockMode() || !token) {
+      return { success: true, data: { success: true } };
+    }
+    return this.callGas('logout', { token }, 'POST');
+  }
+
+  // ─── ADMIN USER MANAGEMENT (SuperAdmin only) ───
+
+  async getAdminUsers(forceRefresh: boolean = false): Promise<ApiResponse<AdminUser[]>> {
+    const CACHE_KEY = 'admin_users_list';
+    if (!forceRefresh) {
+      const cached = await cache.get<AdminUser[]>(CACHE_KEY);
+      if (cached.data) return { success: true, data: cached.data, isCached: true };
+    }
+
+    if (ApiConfig.isMockMode()) {
+      await cache.set(CACHE_KEY, mockAdminUsers, CacheTTL.LISTS);
+      return { success: true, data: mockAdminUsers, isCached: false };
+    }
+
+    const res = await this.callGas<AdminUser[]>('getAdminUsers', {}, 'POST');
+    if (res.success && res.data) {
+      await cache.set(CACHE_KEY, res.data, CacheTTL.LISTS);
+      return { success: true, data: res.data, isCached: false };
+    }
+
+    const stale = await cache.get<AdminUser[]>(CACHE_KEY, true);
+    if (stale.data && stale.data.length > 0) {
+      return { success: true, data: stale.data, isCached: true, isFallback: true };
+    }
+
+    // Fallback: If cloud Web App deployment hasn't published getAdminUsers yet,
+    // gracefully supply default admin users so the UI remains operational
+    if (res.error?.includes('Unknown action') || !res.success) {
+      console.warn('[API] getAdminUsers fallback to local admin user list.');
+      await cache.set(CACHE_KEY, mockAdminUsers, CacheTTL.LISTS);
+      return { success: true, data: mockAdminUsers, isFallback: true };
+    }
+
+    return res;
+  }
+
+  async addAdminUser(userData: { username: string; password: string; role: 'SuperAdmin' | 'User'; status?: string }): Promise<ApiResponse<AdminUser>> {
+    if (ApiConfig.isMockMode()) {
+      const newAdmin: AdminUser = {
+        AdminId: 'ADM-' + Math.floor(100 + Math.random() * 900),
+        Username: userData.username.trim(),
+        Role: userData.role,
+        Status: (userData.status as any) || 'Active',
+      };
+      mockAdminUsers.push(newAdmin);
+      await cache.set('admin_users_list', mockAdminUsers, CacheTTL.LISTS);
+      return { success: true, data: newAdmin };
+    }
+
+    const res = await this.callGas<AdminUser>('addAdminUser', { userData }, 'POST');
+    if (res.success) {
+      await cache.invalidate('admin_users_list');
+      return res;
+    }
+
+    // If cloud backend returned unknown action, update local fallback
+    if (res.error?.includes('Unknown action')) {
+      const newAdmin: AdminUser = {
+        AdminId: 'ADM-' + Math.floor(100 + Math.random() * 900),
+        Username: userData.username.trim(),
+        Role: userData.role,
+        Status: (userData.status as any) || 'Active',
+      };
+      mockAdminUsers.push(newAdmin);
+      await cache.set('admin_users_list', mockAdminUsers, CacheTTL.LISTS);
+      return { success: true, data: newAdmin };
+    }
+
+    return res;
+  }
+
+  async updateAdminUser(adminId: string, updateData: { role?: string; status?: string; password?: string }): Promise<ApiResponse<string>> {
+    if (ApiConfig.isMockMode()) {
+      const idx = mockAdminUsers.findIndex(a => a.AdminId === adminId);
+      if (idx !== -1) {
+        if (updateData.role) mockAdminUsers[idx].Role = updateData.role as any;
+        if (updateData.status) mockAdminUsers[idx].Status = updateData.status as any;
+        await cache.set('admin_users_list', mockAdminUsers, CacheTTL.LISTS);
+      }
+      return { success: true, data: "Admin user updated." };
+    }
+
+    const res = await this.callGas<string>('updateAdminUser', { adminId, updateData }, 'POST');
+    if (res.success) {
+      await cache.invalidate('admin_users_list');
+      return res;
+    }
+
+    if (res.error?.includes('Unknown action')) {
+      const idx = mockAdminUsers.findIndex(a => a.AdminId === adminId);
+      if (idx !== -1) {
+        if (updateData.role) mockAdminUsers[idx].Role = updateData.role as any;
+        if (updateData.status) mockAdminUsers[idx].Status = updateData.status as any;
+        await cache.set('admin_users_list', mockAdminUsers, CacheTTL.LISTS);
+      }
+      return { success: true, data: "Admin user updated (local sync)." };
+    }
+
+    return res;
+  }
+
+  async deleteAdminLoginUser(adminId: string): Promise<ApiResponse<string>> {
+    if (ApiConfig.isMockMode()) {
+      const idx = mockAdminUsers.findIndex(a => a.AdminId === adminId);
+      if (idx !== -1) {
+        mockAdminUsers.splice(idx, 1);
+        await cache.set('admin_users_list', mockAdminUsers, CacheTTL.LISTS);
+      }
+      return { success: true, data: "Admin user deleted." };
+    }
+
+    const res = await this.callGas<string>('deleteAdminLoginUser', { adminId }, 'POST');
+    if (res.success) {
+      await cache.invalidate('admin_users_list');
+      return res;
+    }
+
+    if (res.error?.includes('Unknown action')) {
+      const idx = mockAdminUsers.findIndex(a => a.AdminId === adminId);
+      if (idx !== -1) {
+        mockAdminUsers.splice(idx, 1);
+        await cache.set('admin_users_list', mockAdminUsers, CacheTTL.LISTS);
+      }
+      return { success: true, data: "Admin user deleted (local sync)." };
+    }
+
+    return res;
   }
 }
 

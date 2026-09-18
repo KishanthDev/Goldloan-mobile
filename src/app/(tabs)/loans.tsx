@@ -8,15 +8,18 @@ import { useTheme } from '../../context/ThemeContext';
 import { useAppStore } from '../../services/store';
 import { Loan, Payment } from '../../types';
 import { DataTable, Column } from '../../components/DataTable';
+import { MobileCard } from '../../components/MobileCard';
 import { Badge } from '../../components/Badge';
 import { Ionicons } from '@expo/vector-icons';
 import { useToast } from '../../context/ToastContext';
+import { useAuth } from '../../context/AuthContext';
 
 export default function LoansScreen() {
   const { colors, isDark } = useTheme();
   const styles = getStyles(colors, isDark);
   const store = useAppStore();
   const toast = useToast();
+  const { isSuperAdmin } = useAuth();
 
   const [modalVisible, setModalVisible] = useState(false);
   const [detailModalVisible, setDetailModalVisible] = useState(false);
@@ -314,11 +317,11 @@ export default function LoansScreen() {
       align: 'center',
       render: (l) => (
         <View style={styles.actionRow}>
-          <TouchableOpacity onPress={() => openDetailModal(l)} style={styles.actionBtn}>
+          <TouchableOpacity onPress={() => openDetailModal(l)} style={styles.actionBtn} accessibilityLabel="View Details">
             <Ionicons name="eye-outline" size={16} color="#0284c7" />
           </TouchableOpacity>
-          {l.LoanStatus === 'Active' ? (
-            <TouchableOpacity onPress={() => openPayModal(l)} style={styles.actionBtn}>
+          {isSuperAdmin && l.LoanStatus === 'Active' ? (
+            <TouchableOpacity onPress={() => openPayModal(l)} style={styles.actionBtn} accessibilityLabel="Record Repayment">
               <Ionicons name="card-outline" size={16} color={colors.primaryDark} />
             </TouchableOpacity>
           ) : null}
@@ -326,6 +329,34 @@ export default function LoansScreen() {
       ),
     },
   ];
+
+  const isLoanOverdue = (l: Loan) => {
+    if (l.LoanStatus === 'Overdue') return true;
+    if (l.LoanStatus === 'Active' && l.DueDate) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      return new Date(l.DueDate) < today;
+    }
+    return false;
+  };
+
+  const overdueCount = store.loans.filter(isLoanOverdue).length;
+  const activeCount = store.loans.filter(l => l.LoanStatus === 'Active' && !isLoanOverdue(l)).length;
+  const closedCount = store.loans.filter(l => l.LoanStatus === 'Closed').length;
+  const loanFilterChips = [
+    { label: 'All', value: 'All', count: store.loans.length },
+    { label: 'Active', value: 'Active', count: activeCount },
+    { label: 'Closed', value: 'Closed', count: closedCount },
+    { label: 'Overdue', value: 'Overdue', count: overdueCount },
+  ];
+
+  const customFilterPredicate = (l: Loan, filterVal: string) => {
+    if (filterVal === 'All') return true;
+    if (filterVal === 'Overdue') return isLoanOverdue(l);
+    if (filterVal === 'Active') return l.LoanStatus === 'Active' && !isLoanOverdue(l);
+    if (filterVal === 'Closed') return l.LoanStatus === 'Closed';
+    return l.LoanStatus === filterVal;
+  };
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -335,19 +366,114 @@ export default function LoansScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />}
       >
         <DataTable
+          forceTableView={true}
           isLoading={store.isSyncing && store.loans.length === 0}
           addButtonLabel="Add Loan"
-          onAddPress={openAddModal}
+          onAddPress={isSuperAdmin ? openAddModal : undefined}
           columns={columns}
           data={store.loans}
           keyExtractor={(l) => l.LoanId}
-          searchPlaceholder="Search loan #, user, bank..."
-          searchFilter={(l, q) => 
-            l.LoanNumber.toLowerCase().includes(q) ||
-            l.BankName.toLowerCase().includes(q) ||
-            getUserName(l.UserId).toLowerCase().includes(q) ||
-            l.LoanId.toLowerCase().includes(q)
-          }
+          filterChips={loanFilterChips}
+          customFilterPredicate={customFilterPredicate}
+          searchPlaceholder="Search loan #, borrower, bank, status..."
+          searchFilter={(l, q) => {
+            const normQuery = (q || '').trim().toLowerCase();
+            if (!normQuery) return true;
+            const borrowerName = getUserName(l.UserId).toLowerCase();
+            const loanNo = (l.LoanNumber || '').toLowerCase();
+            const loanId = (l.LoanId || '').toLowerCase();
+            const bank = (l.BankName || '').toLowerCase();
+            const status = (l.LoanStatus || '').toLowerCase();
+            const amount = (l.LoanAmount || '').toString();
+            const loanDate = (l.LoanDate || '').toLowerCase();
+            const dueDate = (l.DueDate || '').toLowerCase();
+            const netWeight = (l.NetWeight || '').toString();
+
+            return (
+              loanNo.includes(normQuery) ||
+              loanId.includes(normQuery) ||
+              borrowerName.includes(normQuery) ||
+              bank.includes(normQuery) ||
+              status.includes(normQuery) ||
+              amount.includes(normQuery) ||
+              loanDate.includes(normQuery) ||
+              dueDate.includes(normQuery) ||
+              netWeight.includes(normQuery)
+            );
+          }}
+          renderMobileCard={(l) => {
+            const overdue = isLoanOverdue(l);
+            const borrower = getUserName(l.UserId);
+            const statusVariant = overdue ? 'danger' : (l.LoanStatus === 'Active' ? 'success' : (l.LoanStatus === 'Closed' ? 'info' : 'default'));
+            const statusLabel = overdue ? 'Overdue' : l.LoanStatus;
+
+            return (
+              <MobileCard
+                onPress={() => openDetailModal(l)}
+                identifier={
+                  <Text style={styles.idText} numberOfLines={1}>
+                    <Text style={{ fontWeight: '700', color: colors.primaryDark, fontSize: 13 }}>{l.LoanNumber}</Text>
+                    {l.LoanId ? <Text style={{ color: colors.textMuted, fontSize: 11 }}> (#{l.LoanId})</Text> : null}
+                  </Text>
+                }
+                badges={
+                  <Badge label={statusLabel} variant={statusVariant} size="sm" />
+                }
+                avatar={
+                  <View style={styles.miniAvatar}>
+                    <Ionicons name="person" size={15} color={colors.primaryDark} />
+                  </View>
+                }
+                title={borrower}
+                subtitle={l.BankName ? `Lender: ${l.BankName}` : undefined}
+                metrics={[
+                  {
+                    label: 'Loan Amount',
+                    value: `₹${(l.LoanAmount || 0).toLocaleString('en-IN')}`,
+                    highlighted: true,
+                    color: colors.primaryDark,
+                  },
+                  {
+                    label: 'Due Date',
+                    value: l.DueDate || '—',
+                    color: overdue ? colors.danger : undefined,
+                  },
+                  {
+                    label: 'Net Weight',
+                    value: `${Number(l.NetWeight || 0).toFixed(2)}g`,
+                    color: isDark ? '#fbbf24' : '#854d0e',
+                    highlighted: true,
+                  },
+                  {
+                    label: 'Gross Weight',
+                    value: `${Number(l.GrossWeight || 0).toFixed(2)}g`,
+                  },
+                  {
+                    label: 'Origination Date',
+                    value: l.LoanDate || '—',
+                  },
+                  {
+                    label: 'Lending Bank',
+                    value: l.BankName || '—',
+                  },
+                ]}
+                viewLabel="View details"
+                onViewPress={() => openDetailModal(l)}
+                primaryAction={
+                  isSuperAdmin && l.LoanStatus === 'Active' ? (
+                    <TouchableOpacity
+                      style={styles.payQuickBtn}
+                      onPress={() => openPayModal(l)}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons name="card-outline" size={13} color="#ffffff" />
+                      <Text style={styles.payQuickBtnText}>Pay</Text>
+                    </TouchableOpacity>
+                  ) : undefined
+                }
+              />
+            );
+          }}
         />
       </ScrollView>
 
@@ -1100,5 +1226,27 @@ const getStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
     color: colors.success,
+  },
+  miniAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: isDark ? '#1e293b' : '#f1f5f9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  payQuickBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.primaryDark,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 6,
+    gap: 4,
+  },
+  payQuickBtnText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '700',
   },
 });
