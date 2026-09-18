@@ -169,6 +169,7 @@ export interface InitialSyncData {
   loans: Loan[];
   payments: Payment[];
   goldRates: GoldRateData | null;
+  adminUsers?: AdminUser[];
   timestamp?: string;
 }
 

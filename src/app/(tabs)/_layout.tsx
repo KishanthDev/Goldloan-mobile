@@ -9,7 +9,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '../../constants/theme';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppStore } from '../../services/store';
-import { ApiConfig } from '../../config/api';
 import { Env } from '../../config/env';
 import { SidebarProvider, useSidebar } from '../../context/SidebarContext';
 import { SidebarTrigger } from '../../components/SidebarTrigger';
@@ -142,8 +141,10 @@ function TabLayoutInner() {
 
   const currentTabKey = (() => {
     if (pathname === '/' || pathname === '/(tabs)' || pathname === '/(tabs)/') return 'index';
-    for (const key of Object.keys(TAB_METADATA)) {
-      if (key !== 'index' && pathname.includes(key)) return key;
+    const cleanPath = pathname.replace(/^\/+|\/+$/g, '');
+    const segments = cleanPath.split('/');
+    for (const key of ['admin-users', 'bank-accounts', 'ornaments', 'loans', 'closure', 'users']) {
+      if (segments.includes(key) || pathname.includes(`/${key}`)) return key;
     }
     return 'index';
   })();
@@ -164,7 +165,6 @@ function TabLayoutInner() {
   const { colors, isDark } = useTheme();
   const styles = getStyles(colors, isDark);
 
-  const isLive = !ApiConfig.isMockMode();
   const live22kRate = store.goldRates?.gold22k?.rate1g;
 
   // ─── ACCURATE SAFE AREA INSETS (PREVENTS NOTIFICATION OVERLAP) ───
@@ -198,7 +198,9 @@ function TabLayoutInner() {
     if (item.name === 'index') {
       return pathname === '/' || pathname === '/(tabs)' || pathname === '/(tabs)/';
     }
-    return pathname.includes(item.name);
+    const cleanPath = pathname.replace(/^\/+|\/+$/g, '');
+    const segments = cleanPath.split('/');
+    return segments.includes(item.name);
   };
 
   const navigateTo = (item: NavItem) => {
@@ -346,22 +348,26 @@ function TabLayoutInner() {
             )}
 
             <View style={styles.topBarActions}>
-              <ThemeToggleBtn size={15} />
-              <TouchableOpacity 
-                onPress={() => store.syncFromBackend(true)} 
-                style={styles.refreshActionBtn} 
-                activeOpacity={0.7}
-                disabled={store.isSyncing}
-              >
-                {store.isSyncing ? (
-                  <ActivityIndicator size="small" color={isDark ? '#fbbf24' : colors.primaryDark} />
-                ) : (
-                  <Ionicons name="refresh" size={15} color={isDark ? '#fbbf24' : colors.primaryDark} />
-                )}
-                <Text style={styles.refreshActionText}>
-                  {store.isSyncing ? 'Syncing...' : isDesktop ? 'Sync Rates & Data' : 'Sync'}
-                </Text>
-              </TouchableOpacity>
+              {isDesktop && (
+                <>
+                  <ThemeToggleBtn size={15} />
+                  <TouchableOpacity 
+                    onPress={() => store.syncFromBackend(true)} 
+                    style={styles.refreshActionBtn} 
+                    activeOpacity={0.7}
+                    disabled={store.isSyncing}
+                  >
+                    {store.isSyncing ? (
+                      <ActivityIndicator size="small" color={isDark ? '#fbbf24' : colors.primaryDark} />
+                    ) : (
+                      <Ionicons name="refresh" size={15} color={isDark ? '#fbbf24' : colors.primaryDark} />
+                    )}
+                    <Text style={styles.refreshActionText}>
+                      {store.isSyncing ? 'Syncing...' : 'Sync Rates & Data'}
+                    </Text>
+                  </TouchableOpacity>
+                </>
+              )}
 
               {/* Profile Avatar / Menu Button */}
               <TouchableOpacity

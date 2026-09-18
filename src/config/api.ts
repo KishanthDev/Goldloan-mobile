@@ -11,23 +11,17 @@ import { Env } from './env';
  */
 
 const STORAGE_KEY_API_URL = '@goldloan_custom_gas_url';
-const STORAGE_KEY_USE_MOCK = '@goldloan_use_mock';
 
 export const DEFAULT_GAS_WEB_APP_URL = Env.GAS_API_URL;
 export const SPREADSHEET_ID = Env.SPREADSHEET_ID;
 
 class ApiConfigManager {
   private customUrl: string | null = null;
-  private forceMock: boolean | null = null;
 
   async init(): Promise<void> {
     try {
-      const [savedUrl, savedMock] = await Promise.all([
-        AsyncStorage.getItem(STORAGE_KEY_API_URL),
-        AsyncStorage.getItem(STORAGE_KEY_USE_MOCK),
-      ]);
+      const savedUrl = await AsyncStorage.getItem(STORAGE_KEY_API_URL);
       if (savedUrl) this.customUrl = savedUrl;
-      if (savedMock !== null) this.forceMock = savedMock === 'true';
     } catch (e) {
       console.warn('Failed to load API config from storage:', e);
     }
@@ -42,16 +36,6 @@ class ApiConfigManager {
     return url.length > 0 && url.startsWith('http');
   }
 
-  isMockMode(): boolean {
-    if (Env.FORCE_MOCK_MODE) {
-      return true;
-    }
-    if (this.forceMock !== null) {
-      return this.forceMock;
-    }
-    return !this.isConfigured();
-  }
-
   async setApiUrl(url: string): Promise<void> {
     this.customUrl = url.trim();
     if (this.customUrl) {
@@ -59,11 +43,6 @@ class ApiConfigManager {
     } else {
       await AsyncStorage.removeItem(STORAGE_KEY_API_URL);
     }
-  }
-
-  async setMockMode(useMock: boolean): Promise<void> {
-    this.forceMock = useMock;
-    await AsyncStorage.setItem(STORAGE_KEY_USE_MOCK, String(useMock));
   }
 }
 

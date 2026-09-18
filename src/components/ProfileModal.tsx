@@ -17,6 +17,10 @@ import { ThemeColors } from '../constants/theme';
 import { ThemeToggleBtn } from './ThemeToggleBtn';
 import { ConfirmModal } from './ConfirmModal';
 
+import { api } from '../services/api';
+import { useToast } from '../context/ToastContext';
+import { TextInput } from 'react-native';
+
 interface ProfileModalProps {
   visible: boolean;
   onClose: () => void;
@@ -28,9 +32,18 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ visible, onClose }) 
   const router = useRouter();
   const { user, isSuperAdmin, logout } = useAuth();
   const store = useAppStore();
+  const toast = useToast();
 
   const [confirmLogoutVisible, setConfirmLogoutVisible] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
+
+  // Change Password state
+  const [changePasswordVisible, setChangePasswordVisible] = useState(false);
+  const [oldPassword, setOldPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passSubmitting, setPassSubmitting] = useState(false);
+  const [passError, setPassError] = useState<string | null>(null);
 
   const username = user?.username || 'User';
   const role = user?.role || 'User';
@@ -39,6 +52,46 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ visible, onClose }) 
   const handleManageUsers = () => {
     onClose();
     router.push('/(tabs)/admin-users' as any);
+  };
+
+  const handleOpenChangePassword = () => {
+    setOldPassword('');
+    setNewPassword('');
+    setConfirmPassword('');
+    setPassError(null);
+    setChangePasswordVisible(true);
+  };
+
+  const handleSubmitPasswordChange = async () => {
+    setPassError(null);
+    const trimmedNew = newPassword.trim();
+    if (!trimmedNew) {
+      setPassError('New password cannot be empty.');
+      return;
+    }
+    if (trimmedNew.length < 4) {
+      setPassError('Password should be at least 4 characters long.');
+      return;
+    }
+    if (trimmedNew !== confirmPassword.trim()) {
+      setPassError('New passwords do not match.');
+      return;
+    }
+
+    setPassSubmitting(true);
+    try {
+      const res = await api.changePassword(trimmedNew, oldPassword.trim() || undefined);
+      if (res.success) {
+        toast.success('Password changed successfully.');
+        setChangePasswordVisible(false);
+      } else {
+        setPassError(res.error || 'Failed to change password.');
+      }
+    } catch (e: any) {
+      setPassError(e.message || 'Error changing password.');
+    } finally {
+      setPassSubmitting(false);
+    }
   };
 
   const handleLogoutPress = () => {
@@ -111,11 +164,27 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ visible, onClose }) 
                 </View>
                 <View style={styles.menuItemContent}>
                   <Text style={styles.menuItemTitle}>
-                    {isSuperAdmin ? 'Manage Admin Users' : 'Staff & Admin Accounts'}
+                    {isSuperAdmin ? 'Manage Admin Users' : 'Staff Accounts'}
                   </Text>
                   <Text style={styles.menuItemSub}>
                     {isSuperAdmin ? 'Add staff, reset passwords & set roles' : 'View admin users & assigned roles'}
                   </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+              </TouchableOpacity>
+
+              {/* Change Password */}
+              <TouchableOpacity
+                style={styles.menuItem}
+                onPress={handleOpenChangePassword}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.menuIconBox, { backgroundColor: isDark ? 'rgba(37, 99, 235, 0.2)' : '#eff6ff' }]}>
+                  <Ionicons name="key-outline" size={18} color={isDark ? '#60a5fa' : '#2563eb'} />
+                </View>
+                <View style={styles.menuItemContent}>
+                  <Text style={styles.menuItemTitle}>Change Password</Text>
+                  <Text style={styles.menuItemSub}>Update your account login password</Text>
                 </View>
                 <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
               </TouchableOpacity>
@@ -178,6 +247,122 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ visible, onClose }) 
             </View>
           </TouchableOpacity>
         </TouchableOpacity>
+      </Modal>
+
+      {/* Change Password Modal */}
+      <Modal visible={changePasswordVisible} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, { maxWidth: 420 }]}>
+            <View style={styles.header}>
+              <Text style={styles.userName}>Change Password</Text>
+              <TouchableOpacity onPress={() => setChangePasswordVisible(false)}>
+                <Ionicons name="close" size={20} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={{ paddingVertical: 14, gap: 12 }}>
+              {passError ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: isDark ? 'rgba(220, 38, 38, 0.2)' : '#fef2f2', padding: 10, borderRadius: 10 }}>
+                  <Ionicons name="alert-circle" size={16} color="#dc2626" style={{ marginRight: 6 }} />
+                  <Text style={{ fontSize: 12, color: '#dc2626', flex: 1 }}>{passError}</Text>
+                </View>
+              ) : null}
+
+              <View>
+                <Text style={{ fontSize: 12, fontWeight: '700', color: colors.textSecondary, marginBottom: 4 }}>
+                  Current Password (Optional)
+                </Text>
+                <TextInput
+                  style={{
+                    backgroundColor: colors.surfaceSubtle,
+                    borderWidth: 1,
+                    borderColor: colors.border,
+                    borderRadius: 10,
+                    paddingHorizontal: 12,
+                    paddingVertical: 9,
+                    fontSize: 13,
+                    color: colors.textPrimary,
+                  }}
+                  placeholder="Enter current password"
+                  placeholderTextColor={colors.placeholder}
+                  value={oldPassword}
+                  onChangeText={setOldPassword}
+                  secureTextEntry
+                  autoCapitalize="none"
+                />
+              </View>
+
+              <View>
+                <Text style={{ fontSize: 12, fontWeight: '700', color: colors.textSecondary, marginBottom: 4 }}>
+                  New Password *
+                </Text>
+                <TextInput
+                  style={{
+                    backgroundColor: colors.surfaceSubtle,
+                    borderWidth: 1,
+                    borderColor: colors.border,
+                    borderRadius: 10,
+                    paddingHorizontal: 12,
+                    paddingVertical: 9,
+                    fontSize: 13,
+                    color: colors.textPrimary,
+                  }}
+                  placeholder="Enter new password"
+                  placeholderTextColor={colors.placeholder}
+                  value={newPassword}
+                  onChangeText={setNewPassword}
+                  secureTextEntry
+                  autoCapitalize="none"
+                />
+              </View>
+
+              <View>
+                <Text style={{ fontSize: 12, fontWeight: '700', color: colors.textSecondary, marginBottom: 4 }}>
+                  Confirm New Password *
+                </Text>
+                <TextInput
+                  style={{
+                    backgroundColor: colors.surfaceSubtle,
+                    borderWidth: 1,
+                    borderColor: colors.border,
+                    borderRadius: 10,
+                    paddingHorizontal: 12,
+                    paddingVertical: 9,
+                    fontSize: 13,
+                    color: colors.textPrimary,
+                  }}
+                  placeholder="Re-enter new password"
+                  placeholderTextColor={colors.placeholder}
+                  value={confirmPassword}
+                  onChangeText={setConfirmPassword}
+                  secureTextEntry
+                  autoCapitalize="none"
+                />
+              </View>
+            </View>
+
+            <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: colors.border }}>
+              <TouchableOpacity
+                style={{ paddingVertical: 8, paddingHorizontal: 14, borderRadius: 10, borderWidth: 1, borderColor: colors.border }}
+                onPress={() => setChangePasswordVisible(false)}
+                disabled={passSubmitting}
+              >
+                <Text style={{ fontSize: 13, fontWeight: '600', color: colors.textSecondary }}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={{ paddingVertical: 8, paddingHorizontal: 18, borderRadius: 10, backgroundColor: isDark ? '#fbbf24' : colors.primaryDark }}
+                onPress={handleSubmitPasswordChange}
+                disabled={passSubmitting}
+              >
+                {passSubmitting ? (
+                  <ActivityIndicator size="small" color="#ffffff" />
+                ) : (
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: isDark ? '#1e293b' : '#ffffff' }}>Update Password</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
       </Modal>
 
       {/* Logout Confirmation */}

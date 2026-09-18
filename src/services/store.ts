@@ -1,20 +1,24 @@
 import { useState, useEffect } from 'react';
 import { User, BankAccount, Ornament, Loan, Payment, GoldRateData, DashboardData, InitialSyncData } from '../types';
-import { 
-  mockUsers, mockBankAccounts, mockOrnaments, 
-  mockLoans, mockPayments, mockGoldRates, mockDashboardData 
-} from './mockData';
 import { api } from './api';
-import { ApiConfig } from '../config/api';
 import { cache, CacheTTL } from './cache';
 
-// Global in-memory state so changes persist across screen transitions (clean empty start - no mock data)
+const defaultGoldRates: GoldRateData = {
+  location: "Bangalore",
+  updatedAt: new Date().toISOString(),
+  displayDate: "Live Rates",
+  gold24k: { rate1g: 8850, change: 0, direction: "up" },
+  gold22k: { rate1g: 8115, change: 0, direction: "up" },
+  gold18k: { rate1g: 6640, change: 0, direction: "up" },
+};
+
+// Global in-memory state so changes persist across screen transitions
 let usersState: User[] = [];
 let bankAccountsState: BankAccount[] = [];
 let ornamentsState: Ornament[] = [];
 let loansState: Loan[] = [];
 let paymentsState: Payment[] = [];
-let goldRatesState: GoldRateData = { ...mockGoldRates };
+let goldRatesState: GoldRateData = { ...defaultGoldRates };
 
 let isSyncing = false;
 let lastSyncedAt: string | null = null;
@@ -112,7 +116,6 @@ export async function hydrateFromCache() {
 
 export async function syncFromBackend(force: boolean = false) {
   if (isSyncing && !force) return;
-  if (ApiConfig.isMockMode()) return;
 
   // Prevent unauthenticated background calls if session token is not set yet
   if (!api.getSessionToken()) {
@@ -142,23 +145,15 @@ export async function syncFromBackend(force: boolean = false) {
       if (Array.isArray(data.payments)) paymentsState = data.payments;
       if (data.goldRates) goldRatesState = data.goldRates;
 
-      // Always persist the fresh data to disk cache!
-      await cache.set('initial_sync_data', data, CacheTTL.SYNC_DATA);
-      if (Array.isArray(data.users)) await cache.set('users_list', data.users, CacheTTL.LISTS);
-      if (Array.isArray(data.bankAccounts)) await cache.set('bank_accounts_all', data.bankAccounts, CacheTTL.LISTS);
-      if (Array.isArray(data.ornaments)) await cache.set('ornaments_all', data.ornaments, CacheTTL.LISTS);
-      if (Array.isArray(data.loans)) await cache.set('loans_all', data.loans, CacheTTL.LISTS);
-      if (Array.isArray(data.payments)) await cache.set('payments_all', data.payments, CacheTTL.LISTS);
-      if (data.goldRates) await cache.set('gold_rates_bangalore', data.goldRates, CacheTTL.GOLD_RATES);
-
-      lastSyncedAt = new Date().toLocaleTimeString();
+      lastSyncedAt = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
       lastSyncTimestamp = Date.now();
       syncError = null;
+      notify();
       return;
     }
 
-    // 2. Resilient fallback using Promise.allSettled so individual failures don't fail the whole sync
-    const results = await Promise.allSettled([
+    // 2. Fallback: individual entity endpoints if unified sync was unavailable
+    const [usersRes, banksRes, ornsRes, loansRes, paymentsRes, ratesRes] = await Promise.allSettled([
       api.getUsers(force),
       api.getBankAccounts(undefined, force),
       api.getOrnaments(undefined, force),
@@ -167,90 +162,77 @@ export async function syncFromBackend(force: boolean = false) {
       api.getGoldRates(force),
     ]);
 
-    const [usersRes, banksRes, ornsRes, loansRes, paymentsRes, ratesRes] = results;
-
-    let hasAnySuccess = false;
-    if (usersRes.status === 'fulfilled' && Array.isArray(usersRes.value) && usersRes.value.length > 0) {
+    if (usersRes.status === 'fulfilled' && Array.isArray(usersRes.value)) {
       usersState = usersRes.value;
-      hasAnySuccess = true;
-      cache.set('users_list', usersState, CacheTTL.LISTS);
     }
-    if (banksRes.status === 'fulfilled' && Array.isArray(banksRes.value) && banksRes.value.length > 0) {
+    if (banksRes.status === 'fulfilled' && Array.isArray(banksRes.value)) {
       bankAccountsState = banksRes.value;
-      hasAnySuccess = true;
-      cache.set('bank_accounts_all', bankAccountsState, CacheTTL.LISTS);
     }
-    if (ornsRes.status === 'fulfilled' && Array.isArray(ornsRes.value) && ornsRes.value.length > 0) {
+    if (ornsRes.status === 'fulfilled' && Array.isArray(ornsRes.value)) {
       ornamentsState = ornsRes.value;
-      hasAnySuccess = true;
-      cache.set('ornaments_all', ornamentsState, CacheTTL.LISTS);
     }
-    if (loansRes.status === 'fulfilled' && Array.isArray(loansRes.value) && loansRes.value.length > 0) {
+    if (loansRes.status === 'fulfilled' && Array.isArray(loansRes.value)) {
       loansState = loansRes.value;
-      hasAnySuccess = true;
-      cache.set('loans_all', loansState, CacheTTL.LISTS);
     }
-    if (paymentsRes.status === 'fulfilled' && Array.isArray(paymentsRes.value) && paymentsRes.value.length > 0) {
+    if (paymentsRes.status === 'fulfilled' && Array.isArray(paymentsRes.value)) {
       paymentsState = paymentsRes.value;
-      hasAnySuccess = true;
-      cache.set('payments_all', paymentsState, CacheTTL.LISTS);
     }
-    if (ratesRes.status === 'fulfilled' && ratesRes.value?.data) {
+    if (ratesRes.status === 'fulfilled' && ratesRes.value.data) {
       goldRatesState = ratesRes.value.data;
-      hasAnySuccess = true;
-      cache.set('gold_rates_bangalore', goldRatesState, CacheTTL.GOLD_RATES);
     }
 
-    if (hasAnySuccess) {
-      lastSyncedAt = new Date().toLocaleTimeString();
-      lastSyncTimestamp = Date.now();
-      syncError = null;
-    } else {
-      if (usersState.length > 0 || loansState.length > 0) {
-        syncError = 'Offline mode — showing cached portfolio data';
-      } else {
-        syncError = 'Offline — unable to connect to Google Sheets. Check internet connection.';
-      }
-    }
+    lastSyncedAt = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    lastSyncTimestamp = Date.now();
+    syncError = null;
   } catch (err: any) {
-    console.warn('[Store] syncFromBackend warning:', err?.message || err);
-    if (usersState.length > 0 || loansState.length > 0) {
-      syncError = 'Offline mode — showing cached portfolio data';
-    } else {
-      syncError = 'Offline — unable to connect to Google Sheets. Check internet connection.';
-    }
+    console.warn('[Store] syncFromBackend error:', err);
+    syncError = err.message || 'Sync failed';
   } finally {
     isSyncing = false;
     notify();
   }
 }
 
-function nextId<T>(prefix: string, values: T[], key: keyof T) {
-  const highest = values.reduce((max, value) => {
-    const numeric = Number(String(value[key] ?? '').replace(prefix, ''));
-    return Number.isFinite(numeric) ? Math.max(max, numeric) : max;
-  }, 0);
-  return `${prefix}${String(highest + 1).padStart(3, '0')}`;
+function calculateUserBankUtilization(userId: string, bankAccountId: string): number {
+  return loansState
+    .filter(l => l.UserId === userId && l.BankAccountId === bankAccountId && l.LoanStatus === 'Active')
+    .reduce((sum, l) => sum + (Number(l.LoanAmount) || 0), 0);
 }
 
-export function calculateLoanPeriodInterest(loan: Partial<Loan>) {
-  const principal = Number(loan.LoanAmount) || 0;
-  const annualRate = Number(loan.InterestRate) || 0;
-  if (principal <= 0 || annualRate <= 0) return 0;
-
-  let months = Number(String(loan.LoanPeriod || '').replace(/[^0-9.]/g, '')) || 0;
-  if (!months && loan.LoanDate && loan.DueDate) {
-    const start = new Date(loan.LoanDate).getTime();
-    const end = new Date(loan.DueDate).getTime();
-    if (Number.isFinite(start) && Number.isFinite(end) && end > start) {
-      months = Math.max(1, Math.round((end - start) / (1000 * 60 * 60 * 24 * 30.4375)));
-    }
+export function calculateLoanPeriodInterest(params: {
+  LoanAmount: number;
+  InterestRate: number;
+  InterestType: string;
+  LoanPeriod: string;
+  LoanDate?: string;
+  DueDate?: string;
+}): number {
+  const { LoanAmount, InterestRate, InterestType, LoanPeriod, LoanDate, DueDate } = params;
+  let months = 12;
+  if (LoanPeriod) {
+    const match = LoanPeriod.match(/(\d+)/);
+    if (match) months = parseInt(match[1], 10);
+  } else if (LoanDate && DueDate) {
+    const start = new Date(LoanDate);
+    const end = new Date(DueDate);
+    const diffDays = Math.max(0, (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+    months = Math.max(1, Math.round(diffDays / 30));
   }
-  months = months || 1;
-  const interest = loan.InterestType === 'Compound'
-    ? principal * (Math.pow(1 + annualRate / 1200, months) - 1)
-    : principal * (annualRate / 100) * (months / 12);
-  return Math.round(interest * 100) / 100;
+
+  const monthlyRate = (InterestRate || 0) / 100;
+  if (InterestType === 'Compound') {
+    return Math.round(LoanAmount * (Math.pow(1 + monthlyRate, months) - 1));
+  }
+  return Math.round(LoanAmount * monthlyRate * months);
+}
+
+function nextId(prefix: string, list: any[], key: string): string {
+  const max = list.reduce((m, item) => {
+    const raw = String(item[key] || '');
+    const num = parseInt(raw.replace(/\D/g, ''), 10);
+    return !isNaN(num) && num > m ? num : m;
+  }, 0);
+  return `${prefix}${String(max + 1).padStart(3, '0')}`;
 }
 
 export function useAppStore() {
@@ -260,9 +242,12 @@ export function useAppStore() {
     const listener = () => setTick(t => t + 1);
     listeners.add(listener);
 
+    // Initial hydration and silent background sync on component mount
     if (!hasInitialized) {
       hasInitialized = true;
-      hydrateFromCache().then(() => syncFromBackend());
+      hydrateFromCache().then(() => {
+        syncFromBackend();
+      });
     }
 
     return () => {
@@ -270,27 +255,18 @@ export function useAppStore() {
     };
   }, []);
 
-  // --- Calculations ---
-
-  const calculateUserBankUtilization = (userId: string, bankAccountId: string) => {
-    return loansState
-      .filter(l => l.LoanStatus === 'Active' && l.UserId === userId && l.BankAccountId === bankAccountId)
-      .reduce((sum, l) => sum + (Number(l.LoanAmount) || 0), 0);
-  };
-
   const getDashboardData = (): DashboardData => {
-    const activeUsers = usersState.filter(u => u.Status === 'Active');
-    const activeBanks = bankAccountsState.filter(b => b.Status === 'Active');
     const activeLoans = loansState.filter(l => l.LoanStatus === 'Active');
     const closedLoans = loansState.filter(l => l.LoanStatus === 'Closed');
-
-    const pledgedOrnaments = ornamentsState.filter(o => o.Status === 'Pledged');
-    const pledgedOrnamentsCount = pledgedOrnaments.length;
-    const pledgedGrams = pledgedOrnaments.reduce((sum, o) => sum + (Number(o.GrossWeight) || 0), 0);
-
     const totalLoanAmount = activeLoans.reduce((sum, l) => sum + (Number(l.LoanAmount) || 0), 0);
-    const totalEligibleLoanAmount = activeBanks.reduce((sum, b) => sum + (Number(b.MaxLoanAmount) || 0), 0);
-    const totalAvailableLoanAmount = activeBanks.reduce((sum, b) => {
+
+    const activeUsers = usersState.filter(u => u.Status === 'Active');
+    const activeBankAccounts = bankAccountsState.filter(b => b.Status === 'Active');
+    const allOrnaments = ornamentsState.filter(o => o.Status !== 'Deleted');
+    const pledgedOrnaments = allOrnaments.filter(o => o.Status === 'Pledged');
+
+    const totalEligibleLoanAmount = activeBankAccounts.reduce((sum, b) => sum + (Number(b.MaxLoanAmount) || 0), 0);
+    const totalAvailableLoanAmount = activeBankAccounts.reduce((sum, b) => {
       const maxL = Number(b.MaxLoanAmount) || 0;
       const util = calculateUserBankUtilization(b.UserId, b.BankAccountId);
       return sum + Math.max(0, maxL - util);
@@ -298,29 +274,43 @@ export function useAppStore() {
 
     let totalGoldWeight = 0;
     let totalBuyingGoldValue = 0;
-    ornamentsState.forEach(o => {
-      if (o.Status !== 'Deleted') {
-        const wt = Number(o.NetWeight) || Number(o.MetalWeight) || Math.max(0, Number(o.GrossWeight) - Number(o.StoneWeight || 0));
-        const rate = Number(o.BuyingPricePerGram) || 0;
-        totalGoldWeight += wt;
-        totalBuyingGoldValue += rate > 0 ? (rate * wt) : (Number(o.BuyingCost) || Number(o.TotalPrice) || 0);
-      }
+    allOrnaments.forEach(o => {
+      const metal = Number(o.MetalWeight);
+      const net = Number(o.NetWeight);
+      const gross = Number(o.GrossWeight) || 0;
+      const weight = !isNaN(metal) && metal > 0 ? metal : (!isNaN(net) && net > 0 ? net : gross);
+      totalGoldWeight += weight;
+
+      const buyPrice = Number(o.BuyingPricePerGram) || 0;
+      const buyCost = Number(o.BuyingCost) || (weight * buyPrice);
+      totalBuyingGoldValue += buyCost;
     });
+
+    const pledgedGrams = pledgedOrnaments.reduce((sum, o) => {
+      const gross = Number(o.GrossWeight) || 0;
+      const net = Number(o.NetWeight) || 0;
+      const metal = Number(o.MetalWeight) || 0;
+      return sum + (metal > 0 ? metal : (net > 0 ? net : gross));
+    }, 0);
+
+    const recentTransactions = [...paymentsState]
+      .sort((a, b) => new Date(b.PaymentDate || b.CreatedDate || '').getTime() - new Date(a.PaymentDate || a.CreatedDate || '').getTime())
+      .slice(0, 5);
 
     return {
       totalUsers: activeUsers.length,
-      totalBankAccounts: activeBanks.length,
-      totalOrnaments: ornamentsState.filter(o => o.Status !== 'Deleted').length,
-      pledgedOrnamentsCount,
-      pledgedGrams,
+      totalBankAccounts: activeBankAccounts.length,
+      totalOrnaments: allOrnaments.length,
+      pledgedOrnamentsCount: pledgedOrnaments.length,
+      pledgedGrams: Math.round(pledgedGrams * 100) / 100,
       activeLoans: activeLoans.length,
       closedLoans: closedLoans.length,
       totalLoanAmount,
       totalEligibleLoanAmount,
       totalAvailableLoanAmount,
-      totalGoldWeight,
-      totalBuyingGoldValue,
-      recentTransactions: paymentsState.slice(-5).reverse(),
+      totalGoldWeight: Math.round(totalGoldWeight * 100) / 100,
+      totalBuyingGoldValue: Math.round(totalBuyingGoldValue),
+      recentTransactions,
     };
   };
 
@@ -331,7 +321,7 @@ export function useAppStore() {
     const newUser: User = {
       UserId: tempId,
       CustomerCode: userData.CustomerCode || `CUST-${100 + usersState.length + 1}`,
-      FullName: userData.FullName || 'New User',
+      FullName: userData.FullName || 'New Customer',
       FatherHusbandName: userData.FatherHusbandName || '',
       MobileNumber: userData.MobileNumber || '',
       AlternateMobileNumber: userData.AlternateMobileNumber || '',
@@ -354,15 +344,13 @@ export function useAppStore() {
     cache.set('users_list', usersState, CacheTTL.LISTS);
     notify();
 
-    if (!ApiConfig.isMockMode()) {
-      api.addUser(userData).then(res => {
-        if (res.success && res.data) {
-          usersState = usersState.map(u => u.UserId === tempId ? { ...u, ...res.data } : u);
-          cache.set('users_list', usersState, CacheTTL.LISTS);
-          notify();
-        }
-      }).catch(err => console.warn('[Store] addUser error:', err));
-    }
+    api.addUser(userData).then(res => {
+      if (res.success && res.data) {
+        usersState = usersState.map(u => u.UserId === tempId ? { ...u, ...res.data } : u);
+        cache.set('users_list', usersState, CacheTTL.LISTS);
+        notify();
+      }
+    }).catch(err => console.warn('[Store] addUser error:', err));
 
     return newUser;
   };
@@ -372,9 +360,7 @@ export function useAppStore() {
     cache.set('users_list', usersState, CacheTTL.LISTS);
     notify();
 
-    if (!ApiConfig.isMockMode()) {
-      api.updateUser(userId, updated).catch(err => console.warn('[Store] updateUser error:', err));
-    }
+    api.updateUser(userId, updated).catch(err => console.warn('[Store] updateUser error:', err));
   };
 
   const deleteUser = (userId: string) => {
@@ -382,9 +368,7 @@ export function useAppStore() {
     cache.set('users_list', usersState, CacheTTL.LISTS);
     notify();
 
-    if (!ApiConfig.isMockMode()) {
-      api.deleteUser(userId).catch(err => console.warn('[Store] deleteUser error:', err));
-    }
+    api.deleteUser(userId).catch(err => console.warn('[Store] deleteUser error:', err));
   };
 
   // --- CRUD: Bank Accounts ---
@@ -415,15 +399,13 @@ export function useAppStore() {
     cache.set('bank_accounts_all', bankAccountsState, CacheTTL.LISTS);
     notify();
 
-    if (!ApiConfig.isMockMode()) {
-      api.addBankAccount(accData).then(res => {
-        if (res.success && res.data) {
-          bankAccountsState = bankAccountsState.map(b => b.BankAccountId === tempId ? { ...b, ...res.data } : b);
-          cache.set('bank_accounts_all', bankAccountsState, CacheTTL.LISTS);
-          notify();
-        }
-      }).catch(err => console.warn('[Store] addBankAccount error:', err));
-    }
+    api.addBankAccount(accData).then(res => {
+      if (res.success && res.data) {
+        bankAccountsState = bankAccountsState.map(b => b.BankAccountId === tempId ? { ...b, ...res.data } : b);
+        cache.set('bank_accounts_all', bankAccountsState, CacheTTL.LISTS);
+        notify();
+      }
+    }).catch(err => console.warn('[Store] addBankAccount error:', err));
 
     return newAcc;
   };
@@ -442,9 +424,7 @@ export function useAppStore() {
     cache.set('bank_accounts_all', bankAccountsState, CacheTTL.LISTS);
     notify();
 
-    if (!ApiConfig.isMockMode()) {
-      api.updateBankAccount(accId, updated).catch(err => console.warn('[Store] updateBankAccount error:', err));
-    }
+    api.updateBankAccount(accId, updated).catch(err => console.warn('[Store] updateBankAccount error:', err));
   };
 
   const deleteBankAccount = (accId: string) => {
@@ -452,9 +432,7 @@ export function useAppStore() {
     cache.set('bank_accounts_all', bankAccountsState, CacheTTL.LISTS);
     notify();
 
-    if (!ApiConfig.isMockMode()) {
-      api.deleteBankAccount(accId).catch(err => console.warn('[Store] deleteBankAccount error:', err));
-    }
+    api.deleteBankAccount(accId).catch(err => console.warn('[Store] deleteBankAccount error:', err));
   };
 
   // --- CRUD: Ornaments ---
@@ -471,13 +449,13 @@ export function useAppStore() {
     const currentPrice = Number(ornData.CurrentPricePerGram) || 0;
     const buyingCost = Math.round(net * buyingPrice * 100) / 100;
     const marketValue = Math.round(net * currentPrice * 100) / 100;
-    const apprVal = Math.round((marketValue - buyingCost) * 100) / 100;
-    const apprPct = buyingCost > 0 ? Math.round(((apprVal / buyingCost) * 100) * 100) / 100 : 0;
+    const appreciationValue = Math.round((marketValue - buyingCost) * 100) / 100;
+    const appreciationPercentage = buyingCost > 0 ? Math.round(((appreciationValue / buyingCost) * 100) * 100) / 100 : 0;
 
     const newOrn: Ornament = {
       OrnamentId: tempId,
-      UserId: ornData.UserId || usersState[0]?.UserId || '',
-      OrnamentName: ornData.OrnamentName || 'Gold Jewelry',
+      UserId: ornData.UserId || usersState[0]?.UserId || 'U001',
+      OrnamentName: ornData.OrnamentName || 'Gold Item',
       OrnamentType: ornData.OrnamentType || 'Necklace',
       OrnamentCategory: ornData.OrnamentCategory || 'Neckwear',
       Description: ornData.Description || '',
@@ -493,10 +471,10 @@ export function useAppStore() {
       BuyingCost: buyingCost,
       TotalPrice: buyingCost,
       MarketValue: marketValue,
-      AppreciationValue: apprVal,
-      AppreciationPercentage: apprPct,
+      AppreciationValue: appreciationValue,
+      AppreciationPercentage: appreciationPercentage,
       MakerName: ornData.MakerName || '',
-      EstimatedValue: Number(ornData.EstimatedValue) || marketValue || buyingCost,
+      EstimatedValue: Number(ornData.EstimatedValue) || marketValue,
       OrnamentImages: ornData.OrnamentImages || '',
       Remarks: ornData.Remarks || '',
       Status: (ornData.Status as any) || 'Available',
@@ -505,15 +483,13 @@ export function useAppStore() {
     cache.set('ornaments_all', ornamentsState, CacheTTL.LISTS);
     notify();
 
-    if (!ApiConfig.isMockMode()) {
-      api.addOrnament(ornData).then(res => {
-        if (res.success && res.data) {
-          ornamentsState = ornamentsState.map(o => o.OrnamentId === tempId ? { ...o, ...res.data } : o);
-          cache.set('ornaments_all', ornamentsState, CacheTTL.LISTS);
-          notify();
-        }
-      }).catch(err => console.warn('[Store] addOrnament error:', err));
-    }
+    api.addOrnament(ornData).then(res => {
+      if (res.success && res.data) {
+        ornamentsState = ornamentsState.map(o => o.OrnamentId === tempId ? { ...o, ...res.data } : o);
+        cache.set('ornaments_all', ornamentsState, CacheTTL.LISTS);
+        notify();
+      }
+    }).catch(err => console.warn('[Store] addOrnament error:', err));
 
     return newOrn;
   };
@@ -553,9 +529,7 @@ export function useAppStore() {
     cache.set('ornaments_all', ornamentsState, CacheTTL.LISTS);
     notify();
 
-    if (!ApiConfig.isMockMode()) {
-      api.updateOrnament(ornId, updated).catch(err => console.warn('[Store] updateOrnament error:', err));
-    }
+    api.updateOrnament(ornId, updated).catch(err => console.warn('[Store] updateOrnament error:', err));
   };
 
   const deleteOrnament = (ornId: string) => {
@@ -563,9 +537,7 @@ export function useAppStore() {
     cache.set('ornaments_all', ornamentsState, CacheTTL.LISTS);
     notify();
 
-    if (!ApiConfig.isMockMode()) {
-      api.deleteOrnament(ornId).catch(err => console.warn('[Store] deleteOrnament error:', err));
-    }
+    api.deleteOrnament(ornId).catch(err => console.warn('[Store] deleteOrnament error:', err));
   };
 
   // --- CRUD: Loans ---
@@ -630,15 +602,13 @@ export function useAppStore() {
     cache.set('bank_accounts_all', bankAccountsState, CacheTTL.LISTS);
     notify();
 
-    if (!ApiConfig.isMockMode()) {
-      api.addLoan(loanData).then(res => {
-        if (res.success && res.data) {
-          loansState = loansState.map(l => l.LoanId === tempId ? { ...l, ...res.data } : l);
-          cache.set('loans_all', loansState, CacheTTL.LISTS);
-          notify();
-        }
-      }).catch(err => console.warn('[Store] addLoan error:', err));
-    }
+    api.addLoan(loanData).then(res => {
+      if (res.success && res.data) {
+        loansState = loansState.map(l => l.LoanId === tempId ? { ...l, ...res.data } : l);
+        cache.set('loans_all', loansState, CacheTTL.LISTS);
+        notify();
+      }
+    }).catch(err => console.warn('[Store] addLoan error:', err));
 
     return newLoan;
   };
@@ -648,9 +618,7 @@ export function useAppStore() {
     cache.set('loans_all', loansState, CacheTTL.LISTS);
     notify();
 
-    if (!ApiConfig.isMockMode()) {
-      api.updateLoan(loanId, updated).catch(err => console.warn('[Store] updateLoan error:', err));
-    }
+    api.updateLoan(loanId, updated).catch(err => console.warn('[Store] updateLoan error:', err));
   };
 
   const closeAndReleaseLoan = (loanId: string, remarks: string) => {
@@ -685,9 +653,7 @@ export function useAppStore() {
     cache.set('bank_accounts_all', bankAccountsState, CacheTTL.LISTS);
     notify();
 
-    if (!ApiConfig.isMockMode()) {
-      api.closeAndReleaseLoan(loanId, remarks).catch(err => console.warn('[Store] closeAndReleaseLoan error:', err));
-    }
+    api.closeAndReleaseLoan(loanId, remarks).catch(err => console.warn('[Store] closeAndReleaseLoan error:', err));
   };
 
   // --- CRUD: Payments ---
@@ -712,15 +678,13 @@ export function useAppStore() {
     cache.set('payments_all', paymentsState, CacheTTL.LISTS);
     notify();
 
-    if (!ApiConfig.isMockMode()) {
-      api.addPayment(payData).then(res => {
-        if (res.success && res.data) {
-          paymentsState = paymentsState.map(p => p.PaymentId === tempId ? { ...p, ...res.data } : p);
-          cache.set('payments_all', paymentsState, CacheTTL.LISTS);
-          notify();
-        }
-      }).catch(err => console.warn('[Store] addPayment error:', err));
-    }
+    api.addPayment(payData).then(res => {
+      if (res.success && res.data) {
+        paymentsState = paymentsState.map(p => p.PaymentId === tempId ? { ...p, ...res.data } : p);
+        cache.set('payments_all', paymentsState, CacheTTL.LISTS);
+        notify();
+      }
+    }).catch(err => console.warn('[Store] addPayment error:', err));
 
     return newPay;
   };

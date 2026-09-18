@@ -4,10 +4,6 @@ import {
   User, BankAccount, Ornament, Loan, Payment, 
   DashboardData, GoldRateData, ApiResponse, InitialSyncData, AdminUser 
 } from '../types';
-import { 
-  mockDashboardData, mockGoldRates, mockUsers, 
-  mockBankAccounts, mockOrnaments, mockLoans, mockPayments, mockAdminUsers 
-} from './mockData';
 
 /**
  * Helper to convert Google Drive sharing links to direct image thumbnail URLs
@@ -23,6 +19,31 @@ export function getDriveDirectImageUrl(driveUrl?: string | null): string | undef
 }
 
 export const getDriveImageUrl = getDriveDirectImageUrl;
+
+const emptyDashboardData: DashboardData = {
+  totalUsers: 0,
+  totalBankAccounts: 0,
+  totalOrnaments: 0,
+  pledgedOrnamentsCount: 0,
+  pledgedGrams: 0,
+  activeLoans: 0,
+  closedLoans: 0,
+  totalLoanAmount: 0,
+  totalEligibleLoanAmount: 0,
+  totalAvailableLoanAmount: 0,
+  totalGoldWeight: 0,
+  totalBuyingGoldValue: 0,
+  recentTransactions: [],
+};
+
+const defaultGoldRates: GoldRateData = {
+  location: "Bangalore",
+  updatedAt: new Date().toISOString(),
+  displayDate: "Live Rates",
+  gold24k: { rate1g: 8850, change: 0, direction: "up" },
+  gold22k: { rate1g: 8115, change: 0, direction: "up" },
+  gold18k: { rate1g: 6640, change: 0, direction: "up" },
+};
 
 class ApiService {
   /**
@@ -99,10 +120,6 @@ class ApiService {
           const parsed = JSON.parse(text);
           if (parsed && typeof parsed === 'object') {
             // Check for unauthorized / expired session token
-            // ONLY trigger logout if:
-            // 1) An active session token was present (user was logged in)
-            // 2) The server explicitly rejected with 401
-            // 3) The action was not 'login' or 'logout'
             if (token && parsed.code === 401 && action !== 'login' && action !== 'logout') {
               console.warn(`[API] 401 Unauthorized encountered on action "${action}".`);
               if (this.onUnauthorizedCallback) {
@@ -118,33 +135,35 @@ class ApiService {
             return parsed;
           }
         } catch {
-          if (text.includes('Script function not found: doPost')) {
-            console.warn('[API] Google Apps Script requires redeployment with updated Code.js (doPost not yet active in cloud).');
-            continue;
+          if (text.includes('Success') || text.includes('success')) {
+            return { success: true, data: text as any };
           }
-          if (text.includes('<!DOCTYPE') || text.includes('<html')) {
-            continue;
+          if (method === methods[methods.length - 1]) {
+            return { success: false, error: `Invalid server response: ${text.slice(0, 100)}` };
           }
-          return { success: false, error: "Server returned non-JSON: " + text.slice(0, 100) };
         }
-      } catch (error: any) {
-        console.warn(`[API] ${method} attempt failed for "${action}": ${error.message || 'Network error'}`);
+      } catch (err: any) {
+        if (method === methods[methods.length - 1]) {
+          return { success: false, error: err.message || 'Network request failed.' };
+        }
       }
     }
 
-    return { success: false, error: `Network request failed for "${action}". Please check your internet connection.` };
+    return { success: false, error: 'Failed to communicate with Google Sheets backend.' };
   }
 
-  private async postToGas<T>(action: string, payload: any = {}): Promise<ApiResponse<T>> {
+  async postToGas<T>(action: string, payload: any = {}): Promise<ApiResponse<T>> {
     return this.callGas<T>(action, payload, 'POST');
   }
 
-  private async getFromGas<T>(action: string, params: Record<string, string> = {}): Promise<ApiResponse<T>> {
+  async getFromGas<T>(action: string, params: Record<string, any> = {}): Promise<ApiResponse<T>> {
     return this.callGas<T>(action, params, 'GET');
   }
 
+  // ─── UNIFIED INITIAL SYNC ───
+
   /**
-   * Fetch all app data in a single unified round-trip with intelligent caching
+   * Fetch all app data in a single unified round-trip from Google Sheets with intelligent caching
    */
   async getInitialSyncData(forceRefresh: boolean = false): Promise<ApiResponse<InitialSyncData>> {
     const CACHE_KEY = 'initial_sync_data';
@@ -154,19 +173,6 @@ class ApiService {
       if (cached.data) {
         return { success: true, data: cached.data, isCached: true };
       }
-    }
-
-    if (ApiConfig.isMockMode()) {
-      const mockData: InitialSyncData = {
-        users: mockUsers,
-        bankAccounts: mockBankAccounts,
-        ornaments: mockOrnaments,
-        loans: mockLoans,
-        payments: mockPayments,
-        goldRates: mockGoldRates,
-      };
-      await cache.set(CACHE_KEY, mockData, CacheTTL.SYNC_DATA);
-      return { success: true, data: mockData, isCached: false };
     }
 
     const res = await this.callGas<InitialSyncData>('getInitialSyncData', {}, 'GET');
@@ -179,6 +185,7 @@ class ApiService {
       if (res.data.loans) await cache.set('loans_all', res.data.loans, CacheTTL.LISTS);
       if (res.data.payments) await cache.set('payments_all', res.data.payments, CacheTTL.LISTS);
       if (res.data.goldRates) await cache.set('gold_rates_bangalore', res.data.goldRates, CacheTTL.GOLD_RATES);
+      if (res.data.adminUsers) await cache.set('admin_users_list', res.data.adminUsers, CacheTTL.LISTS);
       return { success: true, data: res.data, isCached: false };
     }
 
@@ -203,11 +210,6 @@ class ApiService {
       }
     }
 
-    if (ApiConfig.isMockMode()) {
-      await cache.set(CACHE_KEY, mockDashboardData, CacheTTL.DASHBOARD);
-      return { data: mockDashboardData, isCached: false };
-    }
-
     const res = await this.getFromGas<DashboardData>('getDashboardData');
     if (res.success && res.data) {
       await cache.set(CACHE_KEY, res.data, CacheTTL.DASHBOARD);
@@ -220,7 +222,7 @@ class ApiService {
       return { data: stale.data, isCached: true };
     }
 
-    return { data: mockDashboardData, isCached: false };
+    return { data: emptyDashboardData, isCached: false };
   }
 
   async getGoldRates(forceRefresh: boolean = false): Promise<{ data: GoldRateData; isCached: boolean }> {
@@ -231,11 +233,6 @@ class ApiService {
       if (cached.data) {
         return { data: cached.data, isCached: true };
       }
-    }
-
-    if (ApiConfig.isMockMode()) {
-      await cache.set(CACHE_KEY, mockGoldRates, CacheTTL.GOLD_RATES);
-      return { data: mockGoldRates, isCached: false };
     }
 
     const res = await this.getFromGas<GoldRateData>('getGoldRates');
@@ -249,7 +246,7 @@ class ApiService {
       return { data: stale.data, isCached: true };
     }
 
-    return { data: mockGoldRates, isCached: false };
+    return { data: defaultGoldRates, isCached: false };
   }
 
   // ─── USERS / CUSTOMERS ───
@@ -262,11 +259,6 @@ class ApiService {
       if (cached.data) return cached.data;
     }
 
-    if (ApiConfig.isMockMode()) {
-      await cache.set(CACHE_KEY, mockUsers, CacheTTL.LISTS);
-      return mockUsers;
-    }
-
     const res = await this.getFromGas<User[]>('getUsers');
     if (res.success && res.data) {
       await cache.set(CACHE_KEY, res.data, CacheTTL.LISTS);
@@ -274,38 +266,10 @@ class ApiService {
     }
 
     const stale = await cache.get<User[]>(CACHE_KEY, true);
-    return stale.data || mockUsers;
+    return stale.data || [];
   }
 
   async addUser(userData: Partial<User> & { files?: any[] }): Promise<ApiResponse<User>> {
-    if (ApiConfig.isMockMode()) {
-      const newUser: User = {
-        UserId: `U${String(mockUsers.length + 1).padStart(3, '0')}`,
-        CustomerCode: userData.CustomerCode || `CUST-${100 + mockUsers.length + 1}`,
-        FullName: userData.FullName || 'New Customer',
-        FatherHusbandName: userData.FatherHusbandName || '',
-        MobileNumber: userData.MobileNumber || '',
-        AlternateMobileNumber: userData.AlternateMobileNumber || '',
-        Email: userData.Email || '',
-        DateOfBirth: userData.DateOfBirth || '',
-        Gender: userData.Gender || 'Male',
-        AadhaarNumber: userData.AadhaarNumber || '',
-        PANNumber: userData.PANNumber || '',
-        AddressLine1: userData.AddressLine1 || '',
-        AddressLine2: userData.AddressLine2 || '',
-        City: userData.City || 'Bengaluru',
-        State: userData.State || 'Karnataka',
-        Pincode: userData.Pincode || '560001',
-        Occupation: userData.Occupation || '',
-        CustomerPhoto: '',
-        Status: 'Active',
-        CreatedDate: new Date().toISOString(),
-      };
-      mockUsers.unshift(newUser);
-      await cache.invalidateEntity('users');
-      return { success: true, data: newUser };
-    }
-
     const res = await this.postToGas<User>('addUser', { userData });
     if (res.success) {
       await cache.invalidateEntity('users');
@@ -314,15 +278,6 @@ class ApiService {
   }
 
   async updateUser(userId: string, userData: Partial<User> & { files?: any[] }): Promise<ApiResponse<any>> {
-    if (ApiConfig.isMockMode()) {
-      const idx = mockUsers.findIndex(u => u.UserId === userId);
-      if (idx !== -1) {
-        mockUsers[idx] = { ...mockUsers[idx], ...userData, UpdatedDate: new Date().toISOString() };
-      }
-      await cache.invalidateEntity('users');
-      return { success: true, data: 'User updated' };
-    }
-
     const res = await this.postToGas('updateUser', { userId, userData });
     if (res.success) {
       await cache.invalidateEntity('users');
@@ -331,13 +286,6 @@ class ApiService {
   }
 
   async deleteUser(userId: string): Promise<ApiResponse<any>> {
-    if (ApiConfig.isMockMode()) {
-      const idx = mockUsers.findIndex(u => u.UserId === userId);
-      if (idx !== -1) mockUsers.splice(idx, 1);
-      await cache.invalidateEntity('users');
-      return { success: true, data: 'User deleted' };
-    }
-
     const res = await this.postToGas('deleteUser', { userId });
     if (res.success) {
       await cache.invalidateEntity('users');
@@ -355,12 +303,6 @@ class ApiService {
       if (cached.data) return cached.data;
     }
 
-    if (ApiConfig.isMockMode()) {
-      const data = userId ? mockBankAccounts.filter(b => b.UserId === userId) : mockBankAccounts;
-      await cache.set(CACHE_KEY, data, CacheTTL.LISTS);
-      return data;
-    }
-
     const res = await this.getFromGas<BankAccount[]>('getBankAccounts', userId ? { userId } : {});
     if (res.success && Array.isArray(res.data)) {
       await cache.set(CACHE_KEY, res.data, CacheTTL.LISTS);
@@ -368,33 +310,10 @@ class ApiService {
     }
 
     const stale = await cache.get<BankAccount[]>(CACHE_KEY, true);
-    return stale.data || mockBankAccounts;
+    return stale.data || [];
   }
 
   async addBankAccount(accountData: Partial<BankAccount> & { files?: any[] }): Promise<ApiResponse<BankAccount>> {
-    if (ApiConfig.isMockMode()) {
-      const newAcc: BankAccount = {
-        BankAccountId: `BA${String(mockBankAccounts.length + 1).padStart(3, '0')}`,
-        UserId: accountData.UserId || 'U001',
-        AccountHolderName: accountData.AccountHolderName || '',
-        AccountNumber: accountData.AccountNumber || '',
-        BankName: accountData.BankName || '',
-        BranchName: accountData.BranchName || '',
-        City: accountData.City || 'Bengaluru',
-        IFSCCode: accountData.IFSCCode || '',
-        AccountType: accountData.AccountType || 'Savings',
-        UPI_ID: accountData.UPI_ID || '',
-        MaxLoanAmount: Number(accountData.MaxLoanAmount) || 500000,
-        UtilizedLoanAmount: 0,
-        AvailableLoanAmount: Number(accountData.MaxLoanAmount) || 500000,
-        Status: 'Active',
-        CreatedDate: new Date().toISOString(),
-      };
-      mockBankAccounts.unshift(newAcc);
-      await cache.invalidateEntity('bank_accounts');
-      return { success: true, data: newAcc };
-    }
-
     const res = await this.postToGas<BankAccount>('addBankAccount', { accountData });
     if (res.success) {
       await cache.invalidateEntity('bank_accounts');
@@ -403,15 +322,6 @@ class ApiService {
   }
 
   async updateBankAccount(accountId: string, accountData: Partial<BankAccount> & { files?: any[] }): Promise<ApiResponse<any>> {
-    if (ApiConfig.isMockMode()) {
-      const idx = mockBankAccounts.findIndex(b => b.BankAccountId === accountId);
-      if (idx !== -1) {
-        mockBankAccounts[idx] = { ...mockBankAccounts[idx], ...accountData, UpdatedDate: new Date().toISOString() };
-      }
-      await cache.invalidateEntity('bank_accounts');
-      return { success: true, data: 'Bank account updated' };
-    }
-
     const res = await this.postToGas('updateBankAccount', { accountId, accountData });
     if (res.success) {
       await cache.invalidateEntity('bank_accounts');
@@ -420,13 +330,6 @@ class ApiService {
   }
 
   async deleteBankAccount(accountId: string): Promise<ApiResponse<any>> {
-    if (ApiConfig.isMockMode()) {
-      const idx = mockBankAccounts.findIndex(b => b.BankAccountId === accountId);
-      if (idx !== -1) mockBankAccounts.splice(idx, 1);
-      await cache.invalidateEntity('bank_accounts');
-      return { success: true, data: 'Bank account deleted' };
-    }
-
     const res = await this.postToGas('deleteBankAccount', { accountId });
     if (res.success) {
       await cache.invalidateEntity('bank_accounts');
@@ -444,12 +347,6 @@ class ApiService {
       if (cached.data) return cached.data;
     }
 
-    if (ApiConfig.isMockMode()) {
-      const data = userId ? mockOrnaments.filter(o => o.UserId === userId) : mockOrnaments;
-      await cache.set(CACHE_KEY, data, CacheTTL.LISTS);
-      return data;
-    }
-
     const res = await this.getFromGas<Ornament[]>('getOrnaments', userId ? { userId } : {});
     if (res.success && Array.isArray(res.data)) {
       await cache.set(CACHE_KEY, res.data, CacheTTL.LISTS);
@@ -457,14 +354,10 @@ class ApiService {
     }
 
     const stale = await cache.get<Ornament[]>(CACHE_KEY, true);
-    return stale.data || mockOrnaments;
+    return stale.data || [];
   }
 
   async getAvailableOrnaments(): Promise<Ornament[]> {
-    if (ApiConfig.isMockMode()) {
-      return mockOrnaments.filter(o => o.Status === 'Available' || o.Status === 'Released');
-    }
-
     const res = await this.getFromGas<Ornament[]>('getAvailableOrnaments');
     if (res.success && Array.isArray(res.data)) {
       return res.data;
@@ -473,47 +366,6 @@ class ApiService {
   }
 
   async addOrnament(ornamentData: Partial<Ornament> & { files?: any[] }): Promise<ApiResponse<Ornament>> {
-    if (ApiConfig.isMockMode()) {
-      const gross = Number(ornamentData.GrossWeight) || 0;
-      const stone = Number(ornamentData.StoneWeight) || 0;
-      const net = Math.max(0, gross - stone);
-      const buyPrice = Number(ornamentData.BuyingPricePerGram) || 8100;
-      const curPrice = Number(ornamentData.CurrentPricePerGram) || 8850;
-      const cost = Math.round(net * buyPrice);
-      const market = Math.round(net * curPrice);
-
-      const newOrnament: Ornament = {
-        OrnamentId: `ORN${String(mockOrnaments.length + 1).padStart(3, '0')}`,
-        UserId: ornamentData.UserId,
-        OrnamentName: ornamentData.OrnamentName || 'Gold Jewelry',
-        OrnamentType: ornamentData.OrnamentType || 'Necklace',
-        OrnamentCategory: ornamentData.OrnamentCategory || 'Neckwear',
-        Description: ornamentData.Description || '',
-        GrossWeight: gross,
-        StoneWeight: stone,
-        NetWeight: net,
-        MetalWeight: net,
-        Purity: ornamentData.Purity || '22K',
-        HallmarkNumber: ornamentData.HallmarkNumber,
-        Quantity: Number(ornamentData.Quantity) || 1,
-        BuyingPricePerGram: buyPrice,
-        CurrentPricePerGram: curPrice,
-        BuyingCost: cost,
-        TotalPrice: cost,
-        MarketValue: market,
-        AppreciationValue: market - cost,
-        AppreciationPercentage: cost > 0 ? ((market - cost) / cost) * 100 : 0,
-        MakerName: ornamentData.MakerName || '',
-        EstimatedValue: ornamentData.EstimatedValue || market,
-        Status: 'Available',
-        Remarks: ornamentData.Remarks,
-      };
-
-      mockOrnaments.unshift(newOrnament);
-      await cache.invalidateEntity('ornaments');
-      return { success: true, data: newOrnament };
-    }
-
     const res = await this.postToGas<Ornament>('addOrnament', { ornamentData });
     if (res.success) {
       await cache.invalidateEntity('ornaments');
@@ -522,15 +374,6 @@ class ApiService {
   }
 
   async updateOrnament(ornamentId: string, ornamentData: Partial<Ornament> & { files?: any[] }): Promise<ApiResponse<any>> {
-    if (ApiConfig.isMockMode()) {
-      const idx = mockOrnaments.findIndex(o => o.OrnamentId === ornamentId);
-      if (idx !== -1) {
-        mockOrnaments[idx] = { ...mockOrnaments[idx], ...ornamentData };
-      }
-      await cache.invalidateEntity('ornaments');
-      return { success: true, data: 'Ornament updated' };
-    }
-
     const res = await this.postToGas('updateOrnament', { ornamentId, ornamentData });
     if (res.success) {
       await cache.invalidateEntity('ornaments');
@@ -539,13 +382,6 @@ class ApiService {
   }
 
   async deleteOrnament(ornamentId: string): Promise<ApiResponse<any>> {
-    if (ApiConfig.isMockMode()) {
-      const idx = mockOrnaments.findIndex(o => o.OrnamentId === ornamentId);
-      if (idx !== -1) mockOrnaments.splice(idx, 1);
-      await cache.invalidateEntity('ornaments');
-      return { success: true, data: 'Ornament deleted' };
-    }
-
     const res = await this.postToGas('deleteOrnament', { ornamentId });
     if (res.success) {
       await cache.invalidateEntity('ornaments');
@@ -571,14 +407,6 @@ class ApiService {
       if (cached.data) return cached.data;
     }
 
-    if (ApiConfig.isMockMode()) {
-      let data = [...mockLoans];
-      if (userId) data = data.filter(l => l.UserId === userId);
-      if (status) data = data.filter(l => l.LoanStatus === status);
-      await cache.set(CACHE_KEY, data, CacheTTL.LISTS);
-      return data;
-    }
-
     const params: Record<string, string> = {};
     if (userId) params.userId = userId;
     if (status) params.status = status;
@@ -590,58 +418,10 @@ class ApiService {
     }
 
     const stale = await cache.get<Loan[]>(CACHE_KEY, true);
-    return stale.data || mockLoans;
+    return stale.data || [];
   }
 
   async addLoan(loanData: any): Promise<ApiResponse<Loan>> {
-    if (ApiConfig.isMockMode()) {
-      const amount = Number(loanData.LoanAmount) || 0;
-      const newLoan: Loan = {
-        LoanId: `L${String(mockLoans.length + 1).padStart(3, '0')}`,
-        LoanNumber: loanData.LoanNumber || `LN-2025-${String(mockLoans.length + 1).padStart(3, '0')}`,
-        UserId: loanData.UserId,
-        BankAccountId: loanData.BankAccountId,
-        BankName: loanData.BankName || 'Bank',
-        LoanDate: loanData.LoanDate || new Date().toISOString().split('T')[0],
-        LoanAmount: amount,
-        InterestRate: Number(loanData.InterestRate) || 9.5,
-        InterestType: loanData.InterestType || 'Simple',
-        LoanPeriod: loanData.LoanPeriod || '12 Months',
-        GrossWeight: Number(loanData.GrossWeight) || 0,
-        NetWeight: Number(loanData.NetWeight) || 0,
-        ProcessingFee: Number(loanData.ProcessingFee) || 0,
-        DocumentCharge: Number(loanData.DocumentCharge) || 0,
-        InsuranceCharge: Number(loanData.InsuranceCharge) || 0,
-        TotalCharges: Number(loanData.TotalCharges) || 0,
-        NetDisbursementAmount: Number(loanData.NetDisbursementAmount) || amount,
-        DueDate: loanData.DueDate || '',
-        LoanStatus: 'Active',
-        Remarks: loanData.Remarks || '',
-        ornamentIds: loanData.ornamentIds || [],
-      };
-
-      if (loanData.ornamentIds) {
-        mockOrnaments.forEach(o => {
-          if (loanData.ornamentIds.includes(o.OrnamentId)) {
-            o.Status = 'Pledged';
-          }
-        });
-      }
-
-      const bank = mockBankAccounts.find(b => b.BankAccountId === loanData.BankAccountId);
-      if (bank) {
-        bank.UtilizedLoanAmount += amount;
-        bank.AvailableLoanAmount = Math.max(0, bank.MaxLoanAmount - bank.UtilizedLoanAmount);
-      }
-
-      mockLoans.unshift(newLoan);
-      await cache.invalidateEntity('loans');
-      await cache.invalidate('ornaments');
-      await cache.invalidate('bank_accounts');
-
-      return { success: true, data: newLoan };
-    }
-
     const res = await this.postToGas<Loan>('addLoan', { loanData });
     if (res.success) {
       await cache.invalidateEntity('loans');
@@ -651,28 +431,17 @@ class ApiService {
     return res;
   }
 
-  async updateLoan(loanId: string, loanData: Partial<Loan>): Promise<ApiResponse<any>> {
+  async updateLoan(loanId: string, loanData: any): Promise<ApiResponse<any>> {
     const res = await this.postToGas('updateLoan', { loanId, loanData });
     if (res.success) {
       await cache.invalidateEntity('loans');
+      await cache.invalidate('ornaments');
+      await cache.invalidate('bank_accounts');
     }
     return res;
   }
 
-  async closeAndReleaseLoan(loanId: string, closureRemarks: string): Promise<ApiResponse<any>> {
-    if (ApiConfig.isMockMode()) {
-      const l = mockLoans.find(loan => loan.LoanId === loanId);
-      if (l) {
-        l.LoanStatus = 'Closed';
-        l.ClosedDate = new Date().toISOString();
-        l.ClosureRemarks = closureRemarks;
-      }
-      await cache.invalidateEntity('loans');
-      await cache.invalidate('ornaments');
-      await cache.invalidate('bank_accounts');
-      return { success: true, data: 'Loan closed' };
-    }
-
+  async closeAndReleaseLoan(loanId: string, closureRemarks: string = ''): Promise<ApiResponse<any>> {
     const res = await this.postToGas('closeAndReleaseLoan', { loanId, closureRemarks });
     if (res.success) {
       await cache.invalidateEntity('loans');
@@ -682,20 +451,26 @@ class ApiService {
     return res;
   }
 
+  async getActiveLoansForClosure(): Promise<Loan[]> {
+    const res = await this.getFromGas<Loan[]>('getActiveLoansForClosure');
+    if (res.success && Array.isArray(res.data)) {
+      return res.data;
+    }
+    return [];
+  }
+
+  async getLoanDetails(loanId: string): Promise<ApiResponse<any>> {
+    return this.getFromGas('getLoanDetails', { loanId });
+  }
+
   // ─── PAYMENTS ───
 
   async getPayments(loanId?: string, forceRefresh: boolean = false): Promise<Payment[]> {
-    const CACHE_KEY = loanId ? `payments_loan_${loanId}` : 'payments_all';
+    const CACHE_KEY = loanId ? `payments_${loanId}` : 'payments_all';
 
     if (!forceRefresh) {
       const cached = await cache.get<Payment[]>(CACHE_KEY);
-      if (cached.data && Array.isArray(cached.data)) return cached.data;
-    }
-
-    if (ApiConfig.isMockMode()) {
-      const data = loanId ? mockPayments.filter(p => p.LoanId === loanId) : mockPayments;
-      await cache.set(CACHE_KEY, data, CacheTTL.LISTS);
-      return data;
+      if (cached.data) return cached.data;
     }
 
     const res = await this.getFromGas<Payment[]>('getPayments', loanId ? { loanId } : {});
@@ -705,107 +480,30 @@ class ApiService {
     }
 
     const stale = await cache.get<Payment[]>(CACHE_KEY, true);
-    if (stale.data && Array.isArray(stale.data)) {
-      return stale.data;
-    }
-
-    return loanId ? mockPayments.filter(p => p.LoanId === loanId) : mockPayments;
+    return stale.data || [];
   }
 
   async addPayment(paymentData: Partial<Payment>): Promise<ApiResponse<Payment>> {
-    if (ApiConfig.isMockMode()) {
-      const newPay: Payment = {
-        PaymentId: `PAY${String(mockPayments.length + 1).padStart(3, '0')}`,
-        LoanId: paymentData.LoanId || '',
-        PaymentDate: paymentData.PaymentDate || new Date().toISOString().split('T')[0],
-        PaymentType: paymentData.PaymentType || 'Interest',
-        PrincipalAmount: Number(paymentData.PrincipalAmount) || 0,
-        InterestAmount: Number(paymentData.InterestAmount) || 0,
-        PenaltyAmount: Number(paymentData.PenaltyAmount) || 0,
-        TotalPaidAmount: Number(paymentData.TotalPaidAmount) || 0,
-        PaymentMethod: paymentData.PaymentMethod || 'UPI',
-        TransactionReference: paymentData.TransactionReference,
-        Remarks: paymentData.Remarks,
-        CreatedDate: new Date().toISOString(),
-      };
-      mockPayments.unshift(newPay);
-      await cache.invalidate('payments');
-      await cache.invalidate('initial_sync_data');
-      await cache.invalidate('dashboard');
-      return { success: true, data: newPay };
-    }
-
     const res = await this.postToGas<Payment>('addPayment', { paymentData });
     if (res.success) {
-      await cache.invalidate('payments');
-      await cache.invalidate('initial_sync_data');
-      await cache.invalidate('dashboard');
+      await cache.invalidateEntity('payments');
+      await cache.invalidateEntity('loans');
     }
     return res;
-  }
-
-  async testConnection(): Promise<{ ok: boolean; message: string; latencyMs: number }> {
-    const start = Date.now();
-    try {
-      const url = ApiConfig.getApiUrl();
-      if (!url) {
-        return { ok: false, message: 'URL is empty', latencyMs: 0 };
-      }
-      const res = await fetch(`${url}?action=testConnection`);
-      const latencyMs = Date.now() - start;
-      if (res.ok) {
-        const text = await res.text();
-        try {
-          const json = JSON.parse(text);
-          if (json.success) {
-            return { ok: true, message: 'Connected to Google Apps Script Web App', latencyMs };
-          }
-          return { ok: false, message: json.error || 'Server error', latencyMs };
-        } catch {
-          return { ok: false, message: 'Invalid response from server', latencyMs };
-        }
-      }
-      return { ok: false, message: `Server returned status ${res.status}`, latencyMs };
-    } catch (e: any) {
-      return { ok: false, message: e.message || 'Connection failed', latencyMs: Date.now() - start };
-    }
   }
 
   // ─── AUTHENTICATION ───
 
   async login(username: string, password: string): Promise<ApiResponse<{ username: string; role: 'SuperAdmin' | 'User'; token: string }>> {
-    if (ApiConfig.isMockMode()) {
-      const trimmed = username.trim();
-      const mockAdmins = mockAdminUsers;
-      const found = mockAdmins.find(a => a.Username.toLowerCase() === trimmed.toLowerCase());
-      const role = found ? found.Role : (trimmed.toLowerCase().includes('admin') ? 'SuperAdmin' : 'User');
-      const dummyToken = 'mock_token_' + Date.now();
-      const session = { username: trimmed || 'Admin', role, token: dummyToken };
-      this.setSessionToken(dummyToken);
-      return { success: true, data: session };
-    }
-
-    const res = await this.callGas<{ username: string; role: 'SuperAdmin' | 'User'; token: string }>('login', {
-      username: username.trim(),
-      password: password.trim(),
-    }, 'POST');
-
-    if (res.success && res.data?.token) {
-      this.setSessionToken(res.data.token);
-    }
-    return res;
+    return this.callGas('login', { username, password }, 'POST');
   }
 
-  async logout(): Promise<ApiResponse<{ success: boolean }>> {
+  async logout(): Promise<ApiResponse<any>> {
     const token = this.sessionToken;
-    this.setSessionToken(null);
-    if (ApiConfig.isMockMode() || !token) {
-      return { success: true, data: { success: true } };
-    }
     return this.callGas('logout', { token }, 'POST');
   }
 
-  // ─── ADMIN USER MANAGEMENT (SuperAdmin only) ───
+  // ─── ADMIN USER MANAGEMENT (From Google Sheets) ───
 
   async getAdminUsers(forceRefresh: boolean = false): Promise<ApiResponse<AdminUser[]>> {
     const CACHE_KEY = 'admin_users_list';
@@ -814,12 +512,7 @@ class ApiService {
       if (cached.data) return { success: true, data: cached.data, isCached: true };
     }
 
-    if (ApiConfig.isMockMode()) {
-      await cache.set(CACHE_KEY, mockAdminUsers, CacheTTL.LISTS);
-      return { success: true, data: mockAdminUsers, isCached: false };
-    }
-
-    const res = await this.callGas<AdminUser[]>('getAdminUsers', {}, 'POST');
+    const res = await this.callGas<AdminUser[]>('getAdminUsers', {}, 'GET');
     if (res.success && res.data) {
       await cache.set(CACHE_KEY, res.data, CacheTTL.LISTS);
       return { success: true, data: res.data, isCached: false };
@@ -830,111 +523,37 @@ class ApiService {
       return { success: true, data: stale.data, isCached: true, isFallback: true };
     }
 
-    // Fallback: If cloud Web App deployment hasn't published getAdminUsers yet,
-    // gracefully supply default admin users so the UI remains operational
-    if (res.error?.includes('Unknown action') || !res.success) {
-      console.warn('[API] getAdminUsers fallback to local admin user list.');
-      await cache.set(CACHE_KEY, mockAdminUsers, CacheTTL.LISTS);
-      return { success: true, data: mockAdminUsers, isFallback: true };
-    }
-
     return res;
   }
 
   async addAdminUser(userData: { username: string; password: string; role: 'SuperAdmin' | 'User'; status?: string }): Promise<ApiResponse<AdminUser>> {
-    if (ApiConfig.isMockMode()) {
-      const newAdmin: AdminUser = {
-        AdminId: 'ADM-' + Math.floor(100 + Math.random() * 900),
-        Username: userData.username.trim(),
-        Role: userData.role,
-        Status: (userData.status as any) || 'Active',
-      };
-      mockAdminUsers.push(newAdmin);
-      await cache.set('admin_users_list', mockAdminUsers, CacheTTL.LISTS);
-      return { success: true, data: newAdmin };
-    }
-
     const res = await this.callGas<AdminUser>('addAdminUser', { userData }, 'POST');
     if (res.success) {
       await cache.invalidate('admin_users_list');
-      return res;
     }
-
-    // If cloud backend returned unknown action, update local fallback
-    if (res.error?.includes('Unknown action')) {
-      const newAdmin: AdminUser = {
-        AdminId: 'ADM-' + Math.floor(100 + Math.random() * 900),
-        Username: userData.username.trim(),
-        Role: userData.role,
-        Status: (userData.status as any) || 'Active',
-      };
-      mockAdminUsers.push(newAdmin);
-      await cache.set('admin_users_list', mockAdminUsers, CacheTTL.LISTS);
-      return { success: true, data: newAdmin };
-    }
-
     return res;
   }
 
   async updateAdminUser(adminId: string, updateData: { role?: string; status?: string; password?: string }): Promise<ApiResponse<string>> {
-    if (ApiConfig.isMockMode()) {
-      const idx = mockAdminUsers.findIndex(a => a.AdminId === adminId);
-      if (idx !== -1) {
-        if (updateData.role) mockAdminUsers[idx].Role = updateData.role as any;
-        if (updateData.status) mockAdminUsers[idx].Status = updateData.status as any;
-        await cache.set('admin_users_list', mockAdminUsers, CacheTTL.LISTS);
-      }
-      return { success: true, data: "Admin user updated." };
-    }
-
-    const res = await this.callGas<string>('updateAdminUser', { adminId, updateData }, 'POST');
+    const res = await this.callGas<string>('updateAdminUser', { adminId, updateData, ...updateData }, 'POST');
     if (res.success) {
       await cache.invalidate('admin_users_list');
-      return res;
     }
-
-    if (res.error?.includes('Unknown action')) {
-      const idx = mockAdminUsers.findIndex(a => a.AdminId === adminId);
-      if (idx !== -1) {
-        if (updateData.role) mockAdminUsers[idx].Role = updateData.role as any;
-        if (updateData.status) mockAdminUsers[idx].Status = updateData.status as any;
-        await cache.set('admin_users_list', mockAdminUsers, CacheTTL.LISTS);
-      }
-      return { success: true, data: "Admin user updated (local sync)." };
-    }
-
     return res;
   }
 
-  async deleteAdminLoginUser(adminId: string): Promise<ApiResponse<string>> {
-    if (ApiConfig.isMockMode()) {
-      const idx = mockAdminUsers.findIndex(a => a.AdminId === adminId);
-      if (idx !== -1) {
-        mockAdminUsers.splice(idx, 1);
-        await cache.set('admin_users_list', mockAdminUsers, CacheTTL.LISTS);
-      }
-      return { success: true, data: "Admin user deleted." };
-    }
+  async changePassword(newPassword: string, oldPassword?: string): Promise<ApiResponse<string>> {
+    return this.callGas<string>('changePassword', { newPassword, oldPassword }, 'POST');
+  }
 
+  async deleteAdminLoginUser(adminId: string): Promise<ApiResponse<string>> {
     const res = await this.callGas<string>('deleteAdminLoginUser', { adminId }, 'POST');
     if (res.success) {
       await cache.invalidate('admin_users_list');
-      return res;
     }
-
-    if (res.error?.includes('Unknown action')) {
-      const idx = mockAdminUsers.findIndex(a => a.AdminId === adminId);
-      if (idx !== -1) {
-        mockAdminUsers.splice(idx, 1);
-        await cache.set('admin_users_list', mockAdminUsers, CacheTTL.LISTS);
-      }
-      return { success: true, data: "Admin user deleted (local sync)." };
-    }
-
     return res;
   }
 }
 
 export const api = new ApiService();
 api.getDriveImageUrl = getDriveDirectImageUrl;
-

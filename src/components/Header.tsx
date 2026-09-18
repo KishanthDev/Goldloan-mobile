@@ -2,7 +2,6 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
-import { ApiConfig } from '../config/api';
 import { ThemeToggleBtn } from './ThemeToggleBtn';
 
 interface HeaderProps {
@@ -19,7 +18,6 @@ export const Header: React.FC<HeaderProps> = ({
   isRefreshing,
 }) => {
   const { colors, isDark } = useTheme();
-  const isMock = ApiConfig.isMockMode();
 
   return (
     <View style={[styles.container, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
@@ -29,10 +27,10 @@ export const Header: React.FC<HeaderProps> = ({
       </View>
 
       <View style={styles.rightGroup}>
-        <View style={[styles.statusTag, isMock ? (isDark ? styles.mockTagDark : styles.mockTag) : (isDark ? styles.liveTagDark : styles.liveTag)]}>
-          <View style={[styles.statusDot, isMock ? styles.mockDot : styles.liveDot]} />
-          <Text style={[styles.statusText, isMock ? (isDark ? styles.mockTextDark : styles.mockText) : (isDark ? styles.liveTextDark : styles.liveText)]}>
-            {isMock ? 'Demo' : 'Live'}
+        <View style={[styles.statusTag, isDark ? styles.liveTagDark : styles.liveTag]}>
+          <View style={[styles.statusDot, styles.liveDot]} />
+          <Text style={[styles.statusText, isDark ? styles.liveTextDark : styles.liveText]}>
+            Live
           </Text>
         </View>
 
@@ -91,12 +89,6 @@ const styles = StyleSheet.create({
     borderRadius: 9999,
     gap: 5,
   },
-  mockTag: {
-    backgroundColor: '#fef3c7',
-  },
-  mockTagDark: {
-    backgroundColor: '#3d2605',
-  },
   liveTag: {
     backgroundColor: '#dcfce7',
   },
@@ -108,21 +100,12 @@ const styles = StyleSheet.create({
     height: 6,
     borderRadius: 3,
   },
-  mockDot: {
-    backgroundColor: '#d97706',
-  },
   liveDot: {
     backgroundColor: '#16a34a',
   },
   statusText: {
     fontSize: 11,
     fontWeight: '600',
-  },
-  mockText: {
-    color: '#92400e',
-  },
-  mockTextDark: {
-    color: '#fbbf24',
   },
   liveText: {
     color: '#166534',

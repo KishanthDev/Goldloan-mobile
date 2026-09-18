@@ -123,10 +123,10 @@ export function DataTable<T>({
     return columns.reduce((acc, col) => acc + (col.width || 120), 0);
   }, [columns]);
 
-  // Available desktop width: prioritize wrapperWidth, fallback to screenWidth estimate
+  // Available container width
   const effectiveContainerWidth = useMemo(() => {
-    return Math.max(wrapperWidth, screenWidth >= 768 ? screenWidth - 280 : 0);
-  }, [wrapperWidth, screenWidth]);
+    return wrapperWidth > 0 ? wrapperWidth : (screenWidth >= 768 ? Math.max(0, screenWidth - 280) : totalBaseWidth);
+  }, [wrapperWidth, screenWidth, totalBaseWidth]);
 
   // Scaled column widths: if container is wider than totalBaseWidth, stretch columns to 100% full width
   const effectiveColWidths = useMemo(() => {
@@ -406,13 +406,13 @@ export function DataTable<T>({
           >
             <View style={{ width: '100%', minWidth: tableContentWidth, flex: 1 }}>
             {/* Header Row */}
-            <View style={[styles.headerRow, { width: '100%', minWidth: tableContentWidth }]}>
+            <View style={[styles.headerRow, { width: tableContentWidth, minWidth: '100%' }]}>
               {columns.map((col, idx) => (
                 <View 
                   key={`${col.key}_${idx}`} 
                   style={[
                     styles.th, 
-                    { width: effectiveColWidths[idx], flex: col.width || 120, minWidth: col.width || 80 },
+                    { width: effectiveColWidths[idx] },
                     col.align === 'center' && { alignItems: 'center' },
                     col.align === 'right' && { alignItems: 'flex-end' },
                   ]}
@@ -428,14 +428,14 @@ export function DataTable<T>({
               Array.from({ length: 5 }).map((_, rIdx) => (
                 <View 
                   key={`skeleton_${rIdx}`} 
-                  style={[styles.tr, rIdx % 2 !== 0 && styles.trAlt, { width: '100%', minWidth: tableContentWidth }]}
+                  style={[styles.tr, rIdx % 2 !== 0 && styles.trAlt, { width: tableContentWidth, minWidth: '100%' }]}
                 >
                   {columns.map((col, cIdx) => (
                     <View 
                       key={`skel_${cIdx}`} 
                       style={[
                         styles.td, 
-                        { width: effectiveColWidths[cIdx], flex: col.width || 120, minWidth: col.width || 80 },
+                        { width: effectiveColWidths[cIdx] },
                         col.align === 'center' && { alignItems: 'center', justifyContent: 'center' },
                         col.align === 'right' && { alignItems: 'flex-end', justifyContent: 'center' },
                       ]}
@@ -446,7 +446,7 @@ export function DataTable<T>({
                 </View>
               ))
             ) : pageData.length === 0 ? (
-              <View style={[styles.emptyRow, { width: '100%', minWidth: tableContentWidth }]}>
+              <View style={[styles.emptyRow, { width: tableContentWidth, minWidth: '100%' }]}>
                 <Text style={styles.emptyText}>No records found.</Text>
               </View>
             ) : (
@@ -458,7 +458,7 @@ export function DataTable<T>({
                     style={[
                       styles.tr, 
                       !isEven && styles.trAlt,
-                      { width: '100%', minWidth: tableContentWidth }
+                      { width: tableContentWidth, minWidth: '100%' }
                     ]}
                   >
                     {columns.map((col, idx) => (
@@ -466,7 +466,7 @@ export function DataTable<T>({
                         key={`${col.key}_${idx}`} 
                         style={[
                           styles.td, 
-                          { width: effectiveColWidths[idx], flex: col.width || 120, minWidth: col.width || 80 },
+                          { width: effectiveColWidths[idx] },
                           col.align === 'center' && { alignItems: 'center', justifyContent: 'center' },
                           col.align === 'right' && { alignItems: 'flex-end', justifyContent: 'center' },
                         ]}

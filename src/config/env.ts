@@ -15,8 +15,6 @@ export const Env = {
     process.env.EXPO_PUBLIC_SPREADSHEET_ID ||
     "1q8JGANWFJ2NEcbW1ZOFOsUC4W5Ppci_cGXJf8nN-1kk",
 
-  FORCE_MOCK_MODE: process.env.EXPO_PUBLIC_FORCE_MOCK_MODE === 'true',
-
   // Branding & Regional
   APP_NAME: process.env.EXPO_PUBLIC_APP_NAME || "Gold Loan Tracker",
   APP_SUBTITLE: process.env.EXPO_PUBLIC_APP_SUBTITLE || "Bangalore Gold Valuation System",

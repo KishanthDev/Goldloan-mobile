@@ -131,20 +131,26 @@ export default function AdminUsersTabScreen() {
       return;
     }
 
+    if (isEditing && !isSuperAdmin && !trimmedPass) {
+      setModalError('Please enter a new password.');
+      return;
+    }
+
     setModalSubmitting(true);
     try {
       if (isEditing && selectedAdminId) {
-        const updatePayload: { role?: string; status?: string; password?: string } = {
-          role: formRole,
-          status: formStatus,
-        };
+        const updatePayload: { role?: string; status?: string; password?: string } = {};
+        if (isSuperAdmin) {
+          updatePayload.role = formRole;
+          updatePayload.status = formStatus;
+        }
         if (trimmedPass) {
           updatePayload.password = trimmedPass;
         }
 
         const res = await api.updateAdminUser(selectedAdminId, updatePayload);
         if (res.success) {
-          toast.success(`User '${trimmedUser}' updated successfully.`);
+          toast.success(trimmedPass ? `Password updated successfully for '${trimmedUser}'.` : `User '${trimmedUser}' updated successfully.`);
           setModalVisible(false);
           await loadUsers(true);
         } else {
@@ -202,7 +208,7 @@ export default function AdminUsersTabScreen() {
   };
 
   // Columns for Desktop DataTable
-  const baseColumns: Column<AdminUser>[] = [
+  const columns: Column<AdminUser>[] = [
     {
       title: 'Admin ID',
       key: 'AdminId',
@@ -274,10 +280,6 @@ export default function AdminUsersTabScreen() {
         />
       ),
     },
-  ];
-
-  const columns: Column<AdminUser>[] = isSuperAdmin ? [
-    ...baseColumns,
     {
       title: 'Actions',
       key: 'Actions',
@@ -285,17 +287,26 @@ export default function AdminUsersTabScreen() {
       align: 'center',
       render: (item) => {
         const isSelf = item.Username.toLowerCase() === (currentUser?.username || '').toLowerCase();
+        const canEdit = isSuperAdmin || isSelf;
+        const canDelete = isSuperAdmin && !isSelf;
+
+        if (!canEdit && !canDelete) {
+          return <Text style={{ fontSize: 11, color: colors.textMuted }}>—</Text>;
+        }
+
         return (
           <View style={styles.actionBtnRow}>
-            <TouchableOpacity
-              style={[styles.iconActionBtn, { backgroundColor: isDark ? 'rgba(37, 99, 235, 0.2)' : '#eff6ff' }]}
-              onPress={() => openEditModal(item)}
-              accessibilityLabel="Edit User"
-            >
-              <Ionicons name="pencil" size={14} color={isDark ? '#60a5fa' : '#2563eb'} />
-            </TouchableOpacity>
+            {canEdit && (
+              <TouchableOpacity
+                style={[styles.iconActionBtn, { backgroundColor: isDark ? 'rgba(37, 99, 235, 0.2)' : '#eff6ff' }]}
+                onPress={() => openEditModal(item)}
+                accessibilityLabel={isSelf ? "Change Password" : "Edit User"}
+              >
+                <Ionicons name="pencil" size={14} color={isDark ? '#60a5fa' : '#2563eb'} />
+              </TouchableOpacity>
+            )}
 
-            {!isSelf ? (
+            {canDelete ? (
               <TouchableOpacity
                 style={[styles.iconActionBtn, { backgroundColor: isDark ? 'rgba(220, 38, 38, 0.2)' : '#fef2f2' }]}
                 onPress={() => handleDeletePress(item)}
@@ -308,7 +319,7 @@ export default function AdminUsersTabScreen() {
         );
       },
     },
-  ] : baseColumns;
+  ];
 
   return (
     <View style={styles.safeArea}>
@@ -341,12 +352,12 @@ export default function AdminUsersTabScreen() {
           />
         </View>
 
-        {/* Read-Only Notice for staff users */}
+        {/* Notice for staff users */}
         {!isSuperAdmin && (
           <View style={styles.readOnlyBanner}>
             <Ionicons name="information-circle-outline" size={18} color={isDark ? '#fbbf24' : '#b45309'} style={{ marginRight: 8 }} />
             <Text style={styles.readOnlyBannerText}>
-              Staff Directory (View-Only): You are viewing staff login accounts in read-only mode. Adding new users or editing credentials requires SuperAdmin privileges.
+              Staff Directory: You are viewing staff accounts. You can edit and update your own account password by clicking the edit icon on your row. Adding new users or changing roles requires SuperAdmin privileges.
             </Text>
           </View>
         )}
@@ -372,10 +383,11 @@ export default function AdminUsersTabScreen() {
           renderMobileCard={(item) => {
             const isSuper = item.Role === 'SuperAdmin';
             const isSelf = item.Username.toLowerCase() === (currentUser?.username || '').toLowerCase();
+            const canEdit = isSuperAdmin || isSelf;
 
             return (
               <MobileCard
-                onPress={isSuperAdmin ? () => openEditModal(item) : undefined}
+                onPress={canEdit ? () => openEditModal(item) : undefined}
                 identifier={`#${item.AdminId}`}
                 badges={
                   <View style={{ flexDirection: 'row', gap: 6 }}>
@@ -416,15 +428,15 @@ export default function AdminUsersTabScreen() {
                     value: isSelf ? 'Current Active User' : 'Staff Login',
                   },
                 ]}
-                viewLabel={isSuperAdmin ? "Edit user" : undefined}
-                onViewPress={isSuperAdmin ? () => openEditModal(item) : undefined}
-                menuActions={isSuperAdmin ? [
+                viewLabel={canEdit ? (isSelf && !isSuperAdmin ? "Change Password" : "Edit user") : undefined}
+                onViewPress={canEdit ? () => openEditModal(item) : undefined}
+                menuActions={canEdit ? [
                   {
-                    label: 'Edit / Reset Password',
+                    label: isSelf && !isSuperAdmin ? 'Change Password' : 'Edit / Reset Password',
                     icon: 'pencil-outline' as const,
                     onPress: () => openEditModal(item),
                   },
-                  ...(!isSelf
+                  ...(isSuperAdmin && !isSelf
                     ? [
                         {
                           label: 'Delete Account',
@@ -447,7 +459,7 @@ export default function AdminUsersTabScreen() {
           <View style={styles.modalBox}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>
-                {isEditing ? `Edit User (${formUsername})` : 'Add New Admin / User'}
+                {isEditing ? (isSuperAdmin ? `Edit User (${formUsername})` : `Change Password (${formUsername})`) : 'Add New Admin / User'}
               </Text>
               <TouchableOpacity onPress={() => setModalVisible(false)} style={styles.modalCloseBtn}>
                 <Ionicons name="close" size={20} color={colors.textSecondary} />
@@ -483,11 +495,11 @@ export default function AdminUsersTabScreen() {
               {/* Password field */}
               <View style={styles.formGroup}>
                 <Text style={styles.label}>
-                  {isEditing ? 'New Password (Optional)' : 'Password *'}
+                  {isEditing ? (isSuperAdmin ? 'New Password (Optional)' : 'New Password *') : 'Password *'}
                 </Text>
                 <TextInput
                   style={styles.input}
-                  placeholder={isEditing ? 'Leave blank to keep existing password' : 'Enter password'}
+                  placeholder={isEditing ? (isSuperAdmin ? 'Leave blank to keep existing password' : 'Enter your new password') : 'Enter password'}
                   placeholderTextColor={colors.placeholder}
                   value={formPassword}
                   onChangeText={setFormPassword}
@@ -496,80 +508,100 @@ export default function AdminUsersTabScreen() {
                   editable={!modalSubmitting}
                 />
                 {isEditing ? (
-                  <Text style={styles.helperText}>Only enter a password if resetting it.</Text>
+                  <Text style={styles.helperText}>
+                    {isSuperAdmin ? 'Only enter a password if resetting it.' : 'Enter your new password and click Save to update.'}
+                  </Text>
                 ) : null}
               </View>
 
-              {/* Role Selection */}
-              <View style={styles.formGroup}>
-                <Text style={styles.label}>Account Role & Access Level *</Text>
-                <View style={styles.rolePickerRow}>
-                  <TouchableOpacity
-                    style={[
-                      styles.roleChoiceCard,
-                      formRole === 'User' && styles.roleChoiceCardSelected,
-                    ]}
-                    onPress={() => setFormRole('User')}
-                    activeOpacity={0.7}
-                  >
-                    <View style={styles.choiceHeader}>
-                      <Ionicons
-                        name="eye"
-                        size={18}
-                        color={formRole === 'User' ? (isDark ? '#fbbf24' : '#b45309') : colors.textMuted}
-                      />
-                      <Text style={[styles.choiceTitle, formRole === 'User' && styles.choiceTitleSelected]}>
-                        User
-                      </Text>
-                    </View>
-                    <Text style={styles.choiceDesc}>
-                      Read-only. Can inspect loans, customers & vault, but cannot create, edit, or delete records.
-                    </Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={[
-                      styles.roleChoiceCard,
-                      formRole === 'SuperAdmin' && styles.roleChoiceCardSelected,
-                    ]}
-                    onPress={() => setFormRole('SuperAdmin')}
-                    activeOpacity={0.7}
-                  >
-                    <View style={styles.choiceHeader}>
-                      <Ionicons
-                        name="shield-checkmark"
-                        size={18}
-                        color={formRole === 'SuperAdmin' ? (isDark ? '#34d399' : '#059669') : colors.textMuted}
-                      />
-                      <Text style={[styles.choiceTitle, formRole === 'SuperAdmin' && styles.choiceTitleSelected]}>
-                        SuperAdmin
-                      </Text>
-                    </View>
-                    <Text style={styles.choiceDesc}>
-                      Full administrative access. Can perform all mutations, disbursements, loan settlements & manage users.
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-
-              {/* Status Picker */}
-              <View style={styles.formGroup}>
-                <Text style={styles.label}>Status</Text>
-                <View style={styles.statusToggleRow}>
-                  {(['Active', 'Inactive'] as const).map((s) => (
+              {/* Role Selection (Visible/Editable for SuperAdmin, Read-only badge for regular user) */}
+              {isSuperAdmin ? (
+                <View style={styles.formGroup}>
+                  <Text style={styles.label}>Account Role & Access Level *</Text>
+                  <View style={styles.rolePickerRow}>
                     <TouchableOpacity
-                      key={s}
-                      style={[styles.statusToggleBtn, formStatus === s && styles.statusToggleBtnActive]}
-                      onPress={() => setFormStatus(s)}
+                      style={[
+                        styles.roleChoiceCard,
+                        formRole === 'User' && styles.roleChoiceCardSelected,
+                      ]}
+                      onPress={() => setFormRole('User')}
                       activeOpacity={0.7}
                     >
-                      <Text style={[styles.statusToggleText, formStatus === s && styles.statusToggleTextActive]}>
-                        {s}
+                      <View style={styles.choiceHeader}>
+                        <Ionicons
+                          name="eye"
+                          size={18}
+                          color={formRole === 'User' ? (isDark ? '#fbbf24' : '#b45309') : colors.textMuted}
+                        />
+                        <Text style={[styles.choiceTitle, formRole === 'User' && styles.choiceTitleSelected]}>
+                          User
+                        </Text>
+                      </View>
+                      <Text style={styles.choiceDesc}>
+                        Read-only. Can inspect loans, customers & vault, but cannot create, edit, or delete records.
                       </Text>
                     </TouchableOpacity>
-                  ))}
+
+                    <TouchableOpacity
+                      style={[
+                        styles.roleChoiceCard,
+                        formRole === 'SuperAdmin' && styles.roleChoiceCardSelected,
+                      ]}
+                      onPress={() => setFormRole('SuperAdmin')}
+                      activeOpacity={0.7}
+                    >
+                      <View style={styles.choiceHeader}>
+                        <Ionicons
+                          name="shield-checkmark"
+                          size={18}
+                          color={formRole === 'SuperAdmin' ? (isDark ? '#34d399' : '#059669') : colors.textMuted}
+                        />
+                        <Text style={[styles.choiceTitle, formRole === 'SuperAdmin' && styles.choiceTitleSelected]}>
+                          SuperAdmin
+                        </Text>
+                      </View>
+                      <Text style={styles.choiceDesc}>
+                        Full administrative access. Can perform all mutations, disbursements, loan settlements & manage users.
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
-              </View>
+              ) : (
+                <View style={styles.formGroup}>
+                  <Text style={styles.label}>Assigned Role</Text>
+                  <View style={[styles.roleCellBadge, formRole === 'SuperAdmin' ? styles.roleCellSuper : styles.roleCellUser, { marginTop: 4 }]}>
+                    <Ionicons
+                      name={formRole === 'SuperAdmin' ? 'shield-checkmark' : 'eye'}
+                      size={12}
+                      color={formRole === 'SuperAdmin' ? (isDark ? '#34d399' : '#059669') : (isDark ? '#fbbf24' : '#b45309')}
+                    />
+                    <Text style={[styles.roleCellText, formRole === 'SuperAdmin' ? styles.roleTextSuper : styles.roleTextUser]}>
+                      {formRole} (Role changes must be made by a SuperAdmin)
+                    </Text>
+                  </View>
+                </View>
+              )}
+
+              {/* Status Picker (Only SuperAdmin can change status) */}
+              {isSuperAdmin ? (
+                <View style={styles.formGroup}>
+                  <Text style={styles.label}>Status</Text>
+                  <View style={styles.statusToggleRow}>
+                    {(['Active', 'Inactive'] as const).map((s) => (
+                      <TouchableOpacity
+                        key={s}
+                        style={[styles.statusToggleBtn, formStatus === s && styles.statusToggleBtnActive]}
+                        onPress={() => setFormStatus(s)}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={[styles.statusToggleText, formStatus === s && styles.statusToggleTextActive]}>
+                          {s}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+              ) : null}
             </ScrollView>
 
             {/* Modal Actions */}
@@ -590,7 +622,7 @@ export default function AdminUsersTabScreen() {
                 {modalSubmitting ? (
                   <ActivityIndicator size="small" color="#ffffff" />
                 ) : (
-                  <Text style={styles.submitBtnText}>{isEditing ? 'Save Changes' : 'Create User'}</Text>
+                  <Text style={styles.submitBtnText}>{isEditing ? (isSuperAdmin ? 'Save Changes' : 'Update Password') : 'Create User'}</Text>
                 )}
               </TouchableOpacity>
             </View>

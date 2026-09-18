@@ -35,8 +35,6 @@ export default function LoginScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const isMock = ApiConfig.isMockMode();
-
   const handleLogin = async () => {
     setErrorMessage(null);
     const trimmedUser = username.trim();
@@ -86,12 +84,9 @@ export default function LoginScreen() {
             <Text style={styles.appName}>{Env.APP_NAME}</Text>
             <Text style={styles.appSub}>{Env.APP_SUBTITLE}</Text>
 
-            {/* Live / Demo Mode indicator */}
-            <View style={[styles.modeBadge, isMock ? styles.modeBadgeDemo : styles.modeBadgeLive]}>
-              <View style={[styles.modeDot, isMock ? styles.modeDotDemo : styles.modeDotLive]} />
-              <Text style={[styles.modeText, isMock ? styles.modeTextDemo : styles.modeTextLive]}>
-                {isMock ? 'Demo Mode' : 'Live Cloud Server'}
-              </Text>
+            <View style={styles.modeBadge}>
+              <View style={styles.modeDot} />
+              <Text style={styles.modeText}>Live Cloud Server</Text>
             </View>
           </View>
 
@@ -173,15 +168,6 @@ export default function LoginScreen() {
               )}
             </TouchableOpacity>
 
-            {/* Demo Credentials Helper */}
-            {isMock && (
-              <View style={styles.demoHelper}>
-                <Ionicons name="information-circle-outline" size={15} color={colors.primaryDark} style={{ marginRight: 6 }} />
-                <Text style={styles.demoHelperText}>
-                  Try <Text style={{ fontWeight: '700' }}>admin</Text> (SuperAdmin) or <Text style={{ fontWeight: '700' }}>staff</Text> (Read-only)
-                </Text>
-              </View>
-            )}
 
             {/* Security Footer Note */}
             <View style={styles.securityNote}>

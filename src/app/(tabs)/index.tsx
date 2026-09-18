@@ -8,7 +8,6 @@ import { useRouter } from 'expo-router';
 import { Colors, ThemeColors } from '../../constants/theme';
 import { useTheme } from '../../context/ThemeContext';
 import { useAppStore } from '../../services/store';
-import { ApiConfig } from '../../config/api';
 import { Env } from '../../config/env';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
@@ -47,7 +46,6 @@ export default function DashboardScreen() {
     setRefreshing(false);
   };
 
-  const isLive = !ApiConfig.isMockMode();
   const utilPercent = dash.totalEligibleLoanAmount > 0 
     ? Math.min(100, Math.round((dash.totalLoanAmount / dash.totalEligibleLoanAmount) * 100)) 
     : 0;
