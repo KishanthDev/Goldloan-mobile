@@ -7,13 +7,8 @@
 
 export const Env = {
   // Google Apps Script & Google Sheets
-  GAS_API_URL:
-    process.env.EXPO_PUBLIC_GAS_API_URL ||
-    "https://script.google.com/macros/s/AKfycbwddMXiZSOzm8ELoiX8PUpRzQJ3bXP8xtJyyN9_BLGESYDJJD_uR__yFDvVJkiAuwsg/exec",
-  
-  SPREADSHEET_ID:
-    process.env.EXPO_PUBLIC_SPREADSHEET_ID ||
-    "1q8JGANWFJ2NEcbW1ZOFOsUC4W5Ppci_cGXJf8nN-1kk",
+  GAS_API_URL: process.env.EXPO_PUBLIC_GAS_API_URL || "",
+  SPREADSHEET_ID: process.env.EXPO_PUBLIC_SPREADSHEET_ID || "",
 
   // Branding & Regional
   APP_NAME: process.env.EXPO_PUBLIC_APP_NAME || "Goldora",
