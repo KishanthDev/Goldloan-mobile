@@ -1,5 +1,5 @@
 /**
- * Gold Loan Tracker - Google Apps Script Backend (REST API + Web App)
+ * Goldora - Google Apps Script Backend (REST API + Web App)
  * 
  * Features:
  * - Google Sheets as the relational database
@@ -36,7 +36,7 @@ function doGet(e) {
   // Fallback: Check if index.html exists, otherwise return JSON status
   try {
     return HtmlService.createHtmlOutputFromFile("index")
-      .setTitle("Gold Loan Tracker")
+      .setTitle("Goldora")
       .addMetaTag('viewport', 'width=device-width, initial-scale=1')
       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
   } catch (err) {

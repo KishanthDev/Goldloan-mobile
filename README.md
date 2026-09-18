@@ -1,4 +1,4 @@
-# 🪙 Gold Loan Tracker - Mobile App (Expo & React Native)
+# 🪙 Goldora - Mobile App (Expo & React Native)
 
 A cross-platform mobile application for tracking and managing Gold Loans, built with **Expo (React Native)** on the frontend and backed by **Google Sheets** (database) and **Google Drive** (file & photo storage) via a **Google Apps Script REST API** with multi-tier caching.
 

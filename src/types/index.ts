@@ -1,4 +1,4 @@
-// Data models for the Gold Loan Tracker application
+// Data models for the Goldora application
 
 export interface User {
   UserId: string;

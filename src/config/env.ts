@@ -16,7 +16,7 @@ export const Env = {
     "1q8JGANWFJ2NEcbW1ZOFOsUC4W5Ppci_cGXJf8nN-1kk",
 
   // Branding & Regional
-  APP_NAME: process.env.EXPO_PUBLIC_APP_NAME || "Gold Loan Tracker",
+  APP_NAME: process.env.EXPO_PUBLIC_APP_NAME || "Goldora",
   APP_SUBTITLE: process.env.EXPO_PUBLIC_APP_SUBTITLE || "Bangalore Gold Valuation System",
   LOCATION_BENCHMARK: process.env.EXPO_PUBLIC_LOCATION_BENCHMARK || "Bangalore",
 

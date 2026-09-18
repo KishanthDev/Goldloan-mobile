@@ -1,4 +1,4 @@
-// Theme constants for Gold Loan Tracker app
+// Theme constants for Goldora app
 
 export interface ThemeColors {
   // Brand Gold & Amber
