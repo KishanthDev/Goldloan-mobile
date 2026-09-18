@@ -333,19 +333,19 @@ export default function AdminUsersTabScreen() {
         {/* KPI Stat Cards */}
         <View style={styles.kpiRow}>
           <StatCard
-            title="Total Admin Accounts"
+            title={isDesktop ? "Total Admin Accounts" : "Total Admins"}
             value={totalCount}
             iconName="people"
             accentColor={isDark ? '#fbbf24' : colors.primaryDark}
           />
           <StatCard
-            title="SuperAdmin (Full Access)"
+            title={isDesktop ? "SuperAdmin (Full Access)" : "SuperAdmin"}
             value={superAdminCount}
             iconName="shield-checkmark"
             accentColor={colors.success}
           />
           <StatCard
-            title="View-Only Users"
+            title={isDesktop ? "View-Only Users" : "View-Only"}
             value={userRoleCount}
             iconName="eye"
             accentColor={colors.primary}
@@ -655,8 +655,8 @@ const getStyles = (colors: ThemeColors, isDark: boolean, isDesktop: boolean) =>
       flex: 1,
     },
     content: {
-      padding: isDesktop ? 24 : 16,
-      gap: 16,
+      padding: isDesktop ? 24 : 12,
+      gap: isDesktop ? 16 : 10,
     },
     readOnlyBanner: {
       flexDirection: 'row',
@@ -667,17 +667,18 @@ const getStyles = (colors: ThemeColors, isDark: boolean, isDesktop: boolean) =>
       borderRadius: 12,
       paddingHorizontal: 14,
       paddingVertical: 10,
-      marginBottom: 4,
+      marginBottom: 2,
     },
     readOnlyBannerText: {
-      fontSize: 13,
+      fontSize: 12.5,
       color: isDark ? '#fbbf24' : '#92400e',
       flex: 1,
-      lineHeight: 18,
+      lineHeight: 17,
     },
     kpiRow: {
-      flexDirection: isDesktop ? 'row' : 'column',
-      gap: 12,
+      flexDirection: 'row',
+      gap: isDesktop ? 12 : 8,
+      width: '100%',
     },
     idText: {
       fontSize: 12,
