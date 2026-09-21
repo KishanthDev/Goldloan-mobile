@@ -736,7 +736,7 @@ const getStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
   },
   content: {
     padding: 16,
-    paddingBottom: 80,
+    paddingBottom: 20,
     width: '100%',
   },
   contentDesktop: {

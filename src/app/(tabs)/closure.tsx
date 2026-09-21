@@ -493,7 +493,7 @@ const getStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
   },
   content: {
     padding: 12,
-    paddingBottom: 80,
+    paddingBottom: 20,
   },
   infoBanner: {
     flexDirection: 'row',

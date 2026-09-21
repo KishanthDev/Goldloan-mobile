@@ -2,10 +2,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  BackHandler,
   Modal,
   Platform, RefreshControl,
   SafeAreaView,
@@ -220,6 +221,36 @@ export default function OrnamentsScreen() {
     else setViewMode(selectedOrn ? 'details' : 'list');
   };
 
+  // Intercept phone back gesture / Android hardware back button
+  useEffect(() => {
+    const onBackPress = () => {
+      if (pickerModal.visible) {
+        setPickerModal(prev => ({ ...prev, visible: false }));
+        return true;
+      }
+      if (detailMenuVisible) {
+        setDetailMenuVisible(false);
+        return true;
+      }
+      if (deleteModalVisible) {
+        setDeleteModalVisible(false);
+        return true;
+      }
+      if (viewMode === 'add' || viewMode === 'edit') {
+        handleBackStep();
+        return true;
+      }
+      if (viewMode === 'details') {
+        setViewMode('list');
+        return true;
+      }
+      return false; // In list view: let system go back naturally
+    };
+
+    const backSubscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+    return () => backSubscription.remove();
+  }, [viewMode, wizardStep, pickerModal.visible, detailMenuVisible, deleteModalVisible, selectedOrn]);
+
   const handlePickFormImage = async () => {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
@@ -301,9 +332,6 @@ export default function OrnamentsScreen() {
     setPickerModal(p => ({ ...p, visible: false }));
   };
 
-  // Safe bottom inset to prevent overlapping mobile bottom navigation bar
-  const safeBottomPadding = Math.max(insets.bottom, 16) + 76;
-
   // ══════════════════════════════════════════════════════════
   // VIEW: DETAILS SCREEN MATCHING Ornaments details.pdf
   // ══════════════════════════════════════════════════════════
@@ -379,7 +407,7 @@ export default function OrnamentsScreen() {
 
         <ScrollView 
           style={styles.scrollContainer} 
-          contentContainerStyle={[styles.content, { paddingBottom: safeBottomPadding }]}
+          contentContainerStyle={styles.content}
         >
           {/* Gallery Section */}
           {detailImages.length > 0 ? (
@@ -745,7 +773,7 @@ export default function OrnamentsScreen() {
 
         <ScrollView 
           style={styles.scrollContainer} 
-          contentContainerStyle={[styles.content, { paddingBottom: safeBottomPadding }]}
+          contentContainerStyle={styles.content}
         >
           {/* STEP 1: Basic Details */}
           {wizardStep === 1 && (
@@ -1172,7 +1200,7 @@ export default function OrnamentsScreen() {
     <SafeAreaView style={styles.safeArea}>
       <ScrollView 
         style={styles.container} 
-        contentContainerStyle={[styles.content, { paddingBottom: safeBottomPadding + 20 }]}
+        contentContainerStyle={styles.content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#0284c7']} />}
       >
         {/* Header Row */}
@@ -1351,7 +1379,7 @@ export default function OrnamentsScreen() {
 
       {/* Floating Action Button (+) */}
       <TouchableOpacity 
-        style={[styles.fabBtn, { bottom: Math.max(insets.bottom, 16) + 16 }]} 
+        style={[styles.fabBtn, { bottom: 20 }]} 
         onPress={handleAddPress}
         activeOpacity={0.85}
         accessibilityLabel="Add ornament"
@@ -1380,6 +1408,7 @@ const getStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
   content: {
     paddingHorizontal: 16,
     paddingTop: 16,
+    paddingBottom: 20,
     maxWidth: 680,
     width: '100%',
     alignSelf: 'center',
