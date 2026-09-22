@@ -2,12 +2,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   BackHandler,
-  Modal,
   Platform, RefreshControl,
   SafeAreaView,
   ScrollView,
@@ -17,10 +16,10 @@ import {
   TouchableOpacity,
   View
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ConfirmModal } from '../../components/ConfirmModal';
 import { CustomerPickerModal } from '../../components/ornaments/CustomerPickerModal';
 import { OptionPickerModal } from '../../components/ornaments/OptionPickerModal';
+import { OrnamentOptionsMenu, OrnamentOptionsMenuHandle } from '../../components/ornaments/OrnamentOptionsMenu';
 import { OrnamentStatusBadge } from '../../components/ornaments/OrnamentStatusBadge';
 import { ThemeColors } from '../../constants/theme';
 import { useAuth } from '../../context/AuthContext';
@@ -39,7 +38,6 @@ export default function OrnamentsScreen() {
   const styles = getStyles(colors, isDark);
   const store = useAppStore();
   const toast = useToast();
-  const insets = useSafeAreaInsets();
   const { isSuperAdmin } = useAuth();
   const users = store.users;
 
@@ -54,7 +52,7 @@ export default function OrnamentsScreen() {
 
   // Details State
   const [activePhotoIdx, setActivePhotoIdx] = useState(0);
-  const [detailMenuVisible, setDetailMenuVisible] = useState(false);
+  const optionsMenuRef = useRef<OrnamentOptionsMenuHandle>(null);
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
 
   // Add / Edit Wizard State
@@ -264,8 +262,8 @@ export default function OrnamentsScreen() {
         setPickerModal(prev => ({ ...prev, visible: false }));
         return true;
       }
-      if (detailMenuVisible) {
-        setDetailMenuVisible(false);
+      if (optionsMenuRef.current?.isOpen()) {
+        optionsMenuRef.current.close();
         return true;
       }
       if (deleteModalVisible) {
@@ -285,7 +283,7 @@ export default function OrnamentsScreen() {
 
     const backSubscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
     return () => backSubscription.remove();
-  }, [viewMode, wizardStep, pickerModal.visible, detailMenuVisible, deleteModalVisible, customerModalVisible, selectedOrn]);
+  }, [viewMode, wizardStep, pickerModal.visible, deleteModalVisible, customerModalVisible, selectedOrn]);
 
   const handlePickFormImage = async () => {
     try {
@@ -418,7 +416,7 @@ export default function OrnamentsScreen() {
     return (
       <View style={styles.subScreenContainer}>
         {/* Header */}
-        <View style={[styles.detailHeader, { paddingTop: Math.max(insets.top, Platform.OS === 'android' ? 14 : 10) }]}>
+        <View style={[styles.detailHeader, { paddingTop: Platform.OS === 'android' ? 14 : 10 }]}>
           <TouchableOpacity
             onPress={() => setViewMode('list')}
             style={styles.headerBackBtn}
@@ -430,17 +428,15 @@ export default function OrnamentsScreen() {
             <Text style={styles.headerTitle}>Ornaments Details</Text>
             <Text style={styles.headerSubtitle}>View and manage customer information</Text>
           </View>
-          <TouchableOpacity
-            onPress={() => setDetailMenuVisible(true)}
-            style={styles.headerMenuBtn}
-            accessibilityLabel="Menu options"
-          >
-            <View style={styles.menuDotsContainer}>
-              <View style={styles.menuDotCircle} />
-              <View style={styles.menuDotCircle} />
-              <View style={styles.menuDotCircle} />
-            </View>
-          </TouchableOpacity>
+          <OrnamentOptionsMenu
+            ref={optionsMenuRef}
+            isDark={isDark}
+            textPrimaryColor={colors.textPrimary}
+            isSuperAdmin={isSuperAdmin}
+            onEdit={() => handleEditPress(selectedOrn)}
+            onDelete={() => setDeleteModalVisible(true)}
+            onCopyId={handleCopyId}
+          />
         </View>
 
         <ScrollView
@@ -674,45 +670,6 @@ export default function OrnamentsScreen() {
           </View>
         </ScrollView>
 
-        {/* Options Menu Modal */}
-        <Modal visible={detailMenuVisible} transparent animationType="fade">
-          <TouchableOpacity
-            style={styles.menuOverlay}
-            activeOpacity={1}
-            onPress={() => setDetailMenuVisible(false)}
-          >
-            <View style={styles.menuBox}>
-              {isSuperAdmin && (
-                <>
-                  <TouchableOpacity
-                    style={styles.menuItem}
-                    onPress={() => { setDetailMenuVisible(false); handleEditPress(selectedOrn); }}
-                  >
-                    <Ionicons name="pencil-outline" size={18} color={colors.textPrimary} />
-                    <Text style={styles.menuItemText}>Edit Ornament</Text>
-                  </TouchableOpacity>
-                  <View style={styles.menuDivider} />
-                  <TouchableOpacity
-                    style={styles.menuItem}
-                    onPress={() => { setDetailMenuVisible(false); setDeleteModalVisible(true); }}
-                  >
-                    <Ionicons name="trash-outline" size={18} color="#ef4444" />
-                    <Text style={[styles.menuItemText, { color: '#ef4444' }]}>Delete Ornament</Text>
-                  </TouchableOpacity>
-                  <View style={styles.menuDivider} />
-                </>
-              )}
-              <TouchableOpacity
-                style={styles.menuItem}
-                onPress={() => { setDetailMenuVisible(false); handleCopyId(); }}
-              >
-                <Ionicons name="copy-outline" size={18} color={colors.textPrimary} />
-                <Text style={styles.menuItemText}>Copy Ornament ID</Text>
-              </TouchableOpacity>
-            </View>
-          </TouchableOpacity>
-        </Modal>
-
         {/* Delete Confirmation */}
         <ConfirmModal
           visible={deleteModalVisible}
@@ -740,7 +697,7 @@ export default function OrnamentsScreen() {
     return (
       <View style={styles.subScreenContainer}>
         {/* Header */}
-        <View style={[styles.detailHeader, { paddingTop: Math.max(insets.top, Platform.OS === 'android' ? 14 : 10) }]}>
+        <View style={[styles.detailHeader, { paddingTop: Platform.OS === 'android' ? 14 : 10 }]}>
           <TouchableOpacity onPress={handleBackStep} style={styles.headerBackBtn}>
             <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
           </TouchableOpacity>
@@ -1565,27 +1522,6 @@ const getStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
     color: isDark ? '#94a3b8' : '#64748b',
     marginTop: 1,
   },
-  headerMenuBtn: {
-    padding: 6,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  menuDotsContainer: {
-    width: 20,
-    height: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 3.5,
-  },
-  menuDotCircle: {
-    width: 6.5,
-    height: 6.5,
-    borderRadius: 3.5,
-    borderWidth: 1.8,
-    borderColor: isDark ? '#f8fafc' : '#0d172a',
-    backgroundColor: 'transparent',
-  },
-
   // Search Container
   searchContainer: {
     flexDirection: 'row',
@@ -2303,31 +2239,4 @@ const getStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
     justifyContent: 'center',
   },
   backButtonSecondaryText: { fontSize: 13, fontWeight: '700', color: isDark ? '#f8fafc' : '#0f172a' },
-
-  menuOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.35)',
-    justifyContent: 'flex-start',
-    alignItems: 'flex-end',
-    paddingTop: 56,
-    paddingRight: 16,
-  },
-  menuBox: {
-    width: 200,
-    backgroundColor: isDark ? '#1e293b' : '#ffffff',
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: isDark ? '#334155' : '#e2e8f0',
-    paddingVertical: 6,
-    elevation: 5,
-  },
-  menuItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingHorizontal: 16,
-    paddingVertical: 11,
-  },
-  menuItemText: { fontSize: 13, fontWeight: '600', color: isDark ? '#f8fafc' : '#0f172a' },
-  menuDivider: { height: 1, backgroundColor: isDark ? '#334155' : '#f1f5f9' },
 });
