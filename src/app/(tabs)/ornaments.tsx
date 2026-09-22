@@ -1478,17 +1478,25 @@ export default function OrnamentsScreen() {
 
                   <View style={styles.specsRow}>
                     <Text style={styles.specsText}>{orn.Purity || '-'}  •  {orn.OrnamentType || '-'}  •  </Text>
-                    <Ionicons name="shield-checkmark" size={12} color="#0284c7" style={{ marginRight: 3 }} />
+                    <Ionicons name="shield-checkmark-outline" size={13} color={isDark ? '#94a3b8' : '#64748b'} style={{ marginRight: 3 }} />
                     <Text style={styles.specsText}>BIS Hallmark</Text>
                   </View>
 
                   <View style={styles.cardStatsRow}>
                     <View style={styles.statGroup}>
-                      <Ionicons name="scale-outline" size={14} color={isDark ? '#94a3b8' : '#475569'} style={{ marginRight: 4 }} />
+                      <Image
+                        source={require('../../../assets/images/weight_icon.png')}
+                        style={[styles.statIcon, { tintColor: isDark ? '#94a3b8' : '#64748b' }]}
+                        contentFit="contain"
+                      />
                       <Text style={styles.statWeightText}>{weightVal} g</Text>
                     </View>
                     <View style={styles.statGroup}>
-                      <Text style={styles.statPriceCurrency}>₹</Text>
+                      <Image
+                        source={require('../../../assets/images/rupee_circle_icon.png')}
+                        style={[styles.statIcon, { tintColor: isDark ? '#94a3b8' : '#64748b' }]}
+                        contentFit="contain"
+                      />
                       <Text style={styles.statPriceText}>{priceVal}</Text>
                     </View>
                   </View>
@@ -1862,21 +1870,26 @@ const getStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
+  statIcon: {
+    width: 15,
+    height: 15,
+    marginRight: 5,
+  },
   statWeightText: {
     fontSize: 12,
     fontWeight: '700',
-    color: isDark ? '#cbd5e1' : '#334155',
+    color: isDark ? '#f8fafc' : '#000000',
   },
   statPriceCurrency: {
     fontSize: 12,
     fontWeight: '800',
-    color: isDark ? '#f8fafc' : '#0d172a',
+    color: isDark ? '#f8fafc' : '#000000',
     marginRight: 2,
   },
   statPriceText: {
     fontSize: 13,
     fontWeight: '800',
-    color: isDark ? '#f8fafc' : '#0d172a',
+    color: isDark ? '#f8fafc' : '#000000',
   },
   cardRightCol: {
     paddingLeft: 6,
