@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -19,6 +19,9 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ConfirmModal } from '../../components/ConfirmModal';
+import { CustomerPickerModal } from '../../components/ornaments/CustomerPickerModal';
+import { OptionPickerModal } from '../../components/ornaments/OptionPickerModal';
+import { OrnamentStatusBadge } from '../../components/ornaments/OrnamentStatusBadge';
 import { ThemeColors } from '../../constants/theme';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
@@ -26,9 +29,11 @@ import { useToast } from '../../context/ToastContext';
 import { getDriveImageUrl } from '../../services/api';
 import { useAppStore } from '../../services/store';
 import { Ornament } from '../../types';
+import { calculateOrnamentValuation } from '../../utils/ornamentCalculations';
 
 export default function OrnamentsScreen() {
   const router = useRouter();
+  const { action } = useLocalSearchParams<{ action?: string }>();
   const { colors, isDark } = useTheme();
   const styles = getStyles(colors, isDark);
   const store = useAppStore();
@@ -88,18 +93,6 @@ export default function OrnamentsScreen() {
   const selectedUser = useMemo(() => {
     return users.find(u => u.UserId === form.UserId);
   }, [users, form.UserId]);
-
-  const filteredCustomers = useMemo(() => {
-    const q = customerSearchQuery.trim().toLowerCase();
-    if (!q) return users;
-    return users.filter(u => {
-      const name = (u.FullName || '').toLowerCase();
-      const id = (u.UserId || '').toLowerCase();
-      const phone = (u.MobileNumber || '').toLowerCase();
-      const city = (u.City || '').toLowerCase();
-      return name.includes(q) || id.includes(q) || phone.includes(q) || city.includes(q);
-    });
-  }, [users, customerSearchQuery]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -180,6 +173,15 @@ export default function OrnamentsScreen() {
     setViewMode('add');
   };
 
+  // Entered via a deep link/quick-action (e.g. Home dashboard "Add Ornament") requesting the add wizard directly.
+  useEffect(() => {
+    if (action === 'add') {
+      handleAddPress();
+      router.setParams({ action: undefined } as any);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [action]);
+
   // Open Edit
   const handleEditPress = (orn: Ornament) => {
     setSelectedOrn(orn);
@@ -208,14 +210,10 @@ export default function OrnamentsScreen() {
   // Wizard Calculations
   const gross = parseFloat(form.GrossWeight) || 0;
   const stone = parseFloat(form.StoneWeight) || 0;
-  const net = Math.max(0, gross - stone);
   const buyRate = parseFloat(form.BuyingPricePerGram) || 5800;
   const liveRate22k = store.goldRates?.gold22k?.rate1g || 7500;
-  const totalBuyingValue = Math.round(net * buyRate);
-  const currentGoldValueLive = Math.round(net * liveRate22k);
-  const marketValue = Math.round(net * (liveRate22k > 0 ? liveRate22k * 1.0677 : 205000));
-  const appreciation = marketValue - totalBuyingValue;
-  const appreciationPct = totalBuyingValue > 0 ? (appreciation / totalBuyingValue) * 100 : 29.31;
+  const { net, totalBuyingValue, currentGoldValueLive, marketValue, appreciation, appreciationPct } =
+    calculateOrnamentValuation(gross, stone, buyRate, liveRate22k);
 
   const [refreshingRates, setRefreshingRates] = useState(false);
   const handleRefreshRates = async () => {
@@ -373,12 +371,10 @@ export default function OrnamentsScreen() {
   // VIEW: DETAILS SCREEN MATCHING Ornaments details.pdf
   // ══════════════════════════════════════════════════════════
   if (viewMode === 'details' && selectedOrn) {
-    const detailImages = selectedOrn.OrnamentImages 
+    const detailImages = selectedOrn.OrnamentImages
       ? selectedOrn.OrnamentImages.split(' | ').filter(Boolean).map(img => ({ uri: getDriveImageUrl(img) || img }))
       : [];
     const currentPhoto = detailImages[activePhotoIdx] || detailImages[0];
-    const isAvailable = selectedOrn.Status === 'Available';
-    const isPledged = selectedOrn.Status === 'Pledged';
 
     const netWt = Number(selectedOrn.NetWeight || selectedOrn.MetalWeight || 0).toFixed(3);
     const grossWt = Number(selectedOrn.GrossWeight || 0).toFixed(3);
@@ -422,8 +418,8 @@ export default function OrnamentsScreen() {
       <View style={styles.subScreenContainer}>
         {/* Header */}
         <View style={[styles.detailHeader, { paddingTop: Math.max(insets.top, Platform.OS === 'android' ? 14 : 10) }]}>
-          <TouchableOpacity 
-            onPress={() => setViewMode('list')} 
+          <TouchableOpacity
+            onPress={() => setViewMode('list')}
             style={styles.headerBackBtn}
             accessibilityLabel="Go back to list"
           >
@@ -433,8 +429,8 @@ export default function OrnamentsScreen() {
             <Text style={styles.headerTitle}>Ornaments Details</Text>
             <Text style={styles.headerSubtitle}>View and manage customer information</Text>
           </View>
-          <TouchableOpacity 
-            onPress={() => setDetailMenuVisible(true)} 
+          <TouchableOpacity
+            onPress={() => setDetailMenuVisible(true)}
             style={styles.headerMenuBtn}
             accessibilityLabel="Menu options"
           >
@@ -446,8 +442,8 @@ export default function OrnamentsScreen() {
           </TouchableOpacity>
         </View>
 
-        <ScrollView 
-          style={styles.scrollContainer} 
+        <ScrollView
+          style={styles.scrollContainer}
           contentContainerStyle={styles.content}
         >
           {/* Gallery Section */}
@@ -457,14 +453,14 @@ export default function OrnamentsScreen() {
                 <Image source={currentPhoto} style={styles.mainImage} contentFit="cover" />
                 {detailImages.length > 1 && (
                   <>
-                    <TouchableOpacity 
-                      onPress={() => setActivePhotoIdx(p => p > 0 ? p - 1 : detailImages.length - 1)} 
+                    <TouchableOpacity
+                      onPress={() => setActivePhotoIdx(p => p > 0 ? p - 1 : detailImages.length - 1)}
                       style={[styles.arrowBtn, styles.arrowBtnLeft]}
                     >
                       <Ionicons name="chevron-back" size={18} color="#1e293b" />
                     </TouchableOpacity>
-                    <TouchableOpacity 
-                      onPress={() => setActivePhotoIdx(p => p < detailImages.length - 1 ? p + 1 : 0)} 
+                    <TouchableOpacity
+                      onPress={() => setActivePhotoIdx(p => p < detailImages.length - 1 ? p + 1 : 0)}
                       style={[styles.arrowBtn, styles.arrowBtnRight]}
                     >
                       <Ionicons name="chevron-forward" size={18} color="#1e293b" />
@@ -513,21 +509,7 @@ export default function OrnamentsScreen() {
               </TouchableOpacity>
             </View>
 
-            <View style={[
-              styles.statusPill,
-              isAvailable ? styles.statusPillGreen : (isPledged ? styles.statusPillOrange : styles.statusPillBlue)
-            ]}>
-              <View style={[
-                styles.statusDot,
-                isAvailable ? styles.statusDotGreen : (isPledged ? styles.statusDotOrange : styles.statusDotBlue)
-              ]} />
-              <Text style={[
-                styles.statusPillText,
-                isAvailable ? styles.statusTextGreen : (isPledged ? styles.statusTextOrange : styles.statusTextBlue)
-              ]}>
-                {selectedOrn.Status}
-              </Text>
-            </View>
+            <OrnamentStatusBadge status={selectedOrn.Status} isDark={isDark} variant="pill" />
           </View>
 
           {/* Card 1: Weight Details */}
@@ -693,24 +675,24 @@ export default function OrnamentsScreen() {
 
         {/* Options Menu Modal */}
         <Modal visible={detailMenuVisible} transparent animationType="fade">
-          <TouchableOpacity 
-            style={styles.menuOverlay} 
-            activeOpacity={1} 
+          <TouchableOpacity
+            style={styles.menuOverlay}
+            activeOpacity={1}
             onPress={() => setDetailMenuVisible(false)}
           >
             <View style={styles.menuBox}>
               {isSuperAdmin && (
                 <>
-                  <TouchableOpacity 
-                    style={styles.menuItem} 
+                  <TouchableOpacity
+                    style={styles.menuItem}
                     onPress={() => { setDetailMenuVisible(false); handleEditPress(selectedOrn); }}
                   >
                     <Ionicons name="pencil-outline" size={18} color={colors.textPrimary} />
                     <Text style={styles.menuItemText}>Edit Ornament</Text>
                   </TouchableOpacity>
                   <View style={styles.menuDivider} />
-                  <TouchableOpacity 
-                    style={styles.menuItem} 
+                  <TouchableOpacity
+                    style={styles.menuItem}
                     onPress={() => { setDetailMenuVisible(false); setDeleteModalVisible(true); }}
                   >
                     <Ionicons name="trash-outline" size={18} color="#ef4444" />
@@ -719,8 +701,8 @@ export default function OrnamentsScreen() {
                   <View style={styles.menuDivider} />
                 </>
               )}
-              <TouchableOpacity 
-                style={styles.menuItem} 
+              <TouchableOpacity
+                style={styles.menuItem}
                 onPress={() => { setDetailMenuVisible(false); handleCopyId(); }}
               >
                 <Ionicons name="copy-outline" size={18} color={colors.textPrimary} />
@@ -812,8 +794,8 @@ export default function OrnamentsScreen() {
           </View>
         </View>
 
-        <ScrollView 
-          style={styles.scrollContainer} 
+        <ScrollView
+          style={styles.scrollContainer}
           contentContainerStyle={styles.content}
         >
           {/* STEP 1: Basic Details */}
@@ -837,16 +819,16 @@ export default function OrnamentsScreen() {
                   <Text style={styles.inputLabel}>
                     Customer <Text style={{ fontSize: 11, color: isDark ? '#94a3b8' : '#64748b', fontWeight: '400' }}>(Optional)</Text>
                   </Text>
-                  <TouchableOpacity 
+                  <TouchableOpacity
                     style={styles.dropdownInput}
                     onPress={() => setCustomerModalVisible(true)}
                     activeOpacity={0.7}
                   >
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1, paddingRight: 4 }}>
                       <Ionicons name="person-outline" size={16} color={selectedUser ? '#0284c7' : '#94a3b8'} />
-                      <Text 
+                      <Text
                         style={[
-                          styles.dropdownValue, 
+                          styles.dropdownValue,
                           !selectedUser && { color: isDark ? '#94a3b8' : '#64748b', fontWeight: '400' }
                         ]}
                         numberOfLines={1}
@@ -855,7 +837,7 @@ export default function OrnamentsScreen() {
                       </Text>
                     </View>
                     {selectedUser ? (
-                      <TouchableOpacity 
+                      <TouchableOpacity
                         onPress={() => setForm(p => ({ ...p, UserId: '' }))}
                         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                       >
@@ -881,7 +863,7 @@ export default function OrnamentsScreen() {
                 <View style={styles.twoColRow}>
                   <View style={[styles.fieldGroup, { flex: 1 }]}>
                     <Text style={styles.inputLabel}>Type <Text style={styles.requiredStar}>*</Text></Text>
-                    <TouchableOpacity 
+                    <TouchableOpacity
                       style={styles.dropdownInput}
                       onPress={() => openDropdown('OrnamentType', 'Select Type', ['Traditional', 'Modern', 'Antique', 'Temple', 'Bridal', 'Casual'])}
                     >
@@ -891,7 +873,7 @@ export default function OrnamentsScreen() {
                   </View>
                   <View style={[styles.fieldGroup, { flex: 1 }]}>
                     <Text style={styles.inputLabel}>Category <Text style={styles.requiredStar}>*</Text></Text>
-                    <TouchableOpacity 
+                    <TouchableOpacity
                       style={styles.dropdownInput}
                       onPress={() => openDropdown('OrnamentCategory', 'Select Category', ['Necklace', 'Bangles', 'Ring', 'Earrings', 'Chain', 'Bracelet', 'Coin', 'Pendant', 'Others'])}
                     >
@@ -904,7 +886,7 @@ export default function OrnamentsScreen() {
                 <View style={styles.twoColRow}>
                   <View style={[styles.fieldGroup, { flex: 1 }]}>
                     <Text style={styles.inputLabel}>Purity <Text style={styles.requiredStar}>*</Text></Text>
-                    <TouchableOpacity 
+                    <TouchableOpacity
                       style={styles.dropdownInput}
                       onPress={() => openDropdown('Purity', 'Select Purity', ['22karate (91.6%)', '24karate (99.9%)', '18karate (75%)'])}
                     >
@@ -1035,14 +1017,16 @@ export default function OrnamentsScreen() {
               </View>
 
               <View style={styles.card}>
-                <View style={[styles.cardHeader, { alignItems: 'flex-start' }]}>
+                <View style={[styles.cardHeader, { alignItems: 'flex-start', gap: 10 }]}>
                   <View style={styles.cardHeaderLeft}>
                     <View style={styles.iconBox}>
                       <Ionicons name="bar-chart-outline" size={18} color="#0284c7" />
                     </View>
-                    <View>
+                    <View style={{ flex: 1, paddingRight: 4 }}>
                       <Text style={styles.cardTitle}>Valuation Details</Text>
-                      <Text style={styles.cardSubtitle}>Enter buying price and view auto calculated values</Text>
+                      <Text style={styles.cardSubtitle}>
+                        Enter buying price and view{'\n'}auto calculated values
+                      </Text>
                     </View>
                   </View>
                   <View style={styles.liveRateBadge}>
@@ -1052,7 +1036,7 @@ export default function OrnamentsScreen() {
                         <View style={styles.liveRateGreenDot} />
                         <Text style={styles.liveRatePurityText}>(22K)</Text>
                       </View>
-                      <TouchableOpacity 
+                      <TouchableOpacity
                         onPress={handleRefreshRates}
                         activeOpacity={0.6}
                         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -1151,8 +1135,8 @@ export default function OrnamentsScreen() {
                   {formImages.map((imgUri, idx) => (
                     <View key={idx} style={styles.photoThumbWrapper}>
                       <Image source={{ uri: getDriveImageUrl(imgUri) || imgUri }} style={styles.photoThumbImg} contentFit="cover" />
-                      <TouchableOpacity 
-                        style={styles.photoRemoveBtn} 
+                      <TouchableOpacity
+                        style={styles.photoRemoveBtn}
                         onPress={() => handleRemoveFormImage(idx)}
                       >
                         <Ionicons name="close" size={12} color="#ffffff" />
@@ -1218,7 +1202,7 @@ export default function OrnamentsScreen() {
 
                 <View style={styles.fieldGroup}>
                   <Text style={styles.inputLabel}>Status</Text>
-                  <TouchableOpacity 
+                  <TouchableOpacity
                     style={styles.dropdownInput}
                     onPress={() => openDropdown('Status', 'Select Status', ['Available', 'Pledged', 'Released'])}
                   >
@@ -1232,9 +1216,9 @@ export default function OrnamentsScreen() {
                 <TouchableOpacity style={styles.backButtonSecondary} onPress={handleBackStep}>
                   <Text style={styles.backButtonSecondaryText}>← Back</Text>
                 </TouchableOpacity>
-                <TouchableOpacity 
-                  style={[styles.primaryBtn, { flex: 1 }]} 
-                  onPress={handleSaveForm} 
+                <TouchableOpacity
+                  style={[styles.primaryBtn, { flex: 1 }]}
+                  onPress={handleSaveForm}
                   disabled={submitting}
                 >
                   {submitting ? (
@@ -1251,124 +1235,33 @@ export default function OrnamentsScreen() {
           )}
         </ScrollView>
 
-        {/* Option Picker Modal */}
-        <Modal visible={pickerModal.visible} transparent animationType="fade">
-          <TouchableOpacity 
-            style={styles.modalOverlay} 
-            activeOpacity={1} 
-            onPress={() => setPickerModal(p => ({ ...p, visible: false }))}
-          >
-            <View style={styles.pickerBox}>
-              <View style={styles.pickerHeader}>
-                <Text style={styles.pickerTitle}>{pickerModal.title}</Text>
-                <TouchableOpacity onPress={() => setPickerModal(p => ({ ...p, visible: false }))}>
-                  <Ionicons name="close" size={20} color={colors.textSecondary} />
-                </TouchableOpacity>
-              </View>
-              <ScrollView style={{ maxHeight: 280 }}>
-                {pickerModal.options.map(opt => (
-                  <TouchableOpacity
-                    key={opt}
-                    style={styles.pickerItem}
-                    onPress={() => selectOption(opt)}
-                  >
-                    <Text style={styles.pickerItemText}>{opt}</Text>
-                    {form[pickerModal.field] === opt && (
-                      <Ionicons name="checkmark" size={18} color="#0284c7" />
-                    )}
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            </View>
-          </TouchableOpacity>
-        </Modal>
+        <OptionPickerModal
+          visible={pickerModal.visible}
+          title={pickerModal.title}
+          options={pickerModal.options}
+          selectedValue={form[pickerModal.field]}
+          onSelect={selectOption}
+          onClose={() => setPickerModal(p => ({ ...p, visible: false }))}
+          isDark={isDark}
+          secondaryTextColor={colors.textSecondary}
+        />
 
-        {/* Customer Search Picker Modal */}
-        <Modal visible={customerModalVisible} transparent animationType="fade">
-          <TouchableOpacity 
-            style={styles.modalOverlay} 
-            activeOpacity={1} 
-            onPress={() => { setCustomerModalVisible(false); setCustomerSearchQuery(''); }}
-          >
-            <View style={[styles.pickerBox, { maxHeight: '80%' }]}>
-              <View style={styles.pickerHeader}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <Ionicons name="people-outline" size={20} color="#0284c7" />
-                  <Text style={styles.pickerTitle}>Select Customer</Text>
-                </View>
-                <TouchableOpacity onPress={() => { setCustomerModalVisible(false); setCustomerSearchQuery(''); }}>
-                  <Ionicons name="close" size={20} color={colors.textSecondary} />
-                </TouchableOpacity>
-              </View>
-
-              {/* Search Bar */}
-              <View style={styles.customerSearchBox}>
-                <Ionicons name="search" size={16} color="#94a3b8" style={{ marginRight: 8 }} />
-                <TextInput
-                  style={styles.customerSearchInput}
-                  placeholder="Search by name, phone or ID..."
-                  placeholderTextColor={colors.placeholder}
-                  value={customerSearchQuery}
-                  onChangeText={setCustomerSearchQuery}
-                />
-                {customerSearchQuery ? (
-                  <TouchableOpacity onPress={() => setCustomerSearchQuery('')}>
-                    <Ionicons name="close-circle" size={16} color="#94a3b8" />
-                  </TouchableOpacity>
-                ) : null}
-              </View>
-
-              {/* Option to clear / No Customer */}
-              <TouchableOpacity
-                style={[styles.customerPickerItem, !form.UserId && styles.customerSelectedRow]}
-                onPress={() => {
-                  setForm(p => ({ ...p, UserId: '' }));
-                  setCustomerModalVisible(false);
-                  setCustomerSearchQuery('');
-                }}
-              >
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <Ionicons name="remove-circle-outline" size={18} color="#64748b" />
-                  <Text style={[styles.pickerItemText, { color: '#64748b', fontStyle: 'italic' }]}>None (No Customer)</Text>
-                </View>
-                {!form.UserId && <Ionicons name="checkmark" size={18} color="#0284c7" />}
-              </TouchableOpacity>
-
-              {/* Customer List */}
-              <ScrollView style={{ maxHeight: 260 }} keyboardShouldPersistTaps="handled">
-                {filteredCustomers.length === 0 ? (
-                  <View style={{ padding: 20, alignItems: 'center' }}>
-                    <Text style={{ color: '#94a3b8', fontSize: 13 }}>No customers found</Text>
-                  </View>
-                ) : (
-                  filteredCustomers.map(u => (
-                    <TouchableOpacity
-                      key={u.UserId}
-                      style={[styles.customerPickerItem, form.UserId === u.UserId && styles.customerSelectedRow]}
-                      onPress={() => {
-                        setForm(p => ({ ...p, UserId: u.UserId }));
-                        setCustomerModalVisible(false);
-                        setCustomerSearchQuery('');
-                      }}
-                    >
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.customerPickerName}>{u.FullName}</Text>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 2 }}>
-                          <Text style={styles.customerPickerMeta}>ID: {u.UserId}</Text>
-                          {u.MobileNumber ? <Text style={styles.customerPickerMeta}>• {u.MobileNumber}</Text> : null}
-                          {u.City ? <Text style={styles.customerPickerMeta}>• {u.City}</Text> : null}
-                        </View>
-                      </View>
-                      {form.UserId === u.UserId && (
-                        <Ionicons name="checkmark" size={18} color="#0284c7" />
-                      )}
-                    </TouchableOpacity>
-                  ))
-                )}
-              </ScrollView>
-            </View>
-          </TouchableOpacity>
-        </Modal>
+        <CustomerPickerModal
+          visible={customerModalVisible}
+          users={users}
+          searchQuery={customerSearchQuery}
+          onSearchChange={setCustomerSearchQuery}
+          selectedUserId={form.UserId}
+          onSelect={(userId) => {
+            setForm(p => ({ ...p, UserId: userId }));
+            setCustomerModalVisible(false);
+            setCustomerSearchQuery('');
+          }}
+          onClose={() => { setCustomerModalVisible(false); setCustomerSearchQuery(''); }}
+          isDark={isDark}
+          secondaryTextColor={colors.textSecondary}
+          placeholderColor={colors.placeholder}
+        />
       </View>
     );
   }
@@ -1414,12 +1307,12 @@ export default function OrnamentsScreen() {
         </View>
 
         {/* Filter Pills */}
-        <ScrollView 
-          horizontal 
-          showsHorizontalScrollIndicator={false} 
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.filterPillsContainer}
         >
-          <TouchableOpacity 
+          <TouchableOpacity
             style={[styles.filterPill, activeFilter === 'All' && styles.filterPillActive]}
             onPress={() => setActiveFilter('All')}
           >
@@ -1428,7 +1321,7 @@ export default function OrnamentsScreen() {
             </Text>
           </TouchableOpacity>
 
-          <TouchableOpacity 
+          <TouchableOpacity
             style={[styles.filterPill, activeFilter === 'Available' && styles.filterPillActive]}
             onPress={() => setActiveFilter('Available')}
           >
@@ -1437,7 +1330,7 @@ export default function OrnamentsScreen() {
             </Text>
           </TouchableOpacity>
 
-          <TouchableOpacity 
+          <TouchableOpacity
             style={[styles.filterPill, activeFilter === 'Pledged' && styles.filterPillActive]}
             onPress={() => setActiveFilter('Pledged')}
           >
@@ -1446,7 +1339,7 @@ export default function OrnamentsScreen() {
             </Text>
           </TouchableOpacity>
 
-          <TouchableOpacity 
+          <TouchableOpacity
             style={[styles.filterPill, activeFilter === 'Released' && styles.filterPillActive]}
             onPress={() => setActiveFilter('Released')}
           >
@@ -1458,8 +1351,8 @@ export default function OrnamentsScreen() {
       </View>
 
       {/* Ornaments Cards List (White below) */}
-      <ScrollView 
-        style={styles.cardsScrollContainer} 
+      <ScrollView
+        style={styles.cardsScrollContainer}
         contentContainerStyle={styles.cardsScrollContent}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#0284c7']} />}
       >
@@ -1467,7 +1360,6 @@ export default function OrnamentsScreen() {
           {filteredOrnaments.map((orn) => {
             const firstImg = orn.OrnamentImages ? orn.OrnamentImages.split(' | ').filter(Boolean)[0] : '';
             const directUrl = firstImg ? getDriveImageUrl(firstImg) : '';
-            const isAvailable = orn.Status === 'Available';
             const isPledged = orn.Status === 'Pledged';
             const loanNum = getLoanNumber(orn);
             const weight = Number(orn.NetWeight || orn.MetalWeight || orn.GrossWeight || 0);
@@ -1505,21 +1397,7 @@ export default function OrnamentsScreen() {
                 <View style={styles.cardCenterCol}>
                   <View style={styles.cardHeaderRow}>
                     <Text style={styles.listCardTitle} numberOfLines={1}>{orn.OrnamentName}</Text>
-                    <View style={[
-                      styles.statusBadge,
-                      isAvailable ? styles.statusBadgeGreen : (isPledged ? styles.statusBadgeOrange : styles.statusBadgeBlue)
-                    ]}>
-                      <View style={[
-                        styles.statusDot,
-                        isAvailable ? styles.statusDotGreen : (isPledged ? styles.statusDotOrange : styles.statusDotBlue)
-                      ]} />
-                      <Text style={[
-                        styles.statusBadgeText,
-                        isAvailable ? styles.statusTextGreen : (isPledged ? styles.statusTextOrange : styles.statusTextBlue)
-                      ]}>
-                        {orn.Status}
-                      </Text>
-                    </View>
+                    <OrnamentStatusBadge status={orn.Status} isDark={isDark} variant="badge" />
                   </View>
 
                   <Text style={styles.cardIdText}>{orn.OrnamentId}</Text>
@@ -1561,8 +1439,8 @@ export default function OrnamentsScreen() {
       </ScrollView>
 
       {/* Floating Action Button (+) */}
-      <TouchableOpacity 
-        style={[styles.fabBtn, { bottom: 20 }]} 
+      <TouchableOpacity
+        style={[styles.fabBtn, { bottom: 20 }]}
         onPress={handleAddPress}
         activeOpacity={0.85}
         accessibilityLabel="Add ornament"
@@ -1841,50 +1719,6 @@ const getStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
     color: isDark ? '#f8fafc' : '#0d172a',
     flex: 1,
     marginRight: 6,
-  },
-  statusBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 12,
-  },
-  statusDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-  },
-  statusBadgeText: {
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  statusBadgeGreen: {
-    backgroundColor: isDark ? 'rgba(34, 197, 94, 0.15)' : '#ecfdf5',
-  },
-  statusDotGreen: {
-    backgroundColor: '#16a34a',
-  },
-  statusTextGreen: {
-    color: isDark ? '#4ade80' : '#15803d',
-  },
-  statusBadgeOrange: {
-    backgroundColor: isDark ? 'rgba(245, 158, 11, 0.15)' : '#fffbeb',
-  },
-  statusDotOrange: {
-    backgroundColor: '#d97706',
-  },
-  statusTextOrange: {
-    color: isDark ? '#fbbf24' : '#b45309',
-  },
-  statusBadgeBlue: {
-    backgroundColor: isDark ? 'rgba(2, 132, 199, 0.15)' : '#f0f9ff',
-  },
-  statusDotBlue: {
-    backgroundColor: '#0284c7',
-  },
-  statusTextBlue: {
-    color: isDark ? '#38bdf8' : '#0284c7',
   },
 
   cardIdText: {
@@ -2167,32 +2001,6 @@ const getStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
     fontWeight: '600',
     color: isDark ? '#94a3b8' : '#64748b',
   },
-  statusPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderRadius: 20,
-    borderWidth: 1,
-  },
-  statusPillText: {
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  statusPillGreen: {
-    backgroundColor: isDark ? 'rgba(34, 197, 94, 0.15)' : '#dcfce7',
-    borderColor: isDark ? '#22c55e' : '#bbf7d0',
-  },
-  statusPillOrange: {
-    backgroundColor: isDark ? 'rgba(245, 158, 11, 0.15)' : '#fef3c7',
-    borderColor: isDark ? '#f59e0b' : '#fde68a',
-  },
-  statusPillBlue: {
-    backgroundColor: isDark ? 'rgba(2, 132, 199, 0.15)' : '#e0f2fe',
-    borderColor: isDark ? '#0284c7' : '#bae6fd',
-  },
-
   // Card Structure
   card: {
     backgroundColor: isDark ? '#0f172a' : '#ffffff',
@@ -2265,47 +2073,6 @@ const getStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
   verifiedText: { fontSize: 13, fontWeight: '700', color: '#16a34a' },
   appreciationPctText: { fontSize: 12, fontWeight: '700', color: '#16a34a', marginTop: 1 },
 
-  // Customer Search & Dropdown
-  customerSearchBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: isDark ? '#1e293b' : '#f1f5f9',
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: isDark ? '#334155' : '#e2e8f0',
-  },
-  customerSearchInput: {
-    flex: 1,
-    fontSize: 13,
-    color: isDark ? '#f8fafc' : '#0f172a',
-    paddingVertical: 2,
-  },
-  customerPickerItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 10,
-    borderRadius: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: isDark ? '#1e293b' : '#f1f5f9',
-  },
-  customerPickerName: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: isDark ? '#f8fafc' : '#0d172a',
-  },
-  customerPickerMeta: {
-    fontSize: 11,
-    color: isDark ? '#94a3b8' : '#64748b',
-  },
-  customerSelectedRow: {
-    backgroundColor: isDark ? 'rgba(2, 132, 199, 0.15)' : '#e0f2fe',
-  },
-
   fieldGroup: { marginBottom: 12 },
   inputLabel: { fontSize: 12, fontWeight: '600', color: isDark ? '#cbd5e1' : '#334155', marginBottom: 6 },
   requiredStar: { color: '#ef4444' },
@@ -2318,6 +2085,7 @@ const getStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
     paddingVertical: 10,
     fontSize: 13,
     color: isDark ? '#f8fafc' : '#0f172a',
+    outlineWidth: 0,
   },
   twoColRow: { flexDirection: 'row', gap: 12 },
   dropdownInput: {
@@ -2348,6 +2116,7 @@ const getStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
     paddingVertical: 10,
     fontSize: 13,
     color: isDark ? '#f8fafc' : '#0f172a',
+    outlineWidth: 0,
   },
   unitBadge: {
     backgroundColor: isDark ? '#0f172a' : '#f1f5f9',
@@ -2447,7 +2216,7 @@ const getStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
     paddingHorizontal: 12,
   },
   prefixText: { fontSize: 13, fontWeight: '700', color: isDark ? '#94a3b8' : '#64748b', marginRight: 6 },
-  prefixInput: { flex: 1, paddingVertical: 10, fontSize: 13, fontWeight: '700', color: isDark ? '#f8fafc' : '#0f172a' },
+  prefixInput: { flex: 1, paddingVertical: 10, fontSize: 13, fontWeight: '700', color: isDark ? '#f8fafc' : '#0f172a', outlineWidth: 0 },
   suffixText: { fontSize: 12, fontWeight: '600', color: isDark ? '#94a3b8' : '#64748b', marginLeft: 6 },
 
   calcGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 8 },
@@ -2560,40 +2329,4 @@ const getStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
   },
   menuItemText: { fontSize: 13, fontWeight: '600', color: isDark ? '#f8fafc' : '#0f172a' },
   menuDivider: { height: 1, backgroundColor: isDark ? '#334155' : '#f1f5f9' },
-
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  pickerBox: {
-    width: '100%',
-    maxWidth: 380,
-    backgroundColor: isDark ? '#0f172a' : '#ffffff',
-    borderRadius: 16,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: isDark ? '#334155' : '#e2e8f0',
-  },
-  pickerHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-    paddingBottom: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: isDark ? '#1e293b' : '#f1f5f9',
-  },
-  pickerTitle: { fontSize: 15, fontWeight: '800', color: isDark ? '#f8fafc' : '#0d172a' },
-  pickerItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: isDark ? '#1e293b' : '#f8fafc',
-  },
-  pickerItemText: { fontSize: 13, fontWeight: '600', color: isDark ? '#f8fafc' : '#0f172a' },
 });

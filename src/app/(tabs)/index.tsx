@@ -1,17 +1,22 @@
-import React, { useState } from 'react';
-import { 
-  View, Text, StyleSheet, ScrollView, RefreshControl, 
-  TouchableOpacity, useWindowDimensions, ActivityIndicator 
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
+import { useState } from 'react';
+import {
+  ActivityIndicator,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity, useWindowDimensions,
+  View
 } from 'react-native';
 import { Skeleton } from '../../components/Skeleton';
-import { useRouter } from 'expo-router';
-import { Colors, ThemeColors } from '../../constants/theme';
-import { useTheme } from '../../context/ThemeContext';
-import { useAppStore } from '../../services/store';
 import { Env } from '../../config/env';
-import { Ionicons } from '@expo/vector-icons';
+import { Colors, ThemeColors } from '../../constants/theme';
 import { useAuth } from '../../context/AuthContext';
+import { useTheme } from '../../context/ThemeContext';
 import { useToast } from '../../context/ToastContext';
+import { useAppStore } from '../../services/store';
 
 export default function DashboardScreen() {
   const router = useRouter();
@@ -46,11 +51,11 @@ export default function DashboardScreen() {
     setRefreshing(false);
   };
 
-  const utilPercent = dash.totalEligibleLoanAmount > 0 
-    ? Math.min(100, Math.round((dash.totalLoanAmount / dash.totalEligibleLoanAmount) * 100)) 
+  const utilPercent = dash.totalEligibleLoanAmount > 0
+    ? Math.min(100, Math.round((dash.totalLoanAmount / dash.totalEligibleLoanAmount) * 100))
     : 0;
 
-  const handleActionPress = (route: string) => {
+  const handleActionPress = (route: string | { pathname: string; params?: Record<string, string> }) => {
     if (isReadOnly) {
       toast.warning('Read-Only Mode: SuperAdmin privileges required to create or modify records.');
       return;
@@ -60,8 +65,8 @@ export default function DashboardScreen() {
 
   return (
     <View style={styles.screenRoot}>
-      <ScrollView 
-        style={styles.container} 
+      <ScrollView
+        style={styles.container}
         contentContainerStyle={[styles.content, isDesktop && styles.contentDesktop]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />}
       >
@@ -84,8 +89,8 @@ export default function DashboardScreen() {
                 {store.syncError}
               </Text>
             </View>
-            <TouchableOpacity 
-              onPress={() => store.syncFromBackend(true)} 
+            <TouchableOpacity
+              onPress={() => store.syncFromBackend(true)}
               style={styles.offlineRetryPill}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
@@ -154,8 +159,8 @@ export default function DashboardScreen() {
             <Text style={styles.offlineEmptySub}>
               {store.syncError || 'Could not reach Google Sheets. Please check your internet connection and tap retry.'}
             </Text>
-            <TouchableOpacity 
-              style={styles.offlineMainRetryBtn} 
+            <TouchableOpacity
+              style={styles.offlineMainRetryBtn}
               onPress={() => store.syncFromBackend(true)}
               activeOpacity={0.8}
             >
@@ -165,440 +170,440 @@ export default function DashboardScreen() {
           </View>
         ) : (
           <>
-        {/* ─── SECTION 1: LIVE GOLD RATES (RESPONSIVE HERO ON MOBILE) ─── */}
-        <View style={styles.goldRatesCard}>
-          <View style={styles.cardHeaderRow}>
-            <View style={styles.cardHeaderLeft}>
-              <View style={styles.goldBadgeIcon}>
-                <Ionicons name="trending-up" size={16} color={Colors.primaryDark} />
+            {/* ─── SECTION 1: LIVE GOLD RATES (RESPONSIVE HERO ON MOBILE) ─── */}
+            <View style={styles.goldRatesCard}>
+              <View style={styles.cardHeaderRow}>
+                <View style={styles.cardHeaderLeft}>
+                  <View style={styles.goldBadgeIcon}>
+                    <Ionicons name="trending-up" size={16} color={Colors.primaryDark} />
+                  </View>
+                  <Text style={styles.cardSectionTitle} numberOfLines={1}>
+                    {Env.LOCATION_BENCHMARK} Live Gold Benchmark
+                  </Text>
+                </View>
+                <View style={styles.cardHeaderRight}>
+                  <TouchableOpacity
+                    onPress={async () => {
+                      toast.info('Fetching live Bangalore gold rates...');
+                      await store.refreshGoldRates(true);
+                      toast.success('Gold rates updated.');
+                    }}
+                    disabled={store.isFetchingGoldRates}
+                    style={[styles.cityPill, { flexDirection: 'row', alignItems: 'center', gap: 4 }]}
+                    hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                    activeOpacity={0.7}
+                  >
+                    {store.isFetchingGoldRates ? (
+                      <ActivityIndicator size="small" color={colors.primaryDark} style={{ transform: [{ scale: 0.65 }] }} />
+                    ) : (
+                      <Ionicons name="refresh" size={11} color={colors.primaryDark} />
+                    )}
+                    <Text style={styles.cityPillText}>
+                      {store.isFetchingGoldRates ? 'Updating...' : 'Live Rates'}
+                    </Text>
+                  </TouchableOpacity>
+                  <Text style={styles.dateLabel} numberOfLines={1}>
+                    {rates?.displayDate || 'Updated Today'}
+                  </Text>
+                </View>
               </View>
-              <Text style={styles.cardSectionTitle} numberOfLines={1}>
-                {Env.LOCATION_BENCHMARK} Live Gold Benchmark
-              </Text>
+
+              {isCompact ? (
+                // ─── MOBILE RESPONSIVE LAYOUT (Featured 22K Hero + 2-Col 24K/18K) ───
+                <View style={styles.ratesMobileContainer}>
+                  {/* Featured 22K Standard Hero Card */}
+                  <View style={[styles.rateBox, styles.rateBoxFeatured, styles.rateBoxHero]}>
+                    <View style={styles.heroHeaderRow}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1 }}>
+                        <Text style={[styles.rateKarat, styles.rateKaratFeatured]} numberOfLines={1}>
+                          22K Standard (916)
+                        </Text>
+                        <View style={[styles.miniBadge, { backgroundColor: isDark ? '#b45309' : colors.primaryDark }]}>
+                          <Text style={[styles.miniBadgeText, { color: '#ffffff' }]}>Primary</Text>
+                        </View>
+                      </View>
+                      <View style={[styles.sovereignBox, { backgroundColor: '#fef3c7', marginTop: 0 }]}>
+                        <Text style={[styles.sovereignText, { color: '#92400e', fontWeight: '700' }]} numberOfLines={1}>
+                          8g Sovereign: ₹{(live22kRate * 8).toLocaleString()}
+                        </Text>
+                      </View>
+                    </View>
+                    <View style={styles.heroAmountRow}>
+                      <Text style={[styles.rateAmount, styles.rateAmountFeatured]}>
+                        ₹{live22kRate.toLocaleString()}
+                      </Text>
+                      <Text style={styles.rateUnitHero}>per 1g</Text>
+                      {rates?.gold22k?.change ? (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2, marginLeft: 8, backgroundColor: isDark ? '#143823' : '#dcfce7', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 }}>
+                          <Ionicons
+                            name={rates.gold22k.direction === 'up' ? 'arrow-up' : rates.gold22k.direction === 'down' ? 'arrow-down' : 'remove'}
+                            size={11}
+                            color={rates.gold22k.direction === 'up' ? colors.success : colors.danger}
+                          />
+                          <Text style={{ fontSize: 11, fontWeight: '700', color: rates.gold22k.direction === 'up' ? colors.success : colors.danger }}>
+                            {rates.gold22k.change >= 0 ? `+₹${rates.gold22k.change}` : `-₹${Math.abs(rates.gold22k.change)}`}
+                          </Text>
+                        </View>
+                      ) : null}
+                    </View>
+                  </View>
+
+                  {/* 24K and 18K Secondary Side-by-Side */}
+                  <View style={styles.ratesTwoColRow}>
+                    {/* 24K Pure Gold */}
+                    <View style={[styles.rateBox, { flex: 1 }]}>
+                      <View style={styles.rateBoxHeader}>
+                        <Text style={styles.rateKarat} numberOfLines={1}>24K Pure (999)</Text>
+                        <View style={[styles.miniBadge, { backgroundColor: '#fef08a' }]}>
+                          <Text style={[styles.miniBadgeText, { color: '#854d0e' }]}>99.9%</Text>
+                        </View>
+                      </View>
+                      <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4 }}>
+                        <Text style={styles.rateAmount} numberOfLines={1}>₹{live24kRate.toLocaleString()}</Text>
+                        {rates?.gold24k?.change ? (
+                          <Text style={{ fontSize: 10, fontWeight: '700', color: rates.gold24k.direction === 'up' ? colors.success : colors.danger }}>
+                            {rates.gold24k.change >= 0 ? `+₹${rates.gold24k.change}` : `-₹${Math.abs(rates.gold24k.change)}`}
+                          </Text>
+                        ) : null}
+                      </View>
+                      <Text style={styles.rateUnit}>per 1g</Text>
+                      <View style={styles.sovereignBox}>
+                        <Text style={styles.sovereignText} numberOfLines={1}>8g: ₹{(live24kRate * 8).toLocaleString()}</Text>
+                      </View>
+                    </View>
+
+                    {/* 18K Hallmarked */}
+                    <View style={[styles.rateBox, { flex: 1 }]}>
+                      <View style={styles.rateBoxHeader}>
+                        <Text style={styles.rateKarat} numberOfLines={1}>18K Gold (750)</Text>
+                        <View style={[styles.miniBadge, { backgroundColor: '#fed7aa' }]}>
+                          <Text style={[styles.miniBadgeText, { color: '#9a3412' }]}>75.0%</Text>
+                        </View>
+                      </View>
+                      <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4 }}>
+                        <Text style={styles.rateAmount} numberOfLines={1}>₹{live18kRate.toLocaleString()}</Text>
+                        {rates?.gold18k?.change ? (
+                          <Text style={{ fontSize: 10, fontWeight: '700', color: rates.gold18k.direction === 'up' ? colors.success : colors.danger }}>
+                            {rates.gold18k.change >= 0 ? `+₹${rates.gold18k.change}` : `-₹${Math.abs(rates.gold18k.change)}`}
+                          </Text>
+                        ) : null}
+                      </View>
+                      <Text style={styles.rateUnit}>per 1g</Text>
+                      <View style={styles.sovereignBox}>
+                        <Text style={styles.sovereignText} numberOfLines={1}>8g: ₹{(live18kRate * 8).toLocaleString()}</Text>
+                      </View>
+                    </View>
+                  </View>
+                </View>
+              ) : (
+                // ─── DESKTOP/TABLET 3-COLUMN ROW ───
+                <View style={styles.ratesGridRow}>
+                  {/* 24K Pure Gold */}
+                  <View style={styles.rateBox}>
+                    <View style={styles.rateBoxHeader}>
+                      <Text style={styles.rateKarat} numberOfLines={1}>24K Pure (999)</Text>
+                      <View style={[styles.miniBadge, { backgroundColor: '#fef08a' }]}>
+                        <Text style={[styles.miniBadgeText, { color: '#854d0e' }]}>99.9%</Text>
+                      </View>
+                    </View>
+                    <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4 }}>
+                      <Text style={styles.rateAmount} numberOfLines={1}>₹{live24kRate.toLocaleString()}</Text>
+                      {rates?.gold24k?.change ? (
+                        <Text style={{ fontSize: 11, fontWeight: '700', color: rates.gold24k.direction === 'up' ? colors.success : colors.danger }}>
+                          {rates.gold24k.change >= 0 ? `+₹${rates.gold24k.change}` : `-₹${Math.abs(rates.gold24k.change)}`}
+                        </Text>
+                      ) : null}
+                    </View>
+                    <Text style={styles.rateUnit}>per 1g</Text>
+                    <View style={styles.sovereignBox}>
+                      <Text style={styles.sovereignText} numberOfLines={1}>8g: ₹{(live24kRate * 8).toLocaleString()}</Text>
+                    </View>
+                  </View>
+
+                  {/* 22K Jewelry Standard (Featured) */}
+                  <View style={[styles.rateBox, styles.rateBoxFeatured]}>
+                    <View style={styles.rateBoxHeader}>
+                      <Text style={[styles.rateKarat, { color: isDark ? '#fbbf24' : colors.primaryDark }]} numberOfLines={1}>
+                        22K Standard (916)
+                      </Text>
+                      <View style={[styles.miniBadge, { backgroundColor: Colors.primaryDark }]}>
+                        <Text style={[styles.miniBadgeText, { color: '#ffffff' }]}>Primary</Text>
+                      </View>
+                    </View>
+                    <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6 }}>
+                      <Text style={[styles.rateAmount, styles.rateAmountFeatured]} numberOfLines={1}>
+                        ₹{live22kRate.toLocaleString()}
+                      </Text>
+                      {rates?.gold22k?.change ? (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2, backgroundColor: isDark ? '#143823' : '#dcfce7', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 }}>
+                          <Ionicons
+                            name={rates.gold22k.direction === 'up' ? 'arrow-up' : rates.gold22k.direction === 'down' ? 'arrow-down' : 'remove'}
+                            size={11}
+                            color={rates.gold22k.direction === 'up' ? colors.success : colors.danger}
+                          />
+                          <Text style={{ fontSize: 11, fontWeight: '700', color: rates.gold22k.direction === 'up' ? colors.success : colors.danger }}>
+                            {rates.gold22k.change >= 0 ? `+₹${rates.gold22k.change}` : `-₹${Math.abs(rates.gold22k.change)}`}
+                          </Text>
+                        </View>
+                      ) : null}
+                    </View>
+                    <Text style={styles.rateUnit}>per 1g</Text>
+                    <View style={[styles.sovereignBox, { backgroundColor: '#fef3c7' }]}>
+                      <Text style={[styles.sovereignText, { color: '#92400e', fontWeight: '700' }]} numberOfLines={1}>
+                        8g Sovereign: ₹{(live22kRate * 8).toLocaleString()}
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* 18K Hallmarked */}
+                  <View style={styles.rateBox}>
+                    <View style={styles.rateBoxHeader}>
+                      <Text style={styles.rateKarat} numberOfLines={1}>18K Gold (750)</Text>
+                      <View style={[styles.miniBadge, { backgroundColor: '#fed7aa' }]}>
+                        <Text style={[styles.miniBadgeText, { color: '#9a3412' }]}>75.0%</Text>
+                      </View>
+                    </View>
+                    <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4 }}>
+                      <Text style={styles.rateAmount} numberOfLines={1}>₹{live18kRate.toLocaleString()}</Text>
+                      {rates?.gold18k?.change ? (
+                        <Text style={{ fontSize: 11, fontWeight: '700', color: rates.gold18k.direction === 'up' ? colors.success : colors.danger }}>
+                          {rates.gold18k.change >= 0 ? `+₹${rates.gold18k.change}` : `-₹${Math.abs(rates.gold18k.change)}`}
+                        </Text>
+                      ) : null}
+                    </View>
+                    <Text style={styles.rateUnit}>per 1g</Text>
+                    <View style={styles.sovereignBox}>
+                      <Text style={styles.sovereignText} numberOfLines={1}>8g: ₹{(live18kRate * 8).toLocaleString()}</Text>
+                    </View>
+                  </View>
+                </View>
+              )}
             </View>
-            <View style={styles.cardHeaderRight}>
+
+            {/* ─── SECTION 2: GOLD VAULT VALUATION (3-COLUMN GRID) ─── */}
+            <Text style={styles.sectionHeading}>Gold Vault Valuation</Text>
+            <View style={[styles.valGrid, (isDesktop || isTablet) && styles.valGridRow]}>
+              {/* 1. Current Market Value */}
+              <View style={[styles.valCard, (isDesktop || isTablet) && { flex: 1 }]}>
+                <View style={styles.valCardTop}>
+                  <Text style={styles.valTitle} numberOfLines={1}>Current Market Value</Text>
+                  <View style={[styles.valIconBox, { backgroundColor: '#fef3c7' }]}>
+                    <Ionicons name="diamond" size={18} color="#b45309" />
+                  </View>
+                </View>
+                <Text style={styles.valAmount} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+                  ₹{currentGoldValue.toLocaleString()}
+                </Text>
+                <View style={styles.valBadge}>
+                  <Text style={styles.valBadgeText} numberOfLines={1} ellipsizeMode="tail">
+                    {totalGoldWeight.toFixed(2)}g net wt @ ₹{live22kRate}/g
+                  </Text>
+                </View>
+              </View>
+
+              {/* 2. Total Buying Cost */}
+              <View style={[styles.valCard, (isDesktop || isTablet) && { flex: 1 }]}>
+                <View style={styles.valCardTop}>
+                  <Text style={styles.valTitle} numberOfLines={1}>Total Acquisition Cost</Text>
+                  <View style={[styles.valIconBox, { backgroundColor: '#e2e8f0' }]}>
+                    <Ionicons name="wallet" size={18} color="#475569" />
+                  </View>
+                </View>
+                <Text style={styles.valAmount} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+                  ₹{buyingGoldValue.toLocaleString()}
+                </Text>
+                <View style={[styles.valBadge, { backgroundColor: '#f1f5f9' }]}>
+                  <Text style={[styles.valBadgeText, { color: colors.textSecondary }]} numberOfLines={1}>
+                    Historical purchase benchmark
+                  </Text>
+                </View>
+              </View>
+
+              {/* 3. Unrealized Appreciation */}
+              <View style={[styles.valCard, styles.valCardSuccess, (isDesktop || isTablet) && { flex: 1 }]}>
+                <View style={styles.valCardTop}>
+                  <Text style={[styles.valTitle, { color: '#166534' }]} numberOfLines={1}>Appreciation Gains</Text>
+                  <View style={[styles.valIconBox, { backgroundColor: '#dcfce7' }]}>
+                    <Ionicons name="trending-up" size={18} color="#16a34a" />
+                  </View>
+                </View>
+                <Text style={[styles.valAmount, { color: '#15803d' }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+                  +{appreciationGains >= 0 ? '₹' : '-₹'}{Math.abs(appreciationGains).toLocaleString()}
+                </Text>
+                <View style={[styles.valBadge, { backgroundColor: '#dcfce7' }]}>
+                  <Text style={[styles.valBadgeText, { color: '#166534' }]} numberOfLines={1}>
+                    +{appreciationPct.toFixed(1)}% portfolio growth
+                  </Text>
+                </View>
+              </View>
+            </View>
+
+            {/* ─── SECTION 3: OPERATIONAL PORTFOLIO (4-COLUMN GRID ON DESKTOP) ─── */}
+            <Text style={styles.sectionHeading}>Operational Portfolio</Text>
+            <View style={isDesktop ? styles.metricsGridDesktop : styles.metricsGridMobile}>
+              {/* Customers */}
               <TouchableOpacity
-                onPress={async () => {
-                  toast.info('Fetching live Bangalore gold rates...');
-                  await store.refreshGoldRates(true);
-                  toast.success('Gold rates updated.');
-                }}
-                disabled={store.isFetchingGoldRates}
-                style={[styles.cityPill, { flexDirection: 'row', alignItems: 'center', gap: 4 }]}
-                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                style={isDesktop ? styles.metricCardDesktop : styles.metricCardMobile}
+                onPress={() => router.push('/(tabs)/users' as any)}
                 activeOpacity={0.7}
               >
-                {store.isFetchingGoldRates ? (
-                  <ActivityIndicator size="small" color={colors.primaryDark} style={{ transform: [{ scale: 0.65 }] }} />
-                ) : (
-                  <Ionicons name="refresh" size={11} color={colors.primaryDark} />
-                )}
-                <Text style={styles.cityPillText}>
-                  {store.isFetchingGoldRates ? 'Updating...' : 'Live Rates'}
+                <View style={styles.metricTop}>
+                  <View style={styles.metricIconBox}>
+                    <Ionicons name="people" size={20} color={isDark ? '#fbbf24' : colors.primaryDark} />
+                  </View>
+                  <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+                </View>
+                <Text style={styles.metricVal} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+                  {dash.totalUsers}
                 </Text>
+                <Text style={styles.metricLabel} numberOfLines={1}>Active Customers</Text>
+                <Text style={styles.metricHint} numberOfLines={1}>Registered borrowers</Text>
               </TouchableOpacity>
-              <Text style={styles.dateLabel} numberOfLines={1}>
-                {rates?.displayDate || 'Updated Today'}
-              </Text>
-            </View>
-          </View>
 
-          {isCompact ? (
-            // ─── MOBILE RESPONSIVE LAYOUT (Featured 22K Hero + 2-Col 24K/18K) ───
-            <View style={styles.ratesMobileContainer}>
-              {/* Featured 22K Standard Hero Card */}
-              <View style={[styles.rateBox, styles.rateBoxFeatured, styles.rateBoxHero]}>
-                <View style={styles.heroHeaderRow}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1 }}>
-                    <Text style={[styles.rateKarat, styles.rateKaratFeatured]} numberOfLines={1}>
-                      22K Standard (916)
-                    </Text>
-                    <View style={[styles.miniBadge, { backgroundColor: isDark ? '#b45309' : colors.primaryDark }]}>
-                      <Text style={[styles.miniBadgeText, { color: '#ffffff' }]}>Primary</Text>
-                    </View>
+              {/* Bank Accounts */}
+              <TouchableOpacity
+                style={isDesktop ? styles.metricCardDesktop : styles.metricCardMobile}
+                onPress={() => router.push('/(tabs)/bank-accounts' as any)}
+                activeOpacity={0.7}
+              >
+                <View style={styles.metricTop}>
+                  <View style={[styles.metricIconBox, { backgroundColor: '#e0f2fe' }]}>
+                    <Ionicons name="business" size={20} color="#0284c7" />
                   </View>
-                  <View style={[styles.sovereignBox, { backgroundColor: '#fef3c7', marginTop: 0 }]}>
-                    <Text style={[styles.sovereignText, { color: '#92400e', fontWeight: '700' }]} numberOfLines={1}>
-                      8g Sovereign: ₹{(live22kRate * 8).toLocaleString()}
-                    </Text>
+                  <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+                </View>
+                <Text style={styles.metricVal} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+                  {dash.totalBankAccounts}
+                </Text>
+                <Text style={styles.metricLabel} numberOfLines={1}>Bank Accounts</Text>
+                <Text style={styles.metricHint} numberOfLines={1}>Linked disbursement banks</Text>
+              </TouchableOpacity>
+
+              {/* Active Loans */}
+              <TouchableOpacity
+                style={isDesktop ? styles.metricCardDesktop : styles.metricCardMobile}
+                onPress={() => router.push('/(tabs)/loans' as any)}
+                activeOpacity={0.7}
+              >
+                <View style={styles.metricTop}>
+                  <View style={[styles.metricIconBox, { backgroundColor: '#fef3c7' }]}>
+                    <Ionicons name="cash" size={20} color="#b45309" />
                   </View>
+                  <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
                 </View>
-                <View style={styles.heroAmountRow}>
-                  <Text style={[styles.rateAmount, styles.rateAmountFeatured]}>
-                    ₹{live22kRate.toLocaleString()}
-                  </Text>
-                  <Text style={styles.rateUnitHero}>per 1g</Text>
-                  {rates?.gold22k?.change ? (
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2, marginLeft: 8, backgroundColor: isDark ? '#143823' : '#dcfce7', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 }}>
-                      <Ionicons 
-                        name={rates.gold22k.direction === 'up' ? 'arrow-up' : rates.gold22k.direction === 'down' ? 'arrow-down' : 'remove'} 
-                        size={11} 
-                        color={rates.gold22k.direction === 'up' ? colors.success : colors.danger} 
-                      />
-                      <Text style={{ fontSize: 11, fontWeight: '700', color: rates.gold22k.direction === 'up' ? colors.success : colors.danger }}>
-                        {rates.gold22k.change >= 0 ? `+₹${rates.gold22k.change}` : `-₹${Math.abs(rates.gold22k.change)}`}
-                      </Text>
-                    </View>
-                  ) : null}
-                </View>
-              </View>
+                <Text style={styles.metricVal} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+                  ₹{(dash.totalLoanAmount / 1000).toFixed(0)}k
+                </Text>
+                <Text style={styles.metricLabel} numberOfLines={1}>{dash.activeLoans} Active Loans</Text>
+                <Text style={styles.metricHint} numberOfLines={1}>Total disbursed capital</Text>
+              </TouchableOpacity>
 
-              {/* 24K and 18K Secondary Side-by-Side */}
-              <View style={styles.ratesTwoColRow}>
-                {/* 24K Pure Gold */}
-                <View style={[styles.rateBox, { flex: 1 }]}>
-                  <View style={styles.rateBoxHeader}>
-                    <Text style={styles.rateKarat} numberOfLines={1}>24K Pure (999)</Text>
-                    <View style={[styles.miniBadge, { backgroundColor: '#fef08a' }]}>
-                      <Text style={[styles.miniBadgeText, { color: '#854d0e' }]}>99.9%</Text>
-                    </View>
+              {/* Pledged Ornaments */}
+              <TouchableOpacity
+                style={isDesktop ? styles.metricCardDesktop : styles.metricCardMobile}
+                onPress={() => router.push('/(tabs)/ornaments' as any)}
+                activeOpacity={0.7}
+              >
+                <View style={styles.metricTop}>
+                  <View style={[styles.metricIconBox, { backgroundColor: '#dcfce7' }]}>
+                    <Ionicons name="shield-checkmark" size={20} color="#16a34a" />
                   </View>
-                  <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4 }}>
-                    <Text style={styles.rateAmount} numberOfLines={1}>₹{live24kRate.toLocaleString()}</Text>
-                    {rates?.gold24k?.change ? (
-                      <Text style={{ fontSize: 10, fontWeight: '700', color: rates.gold24k.direction === 'up' ? colors.success : colors.danger }}>
-                        {rates.gold24k.change >= 0 ? `+₹${rates.gold24k.change}` : `-₹${Math.abs(rates.gold24k.change)}`}
-                      </Text>
-                    ) : null}
-                  </View>
-                  <Text style={styles.rateUnit}>per 1g</Text>
-                  <View style={styles.sovereignBox}>
-                    <Text style={styles.sovereignText} numberOfLines={1}>8g: ₹{(live24kRate * 8).toLocaleString()}</Text>
-                  </View>
+                  <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
                 </View>
-
-                {/* 18K Hallmarked */}
-                <View style={[styles.rateBox, { flex: 1 }]}>
-                  <View style={styles.rateBoxHeader}>
-                    <Text style={styles.rateKarat} numberOfLines={1}>18K Gold (750)</Text>
-                    <View style={[styles.miniBadge, { backgroundColor: '#fed7aa' }]}>
-                      <Text style={[styles.miniBadgeText, { color: '#9a3412' }]}>75.0%</Text>
-                    </View>
-                  </View>
-                  <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4 }}>
-                    <Text style={styles.rateAmount} numberOfLines={1}>₹{live18kRate.toLocaleString()}</Text>
-                    {rates?.gold18k?.change ? (
-                      <Text style={{ fontSize: 10, fontWeight: '700', color: rates.gold18k.direction === 'up' ? colors.success : colors.danger }}>
-                        {rates.gold18k.change >= 0 ? `+₹${rates.gold18k.change}` : `-₹${Math.abs(rates.gold18k.change)}`}
-                      </Text>
-                    ) : null}
-                  </View>
-                  <Text style={styles.rateUnit}>per 1g</Text>
-                  <View style={styles.sovereignBox}>
-                    <Text style={styles.sovereignText} numberOfLines={1}>8g: ₹{(live18kRate * 8).toLocaleString()}</Text>
-                  </View>
-                </View>
-              </View>
+                <Text style={styles.metricVal} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+                  {dash.pledgedGrams.toFixed(1)}g
+                </Text>
+                <Text style={styles.metricLabel} numberOfLines={1}>{dash.pledgedOrnamentsCount} Pledged Items</Text>
+                <Text style={styles.metricHint} numberOfLines={1}>Secured in bank vault</Text>
+              </TouchableOpacity>
             </View>
-          ) : (
-            // ─── DESKTOP/TABLET 3-COLUMN ROW ───
-            <View style={styles.ratesGridRow}>
-              {/* 24K Pure Gold */}
-              <View style={styles.rateBox}>
-                <View style={styles.rateBoxHeader}>
-                  <Text style={styles.rateKarat} numberOfLines={1}>24K Pure (999)</Text>
-                  <View style={[styles.miniBadge, { backgroundColor: '#fef08a' }]}>
-                    <Text style={[styles.miniBadgeText, { color: '#854d0e' }]}>99.9%</Text>
-                  </View>
+
+            {/* ─── SECTION 4: BANK LIMIT UTILIZATION ─── */}
+            <View style={styles.bankUtilCard}>
+              <View style={styles.bankUtilHeader}>
+                <View style={{ flex: 1, minWidth: 160 }}>
+                  <Text style={styles.bankUtilTitle} numberOfLines={1}>Bank Loan Limit Utilization</Text>
+                  <Text style={styles.bankUtilSubText} numberOfLines={1}>Overall credit line exposure across banks</Text>
                 </View>
-                <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4 }}>
-                  <Text style={styles.rateAmount} numberOfLines={1}>₹{live24kRate.toLocaleString()}</Text>
-                  {rates?.gold24k?.change ? (
-                    <Text style={{ fontSize: 11, fontWeight: '700', color: rates.gold24k.direction === 'up' ? colors.success : colors.danger }}>
-                      {rates.gold24k.change >= 0 ? `+₹${rates.gold24k.change}` : `-₹${Math.abs(rates.gold24k.change)}`}
-                    </Text>
-                  ) : null}
-                </View>
-                <Text style={styles.rateUnit}>per 1g</Text>
-                <View style={styles.sovereignBox}>
-                  <Text style={styles.sovereignText} numberOfLines={1}>8g: ₹{(live24kRate * 8).toLocaleString()}</Text>
+                <View style={styles.utilPill}>
+                  <Text style={styles.utilPillText}>{utilPercent}% Utilized</Text>
                 </View>
               </View>
 
-              {/* 22K Jewelry Standard (Featured) */}
-              <View style={[styles.rateBox, styles.rateBoxFeatured]}>
-                <View style={styles.rateBoxHeader}>
-                  <Text style={[styles.rateKarat, { color: isDark ? '#fbbf24' : colors.primaryDark }]} numberOfLines={1}>
-                    22K Standard (916)
-                  </Text>
-                  <View style={[styles.miniBadge, { backgroundColor: Colors.primaryDark }]}>
-                    <Text style={[styles.miniBadgeText, { color: '#ffffff' }]}>Primary</Text>
-                  </View>
+              <View style={styles.utilAmountsRow}>
+                <View>
+                  <Text style={styles.utilAmountLabel}>Total Disbursed</Text>
+                  <Text style={styles.utilAmountVal} numberOfLines={1}>₹{dash.totalLoanAmount.toLocaleString()}</Text>
                 </View>
-                <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6 }}>
-                  <Text style={[styles.rateAmount, styles.rateAmountFeatured]} numberOfLines={1}>
-                    ₹{live22kRate.toLocaleString()}
-                  </Text>
-                  {rates?.gold22k?.change ? (
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2, backgroundColor: isDark ? '#143823' : '#dcfce7', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 }}>
-                      <Ionicons 
-                        name={rates.gold22k.direction === 'up' ? 'arrow-up' : rates.gold22k.direction === 'down' ? 'arrow-down' : 'remove'} 
-                        size={11} 
-                        color={rates.gold22k.direction === 'up' ? colors.success : colors.danger} 
-                      />
-                      <Text style={{ fontSize: 11, fontWeight: '700', color: rates.gold22k.direction === 'up' ? colors.success : colors.danger }}>
-                        {rates.gold22k.change >= 0 ? `+₹${rates.gold22k.change}` : `-₹${Math.abs(rates.gold22k.change)}`}
-                      </Text>
-                    </View>
-                  ) : null}
-                </View>
-                <Text style={styles.rateUnit}>per 1g</Text>
-                <View style={[styles.sovereignBox, { backgroundColor: '#fef3c7' }]}>
-                  <Text style={[styles.sovereignText, { color: '#92400e', fontWeight: '700' }]} numberOfLines={1}>
-                    8g Sovereign: ₹{(live22kRate * 8).toLocaleString()}
-                  </Text>
+                <View style={{ alignItems: 'flex-end' }}>
+                  <Text style={styles.utilAmountLabel}>Eligible Limit ({Env.MAX_LTV_PERCENT}% LTV)</Text>
+                  <Text style={styles.utilAmountVal} numberOfLines={1}>₹{dash.totalEligibleLoanAmount.toLocaleString()}</Text>
                 </View>
               </View>
 
-              {/* 18K Hallmarked */}
-              <View style={styles.rateBox}>
-                <View style={styles.rateBoxHeader}>
-                  <Text style={styles.rateKarat} numberOfLines={1}>18K Gold (750)</Text>
-                  <View style={[styles.miniBadge, { backgroundColor: '#fed7aa' }]}>
-                    <Text style={[styles.miniBadgeText, { color: '#9a3412' }]}>75.0%</Text>
-                  </View>
+              <View style={styles.barBg}>
+                <View style={[styles.barFill, { width: `${utilPercent}%` }]} />
+              </View>
+
+              <View style={styles.utilFooter}>
+                <Ionicons name="checkmark-circle" size={16} color={colors.success} />
+                <Text style={styles.bankUtilSub} numberOfLines={1} ellipsizeMode="tail">
+                  Available credit headroom: <Text style={{ color: colors.success, fontWeight: '700' }}>₹{dash.totalAvailableLoanAmount.toLocaleString()}</Text>
+                </Text>
+              </View>
+            </View>
+
+            {/* ─── SECTION 5: QUICK ACTIONS GRID (4-IN-A-ROW ON DESKTOP, 2x2 ON MOBILE) ─── */}
+            <Text style={styles.sectionHeading}>Quick Actions</Text>
+            <View style={isDesktop ? styles.quickActionsGridDesktop : styles.quickActionsGridMobile}>
+              <TouchableOpacity
+                style={[isDesktop ? styles.actionCardDesktop : styles.actionCardMobile, isReadOnly && styles.actionCardDisabled]}
+                onPress={() => handleActionPress('/loans/new')}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.actionIconBox, { backgroundColor: '#fef08a' }]}>
+                  <Ionicons name={isReadOnly ? "lock-closed" : "add-circle"} size={20} color={isDark ? '#fbbf24' : colors.primaryDark} />
                 </View>
-                <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4 }}>
-                  <Text style={styles.rateAmount} numberOfLines={1}>₹{live18kRate.toLocaleString()}</Text>
-                  {rates?.gold18k?.change ? (
-                    <Text style={{ fontSize: 11, fontWeight: '700', color: rates.gold18k.direction === 'up' ? colors.success : colors.danger }}>
-                      {rates.gold18k.change >= 0 ? `+₹${rates.gold18k.change}` : `-₹${Math.abs(rates.gold18k.change)}`}
-                    </Text>
-                  ) : null}
+                <Text style={styles.actionTitle} numberOfLines={1}>New Loan</Text>
+                <Text style={styles.actionSub} numberOfLines={1}>{isReadOnly ? 'Admin only' : 'Disburse collateral'}</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[isDesktop ? styles.actionCardDesktop : styles.actionCardMobile, isReadOnly && styles.actionCardDisabled]}
+                onPress={() => handleActionPress('/customers/new')}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.actionIconBox, { backgroundColor: '#e0f2fe' }]}>
+                  <Ionicons name={isReadOnly ? "lock-closed" : "person-add"} size={20} color="#0284c7" />
                 </View>
-                <Text style={styles.rateUnit}>per 1g</Text>
-                <View style={styles.sovereignBox}>
-                  <Text style={styles.sovereignText} numberOfLines={1}>8g: ₹{(live18kRate * 8).toLocaleString()}</Text>
+                <Text style={styles.actionTitle} numberOfLines={1}>Add Customer</Text>
+                <Text style={styles.actionSub} numberOfLines={1}>{isReadOnly ? 'Admin only' : 'Register borrower'}</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[isDesktop ? styles.actionCardDesktop : styles.actionCardMobile, isReadOnly && styles.actionCardDisabled]}
+                onPress={() => handleActionPress({ pathname: '/(tabs)/ornaments', params: { action: 'add' } })}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.actionIconBox, { backgroundColor: '#fef3c7' }]}>
+                  <Ionicons name={isReadOnly ? "lock-closed" : "diamond"} size={20} color="#b45309" />
                 </View>
-              </View>
-            </View>
-          )}
-        </View>
+                <Text style={styles.actionTitle} numberOfLines={1}>Pledge Gold</Text>
+                <Text style={styles.actionSub} numberOfLines={1}>{isReadOnly ? 'Admin only' : 'Deposit vault item'}</Text>
+              </TouchableOpacity>
 
-        {/* ─── SECTION 2: GOLD VAULT VALUATION (3-COLUMN GRID) ─── */}
-        <Text style={styles.sectionHeading}>Gold Vault Valuation</Text>
-        <View style={[styles.valGrid, (isDesktop || isTablet) && styles.valGridRow]}>
-          {/* 1. Current Market Value */}
-          <View style={[styles.valCard, (isDesktop || isTablet) && { flex: 1 }]}>
-            <View style={styles.valCardTop}>
-              <Text style={styles.valTitle} numberOfLines={1}>Current Market Value</Text>
-              <View style={[styles.valIconBox, { backgroundColor: '#fef3c7' }]}>
-                <Ionicons name="diamond" size={18} color="#b45309" />
-              </View>
+              <TouchableOpacity
+                style={isDesktop ? styles.actionCardDesktop : styles.actionCardMobile}
+                onPress={() => router.push('/(tabs)/closure' as any)}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.actionIconBox, { backgroundColor: '#dcfce7' }]}>
+                  <Ionicons name="receipt" size={20} color="#16a34a" />
+                </View>
+                <Text style={styles.actionTitle} numberOfLines={1}>Settlements</Text>
+                <Text style={styles.actionSub} numberOfLines={1}>{isReadOnly ? 'View closures' : 'Record settlement'}</Text>
+              </TouchableOpacity>
             </View>
-            <Text style={styles.valAmount} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
-              ₹{currentGoldValue.toLocaleString()}
-            </Text>
-            <View style={styles.valBadge}>
-              <Text style={styles.valBadgeText} numberOfLines={1} ellipsizeMode="tail">
-                {totalGoldWeight.toFixed(2)}g net wt @ ₹{live22kRate}/g
-              </Text>
-            </View>
-          </View>
-
-          {/* 2. Total Buying Cost */}
-          <View style={[styles.valCard, (isDesktop || isTablet) && { flex: 1 }]}>
-            <View style={styles.valCardTop}>
-              <Text style={styles.valTitle} numberOfLines={1}>Total Acquisition Cost</Text>
-              <View style={[styles.valIconBox, { backgroundColor: '#e2e8f0' }]}>
-                <Ionicons name="wallet" size={18} color="#475569" />
-              </View>
-            </View>
-            <Text style={styles.valAmount} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
-              ₹{buyingGoldValue.toLocaleString()}
-            </Text>
-            <View style={[styles.valBadge, { backgroundColor: '#f1f5f9' }]}>
-              <Text style={[styles.valBadgeText, { color: colors.textSecondary }]} numberOfLines={1}>
-                Historical purchase benchmark
-              </Text>
-            </View>
-          </View>
-
-          {/* 3. Unrealized Appreciation */}
-          <View style={[styles.valCard, styles.valCardSuccess, (isDesktop || isTablet) && { flex: 1 }]}>
-            <View style={styles.valCardTop}>
-              <Text style={[styles.valTitle, { color: '#166534' }]} numberOfLines={1}>Appreciation Gains</Text>
-              <View style={[styles.valIconBox, { backgroundColor: '#dcfce7' }]}>
-                <Ionicons name="trending-up" size={18} color="#16a34a" />
-              </View>
-            </View>
-            <Text style={[styles.valAmount, { color: '#15803d' }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
-              +{appreciationGains >= 0 ? '₹' : '-₹'}{Math.abs(appreciationGains).toLocaleString()}
-            </Text>
-            <View style={[styles.valBadge, { backgroundColor: '#dcfce7' }]}>
-              <Text style={[styles.valBadgeText, { color: '#166534' }]} numberOfLines={1}>
-                +{appreciationPct.toFixed(1)}% portfolio growth
-              </Text>
-            </View>
-          </View>
-        </View>
-
-        {/* ─── SECTION 3: OPERATIONAL PORTFOLIO (4-COLUMN GRID ON DESKTOP) ─── */}
-        <Text style={styles.sectionHeading}>Operational Portfolio</Text>
-        <View style={isDesktop ? styles.metricsGridDesktop : styles.metricsGridMobile}>
-          {/* Customers */}
-          <TouchableOpacity 
-            style={isDesktop ? styles.metricCardDesktop : styles.metricCardMobile} 
-            onPress={() => router.push('/(tabs)/users' as any)}
-            activeOpacity={0.7}
-          >
-            <View style={styles.metricTop}>
-              <View style={styles.metricIconBox}>
-                <Ionicons name="people" size={20} color={isDark ? '#fbbf24' : colors.primaryDark} />
-              </View>
-              <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
-            </View>
-            <Text style={styles.metricVal} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
-              {dash.totalUsers}
-            </Text>
-            <Text style={styles.metricLabel} numberOfLines={1}>Active Customers</Text>
-            <Text style={styles.metricHint} numberOfLines={1}>Registered borrowers</Text>
-          </TouchableOpacity>
-
-          {/* Bank Accounts */}
-          <TouchableOpacity 
-            style={isDesktop ? styles.metricCardDesktop : styles.metricCardMobile} 
-            onPress={() => router.push('/(tabs)/bank-accounts' as any)}
-            activeOpacity={0.7}
-          >
-            <View style={styles.metricTop}>
-              <View style={[styles.metricIconBox, { backgroundColor: '#e0f2fe' }]}>
-                <Ionicons name="business" size={20} color="#0284c7" />
-              </View>
-              <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
-            </View>
-            <Text style={styles.metricVal} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
-              {dash.totalBankAccounts}
-            </Text>
-            <Text style={styles.metricLabel} numberOfLines={1}>Bank Accounts</Text>
-            <Text style={styles.metricHint} numberOfLines={1}>Linked disbursement banks</Text>
-          </TouchableOpacity>
-
-          {/* Active Loans */}
-          <TouchableOpacity 
-            style={isDesktop ? styles.metricCardDesktop : styles.metricCardMobile} 
-            onPress={() => router.push('/(tabs)/loans' as any)}
-            activeOpacity={0.7}
-          >
-            <View style={styles.metricTop}>
-              <View style={[styles.metricIconBox, { backgroundColor: '#fef3c7' }]}>
-                <Ionicons name="cash" size={20} color="#b45309" />
-              </View>
-              <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
-            </View>
-            <Text style={styles.metricVal} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
-              ₹{(dash.totalLoanAmount / 1000).toFixed(0)}k
-            </Text>
-            <Text style={styles.metricLabel} numberOfLines={1}>{dash.activeLoans} Active Loans</Text>
-            <Text style={styles.metricHint} numberOfLines={1}>Total disbursed capital</Text>
-          </TouchableOpacity>
-
-          {/* Pledged Ornaments */}
-          <TouchableOpacity 
-            style={isDesktop ? styles.metricCardDesktop : styles.metricCardMobile} 
-            onPress={() => router.push('/(tabs)/ornaments' as any)}
-            activeOpacity={0.7}
-          >
-            <View style={styles.metricTop}>
-              <View style={[styles.metricIconBox, { backgroundColor: '#dcfce7' }]}>
-                <Ionicons name="shield-checkmark" size={20} color="#16a34a" />
-              </View>
-              <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
-            </View>
-            <Text style={styles.metricVal} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
-              {dash.pledgedGrams.toFixed(1)}g
-            </Text>
-            <Text style={styles.metricLabel} numberOfLines={1}>{dash.pledgedOrnamentsCount} Pledged Items</Text>
-            <Text style={styles.metricHint} numberOfLines={1}>Secured in bank vault</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* ─── SECTION 4: BANK LIMIT UTILIZATION ─── */}
-        <View style={styles.bankUtilCard}>
-          <View style={styles.bankUtilHeader}>
-            <View style={{ flex: 1, minWidth: 160 }}>
-              <Text style={styles.bankUtilTitle} numberOfLines={1}>Bank Loan Limit Utilization</Text>
-              <Text style={styles.bankUtilSubText} numberOfLines={1}>Overall credit line exposure across banks</Text>
-            </View>
-            <View style={styles.utilPill}>
-              <Text style={styles.utilPillText}>{utilPercent}% Utilized</Text>
-            </View>
-          </View>
-
-          <View style={styles.utilAmountsRow}>
-            <View>
-              <Text style={styles.utilAmountLabel}>Total Disbursed</Text>
-              <Text style={styles.utilAmountVal} numberOfLines={1}>₹{dash.totalLoanAmount.toLocaleString()}</Text>
-            </View>
-            <View style={{ alignItems: 'flex-end' }}>
-              <Text style={styles.utilAmountLabel}>Eligible Limit ({Env.MAX_LTV_PERCENT}% LTV)</Text>
-              <Text style={styles.utilAmountVal} numberOfLines={1}>₹{dash.totalEligibleLoanAmount.toLocaleString()}</Text>
-            </View>
-          </View>
-
-          <View style={styles.barBg}>
-            <View style={[styles.barFill, { width: `${utilPercent}%` }]} />
-          </View>
-
-          <View style={styles.utilFooter}>
-            <Ionicons name="checkmark-circle" size={16} color={colors.success} />
-            <Text style={styles.bankUtilSub} numberOfLines={1} ellipsizeMode="tail">
-              Available credit headroom: <Text style={{ color: colors.success, fontWeight: '700' }}>₹{dash.totalAvailableLoanAmount.toLocaleString()}</Text>
-            </Text>
-          </View>
-        </View>
-
-        {/* ─── SECTION 5: QUICK ACTIONS GRID (4-IN-A-ROW ON DESKTOP, 2x2 ON MOBILE) ─── */}
-        <Text style={styles.sectionHeading}>Quick Actions</Text>
-        <View style={isDesktop ? styles.quickActionsGridDesktop : styles.quickActionsGridMobile}>
-          <TouchableOpacity 
-            style={[isDesktop ? styles.actionCardDesktop : styles.actionCardMobile, isReadOnly && styles.actionCardDisabled]} 
-            onPress={() => handleActionPress('/loans/new')} 
-            activeOpacity={0.7}
-          >
-            <View style={[styles.actionIconBox, { backgroundColor: '#fef08a' }]}>
-              <Ionicons name={isReadOnly ? "lock-closed" : "add-circle"} size={20} color={isDark ? '#fbbf24' : colors.primaryDark} />
-            </View>
-            <Text style={styles.actionTitle} numberOfLines={1}>New Loan</Text>
-            <Text style={styles.actionSub} numberOfLines={1}>{isReadOnly ? 'Admin only' : 'Disburse collateral'}</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity 
-            style={[isDesktop ? styles.actionCardDesktop : styles.actionCardMobile, isReadOnly && styles.actionCardDisabled]} 
-            onPress={() => handleActionPress('/customers/new')} 
-            activeOpacity={0.7}
-          >
-            <View style={[styles.actionIconBox, { backgroundColor: '#e0f2fe' }]}>
-              <Ionicons name={isReadOnly ? "lock-closed" : "person-add"} size={20} color="#0284c7" />
-            </View>
-            <Text style={styles.actionTitle} numberOfLines={1}>Add Customer</Text>
-            <Text style={styles.actionSub} numberOfLines={1}>{isReadOnly ? 'Admin only' : 'Register borrower'}</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity 
-            style={[isDesktop ? styles.actionCardDesktop : styles.actionCardMobile, isReadOnly && styles.actionCardDisabled]} 
-            onPress={() => handleActionPress('/ornaments/new')} 
-            activeOpacity={0.7}
-          >
-            <View style={[styles.actionIconBox, { backgroundColor: '#fef3c7' }]}>
-              <Ionicons name={isReadOnly ? "lock-closed" : "diamond"} size={20} color="#b45309" />
-            </View>
-            <Text style={styles.actionTitle} numberOfLines={1}>Pledge Gold</Text>
-            <Text style={styles.actionSub} numberOfLines={1}>{isReadOnly ? 'Admin only' : 'Deposit vault item'}</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity 
-            style={isDesktop ? styles.actionCardDesktop : styles.actionCardMobile} 
-            onPress={() => router.push('/(tabs)/closure' as any)} 
-            activeOpacity={0.7}
-          >
-            <View style={[styles.actionIconBox, { backgroundColor: '#dcfce7' }]}>
-              <Ionicons name="receipt" size={20} color="#16a34a" />
-            </View>
-            <Text style={styles.actionTitle} numberOfLines={1}>Settlements</Text>
-            <Text style={styles.actionSub} numberOfLines={1}>{isReadOnly ? 'View closures' : 'Record settlement'}</Text>
-          </TouchableOpacity>
-        </View>
           </>
         )}
       </ScrollView>
@@ -736,7 +741,7 @@ const getStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
   },
   content: {
     padding: 16,
-    paddingBottom: 20,
+    paddingBottom: 80,
     width: '100%',
   },
   contentDesktop: {
