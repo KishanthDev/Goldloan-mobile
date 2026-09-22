@@ -344,12 +344,14 @@ export default function NewOrnamentScreen() {
             {/* Card: Basic Information */}
             <View style={styles.card}>
               <View style={styles.cardHeader}>
-                <View style={styles.iconBox}>
-                  <Ionicons name="document-text-outline" size={18} color="#0284c7" />
-                </View>
-                <View>
-                  <Text style={styles.cardTitle}>Basic Information</Text>
-                  <Text style={styles.cardSubtitle}>Enter basic details about the ornament</Text>
+                <View style={styles.cardHeaderLeft}>
+                  <View style={styles.iconBox}>
+                    <Ionicons name="document-text-outline" size={18} color="#0284c7" />
+                  </View>
+                  <View>
+                    <Text style={styles.cardTitle}>Basic Information</Text>
+                    <Text style={styles.cardSubtitle}>Enter basic details about the ornament</Text>
+                  </View>
                 </View>
               </View>
 
@@ -490,12 +492,14 @@ export default function NewOrnamentScreen() {
             {/* Card 1: Weight Details */}
             <View style={styles.card}>
               <View style={styles.cardHeader}>
-                <View style={styles.iconBox}>
-                  <Ionicons name="scale-outline" size={18} color="#0284c7" />
-                </View>
-                <View>
-                  <Text style={styles.cardTitle}>Weight Details</Text>
-                  <Text style={styles.cardSubtitle}>Enter weight details of the ornament</Text>
+                <View style={styles.cardHeaderLeft}>
+                  <View style={styles.iconBox}>
+                    <Ionicons name="scale-outline" size={18} color="#0284c7" />
+                  </View>
+                  <View>
+                    <Text style={styles.cardTitle}>Weight Details</Text>
+                    <Text style={styles.cardSubtitle}>Enter weight details of the ornament</Text>
+                  </View>
                 </View>
               </View>
 
@@ -668,12 +672,14 @@ export default function NewOrnamentScreen() {
             {/* Card 1: Ornament Photos */}
             <View style={styles.card}>
               <View style={styles.cardHeader}>
-                <View style={styles.iconBox}>
-                  <Ionicons name="image-outline" size={18} color="#0284c7" />
-                </View>
-                <View>
-                  <Text style={styles.cardTitle}>Ornament Photos</Text>
-                  <Text style={styles.cardSubtitle}>Add clear photos of the ornament (at least 1)</Text>
+                <View style={styles.cardHeaderLeft}>
+                  <View style={styles.iconBox}>
+                    <Ionicons name="image-outline" size={18} color="#0284c7" />
+                  </View>
+                  <View>
+                    <Text style={styles.cardTitle}>Ornament Photos</Text>
+                    <Text style={styles.cardSubtitle}>Add clear photos of the ornament (at least 1)</Text>
+                  </View>
                 </View>
               </View>
 
@@ -711,12 +717,14 @@ export default function NewOrnamentScreen() {
             {/* Card 2: Additional Information */}
             <View style={styles.card}>
               <View style={styles.cardHeader}>
-                <View style={styles.iconBox}>
-                  <Ionicons name="document-text-outline" size={18} color="#0284c7" />
-                </View>
-                <View>
-                  <Text style={styles.cardTitle}>Additional Information</Text>
-                  <Text style={styles.cardSubtitle}>Add any additional details</Text>
+                <View style={styles.cardHeaderLeft}>
+                  <View style={styles.iconBox}>
+                    <Ionicons name="document-text-outline" size={18} color="#0284c7" />
+                  </View>
+                  <View>
+                    <Text style={styles.cardTitle}>Additional Information</Text>
+                    <Text style={styles.cardSubtitle}>Add any additional details</Text>
+                  </View>
                 </View>
               </View>
 
