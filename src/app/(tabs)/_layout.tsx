@@ -7,7 +7,7 @@ import {
 import { Tabs, useRouter, usePathname } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '../../constants/theme';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAppStore } from '../../services/store';
 import { Env } from '../../config/env';
 import { SidebarProvider, useSidebar } from '../../context/SidebarContext';
@@ -23,8 +23,9 @@ interface NavItem {
   route: string;
   title: string;
   shortTitle: string;
-  icon: keyof typeof Ionicons.glyphMap;
-  activeIcon: keyof typeof Ionicons.glyphMap;
+  icon: string;
+  activeIcon: string;
+  iconSet?: 'Ionicons' | 'MaterialCommunityIcons';
 }
 
 const NAV_ITEMS: NavItem[] = [
@@ -55,10 +56,11 @@ const NAV_ITEMS: NavItem[] = [
   {
     name: 'ornaments',
     route: '/(tabs)/ornaments',
-    title: 'Gold Vault',
-    shortTitle: 'Vault',
-    icon: 'diamond-outline',
-    activeIcon: 'diamond',
+    title: 'Ornaments',
+    shortTitle: 'Ornaments',
+    icon: 'ring',
+    activeIcon: 'ring',
+    iconSet: 'MaterialCommunityIcons',
   },
   {
     name: 'loans',
@@ -92,8 +94,8 @@ const TAB_METADATA: Record<string, { title: string; subtitle: string }> = {
     subtitle: 'Manage credit limits, lenders & utilized balances',
   },
   ornaments: {
-    title: 'Gold Vault Inventory',
-    subtitle: 'Physical inventory, karat purity & vault custody',
+    title: 'Ornaments',
+    subtitle: 'Physical inventory, karat purity & ornament details',
   },
   loans: {
     title: 'Active Loans Portfolio',
@@ -248,11 +250,19 @@ function TabLayoutInner() {
                   >
                     {active && <View style={styles.activePillIndicator} />}
                     <View style={styles.desktopNavIconBox}>
-                      <Ionicons
-                        name={active ? item.activeIcon : item.icon}
-                        size={20}
-                        color={active ? (isDark ? '#fbbf24' : colors.primaryDark) : colors.textSecondary}
-                      />
+                      {item.iconSet === 'MaterialCommunityIcons' ? (
+                        <MaterialCommunityIcons
+                          name={item.icon as any}
+                          size={20}
+                          color={active ? (isDark ? '#fbbf24' : colors.primaryDark) : colors.textSecondary}
+                        />
+                      ) : (
+                        <Ionicons
+                          name={(active ? item.activeIcon : item.icon) as any}
+                          size={20}
+                          color={active ? (isDark ? '#fbbf24' : colors.primaryDark) : colors.textSecondary}
+                        />
+                      )}
                     </View>
                     <Animated.View style={[styles.desktopNavTextWrapper, { opacity: textOpacity }]}>
                       <Text 
@@ -407,7 +417,7 @@ function TabLayoutInner() {
               <Tabs.Screen name="index" options={{ title: 'Dashboard' }} />
               <Tabs.Screen name="users" options={{ title: 'Users' }} />
               <Tabs.Screen name="bank-accounts" options={{ title: 'Banks' }} />
-              <Tabs.Screen name="ornaments" options={{ title: 'Vault' }} />
+              <Tabs.Screen name="ornaments" options={{ title: 'Ornaments' }} />
               <Tabs.Screen name="loans" options={{ title: 'Loans' }} />
               <Tabs.Screen name="closure" options={{ title: 'Closure' }} />
               <Tabs.Screen name="admin-users" options={{ title: 'Admins' }} />
@@ -427,11 +437,19 @@ function TabLayoutInner() {
                     activeOpacity={0.7}
                   >
                     <View style={[styles.bottomNavIconWrapper, active && styles.bottomNavIconWrapperActive]}>
-                      <Ionicons
-                        name={active ? item.activeIcon : item.icon}
-                        size={21}
-                        color={active ? (isDark ? '#fbbf24' : colors.primaryDark) : colors.textSecondary}
-                      />
+                      {item.iconSet === 'MaterialCommunityIcons' ? (
+                        <MaterialCommunityIcons
+                          name={item.icon as any}
+                          size={22}
+                          color={active ? (isDark ? '#fbbf24' : colors.primaryDark) : colors.textSecondary}
+                        />
+                      ) : (
+                        <Ionicons
+                          name={(active ? item.activeIcon : item.icon) as any}
+                          size={21}
+                          color={active ? (isDark ? '#fbbf24' : colors.primaryDark) : colors.textSecondary}
+                        />
+                      )}
                     </View>
                     <Text 
                       style={[
