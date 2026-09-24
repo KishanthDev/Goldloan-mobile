@@ -1,18 +1,26 @@
-import React, { useState } from 'react';
-import { 
-  View, Text, StyleSheet, ScrollView, TouchableOpacity, 
-  Modal, TextInput, Alert, SafeAreaView, Platform, RefreshControl 
-} from 'react-native';
-import { Colors, ThemeColors } from '../../constants/theme';
-import { useTheme } from '../../context/ThemeContext';
-import { useAppStore } from '../../services/store';
-import { Loan, Payment } from '../../types';
-import { DataTable, Column } from '../../components/DataTable';
-import { MobileCard } from '../../components/MobileCard';
-import { Badge } from '../../components/Badge';
 import { Ionicons } from '@expo/vector-icons';
-import { useToast } from '../../context/ToastContext';
+import { useState } from 'react';
+import {
+    Alert,
+    Modal,
+    Platform, RefreshControl,
+    SafeAreaView,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
+} from 'react-native';
+import { Badge } from '../../components/Badge';
+import { Column, DataTable } from '../../components/DataTable';
+import { MobileCard } from '../../components/MobileCard';
+import { ThemeColors } from '../../constants/theme';
 import { useAuth } from '../../context/AuthContext';
+import { useTheme } from '../../context/ThemeContext';
+import { useToast } from '../../context/ToastContext';
+import { useAppStore } from '../../services/store';
+import { Loan } from '../../types';
 
 export default function LoansScreen() {
   const { colors, isDark } = useTheme();
@@ -94,7 +102,7 @@ export default function LoansScreen() {
     if (form.UserId && o.UserId && o.UserId !== form.UserId) return false;
     if (isEditing && editingLoan?.ornamentIds?.includes(o.OrnamentId)) return true;
     if (selectedOrnIds.includes(o.OrnamentId)) return true;
-    return o.Status === 'Available' || o.Status === 'Released';
+    return o.Status === 'Available';
   });
   const selectedOrnsList = store.ornaments.filter(o => selectedOrnIds.includes(o.OrnamentId));
   const totalGrossWeight = selectedOrnsList.reduce((s, o) => s + (Number(o.GrossWeight) || 0), 0);
@@ -147,7 +155,7 @@ export default function LoansScreen() {
       NetWeight: '',
       Remarks: '',
     });
-    const candidateInitial = store.ornaments.filter(o => (o.Status === 'Available' || o.Status === 'Released') && (!initialUser || o.UserId === initialUser));
+    const candidateInitial = store.ornaments.filter(o => o.Status === 'Available' && (!initialUser || o.UserId === initialUser));
     setSelectedOrnIds(candidateInitial.slice(0, 1).map(o => o.OrnamentId));
     setModalVisible(true);
   };

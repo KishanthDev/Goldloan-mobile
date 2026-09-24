@@ -1,9 +1,16 @@
 import { ApiConfig } from '../config/api';
-import { cache, CacheTTL } from './cache';
-import { 
-  User, BankAccount, Ornament, Loan, Payment, 
-  DashboardData, GoldRateData, ApiResponse, InitialSyncData, AdminUser 
+import {
+  AdminUser,
+  ApiResponse,
+  BankAccount,
+  DashboardData, GoldRateData,
+  InitialSyncData,
+  Loan,
+  Ornament,
+  Payment,
+  User
 } from '../types';
+import { cache, CacheTTL } from './cache';
 
 /**
  * Helper to convert Google Drive sharing links to direct image thumbnail URLs

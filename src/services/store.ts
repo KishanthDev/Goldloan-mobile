@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { User, BankAccount, Ornament, Loan, Payment, GoldRateData, DashboardData, InitialSyncData } from '../types';
+import { useEffect, useState } from 'react';
+import { BankAccount, DashboardData, GoldRateData, InitialSyncData, Loan, Ornament, Payment, User } from '../types';
 import { api } from './api';
 import { cache, CacheTTL } from './cache';
 
@@ -697,10 +697,10 @@ export function useAppStore() {
     } : l);
 
     if (targetLoan.ornamentIds && targetLoan.ornamentIds.length > 0) {
-      ornamentsState = ornamentsState.map(o => 
+      ornamentsState = ornamentsState.map(o =>
         targetLoan.ornamentIds?.includes(o.OrnamentId) ? {
           ...o,
-          Status: 'Released',
+          Status: 'Available',
           ReleaseDate: new Date().toISOString(),
           ReleasedLoanId: loanId,
         } : o

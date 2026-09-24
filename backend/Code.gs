@@ -1,21 +1,7 @@
-/**
- * Goldora - Google Apps Script Backend (REST API + Web App)
- * 
- * Features:
- * - Google Sheets as the relational database
- * - Google Drive for customer photos, passbook images, ornament photos, and delivery proofs
- * - doGet(e) and doPost(e) REST API dispatcher for Expo / React Native mobile apps
- * - Server-side CacheService for fast reads (< 150ms) and automatic cache invalidation
- * - GoodReturns live gold rates scraper for Bangalore (24K, 22K, 18K)
- */
-
-// Paste your Google Spreadsheet ID here (or leave empty to use active spreadsheet):
-const SPREADSHEET_ID = SpreadsheetApp.getActiveSpreadsheet() 
-  ? SpreadsheetApp.getActiveSpreadsheet().getId() 
-  : "YOUR_SPREADSHEET_ID_HERE";
-
+const SPREADSHEET_ID =
+  SpreadsheetApp.getActiveSpreadsheet().getId();
 const SHEET_HEADERS = {
-  Admins: ["AdminId", "Username", "Password", "Role", "Status"],
+  Admins: ["AdminId", "Username", "Password", "Role", "Status"], // NEW: Admin Sheet
   Users: ["UserId", "CustomerCode", "FullName", "FatherHusbandName", "MobileNumber", "AlternateMobileNumber", "Email", "DateOfBirth", "Gender", "AadhaarNumber", "PANNumber", "AddressLine1", "AddressLine2", "City", "State", "Pincode", "Occupation", "CustomerPhoto", "Status", "CreatedDate", "UpdatedDate"],
   BankAccounts: ["BankAccountId", "UserId", "AccountHolderName", "AccountNumber", "BankName", "BranchName", "City", "IFSCCode", "AccountType", "UPI_ID", "PassbookImage", "Status", "CreatedDate", "UpdatedDate", "MaxLoanAmount", "UtilizedLoanAmount"],
   Ornaments: ["OrnamentId", "UserId", "OrnamentName", "OrnamentType", "OrnamentCategory", "Description", "GrossWeight", "NetWeight", "MetalWeight", "StoneWeight", "Purity", "HallmarkNumber", "Quantity", "BuyingPricePerGram", "CurrentPricePerGram", "BuyingCost", "TotalPrice", "MarketValue", "AppreciationValue", "AppreciationPercentage", "MakerName", "EstimatedValue", "OrnamentImages", "Remarks", "Status", "ReleaseDate", "ReleasedLoanId"],
@@ -25,143 +11,11 @@ const SHEET_HEADERS = {
   Releases: ["ReleaseId", "LoanId", "OrnamentId", "ReleaseDate", "ReleasedBy", "CustomerSignature", "DeliveryProofImage", "Remarks"]
 };
 
-// ─── WEB APP REST API ROUTERS ───
-
-function doGet(e) {
-  // If called as an API with ?action=...
-  if (e && e.parameter && e.parameter.action) {
-    return handleApiGet(e);
-  }
-
-  // Fallback: Check if index.html exists, otherwise return JSON status
-  try {
-    return HtmlService.createHtmlOutputFromFile("index")
-      .setTitle("Goldora")
-      .addMetaTag('viewport', 'width=device-width, initial-scale=1')
-      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
-  } catch (err) {
-    return jsonResponse({ status: "ok", message: "Gold Loan REST API is running. Use ?action=getDashboardData" });
-  }
-}
-
-function doPost(e) {
-  try {
-    const postData = e.postData && e.postData.contents ? JSON.parse(e.postData.contents) : {};
-    const action = postData.action || (e.parameter ? e.parameter.action : null);
-    return handleApiPost(action, postData);
-  } catch (error) {
-    return jsonResponse({ success: false, error: "Invalid JSON request: " + error.message });
-  }
-}
-
-function handleApiGet(e) {
-  const action = e.parameter.action;
-  let result;
-
-  switch (action) {
-    case "getDashboardData":
-      result = getDashboardData();
-      break;
-    case "getGoldRates":
-      result = getGoldRates(e.parameter.forceRefresh === "true");
-      break;
-    case "getUsers":
-      result = getUsers();
-      break;
-    case "getBankAccounts":
-      result = getBankAccounts(e.parameter.userId);
-      break;
-    case "getOrnaments":
-      result = getOrnaments(e.parameter.userId);
-      break;
-    case "getAvailableOrnaments":
-      result = getAvailableOrnaments();
-      break;
-    case "getLoans":
-      result = getLoans(e.parameter.userId, e.parameter.status);
-      break;
-    case "getLoanDetails":
-      result = getLoanDetails(e.parameter.loanId);
-      break;
-    case "setupSheets":
-      result = setupSheets();
-      break;
-    default:
-      result = { success: false, error: "Unknown GET action: " + action };
-  }
-
-  return jsonResponse(result);
-}
-
-function handleApiPost(action, body) {
-  let result;
-
-  switch (action) {
-    case "addUser":
-      result = addUser(body.userData || body);
-      break;
-    case "updateUser":
-      result = updateUser(body.userId, body.userData || body);
-      break;
-    case "deleteUser":
-      result = deleteUser(body.userId);
-      break;
-    case "addBankAccount":
-      result = addBankAccount(body.accountData || body);
-      break;
-    case "updateBankAccount":
-      result = updateBankAccount(body.accountId, body.accountData || body);
-      break;
-    case "deleteBankAccount":
-      result = deleteBankAccount(body.accountId);
-      break;
-    case "addOrnament":
-      result = addOrnament(body.ornamentData || body);
-      break;
-    case "updateOrnament":
-      result = updateOrnament(body.ornamentId, body.ornamentData || body);
-      break;
-    case "deleteOrnament":
-      result = deleteOrnament(body.ornamentId);
-      break;
-    case "addLoan":
-      result = addLoan(body.loanData || body);
-      break;
-    case "updateLoan":
-      result = updateLoan(body.loanId, body.loanData || body);
-      break;
-    case "addPayment":
-      result = addPayment(body.paymentData || body);
-      break;
-    case "releaseOrnaments":
-      result = releaseOrnaments(body.releaseData || body);
-      break;
-    case "closeAndReleaseLoan":
-      result = closeAndReleaseLoan(body);
-      break;
-    case "authenticateAdmin":
-      result = authenticateAdmin(body.username, body.password);
-      break;
-    case "setupSheets":
-      result = setupSheets();
-      break;
-    default:
-      result = { success: false, error: "Unknown POST action: " + action };
-  }
-
-  return jsonResponse(result);
-}
-
-function jsonResponse(data) {
-  return ContentService
-    .createTextOutput(JSON.stringify(data))
-    .setMimeType(ContentService.MimeType.JSON);
-}
-
-// ─── INITIAL SETUP & SEEDING ───
+// ─── SETUP ───
 
 function setupSheets() {
   try {
+    assertOwner_();
     const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
     Object.entries(SHEET_HEADERS).forEach(([name, headers]) => {
       let sheet = ss.getSheetByName(name);
@@ -176,36 +30,703 @@ function setupSheets() {
         firstRowRange.setFontWeight("bold").setBackground("#4a90e2").setFontColor("#ffffff");
         sheet.setFrozenRows(1);
 
+        // NEW: Seed default admin credentials if setting up for the first time
         if (name === "Admins") {
-          sheet.appendRow(["ADM001", "admin", "password123", "SuperAdmin", "Active"]);
+          // Default Username: admin, Password: password123 (stored as SHA-256 hash)
+          sheet.appendRow(["ADM001", "admin", hashValue_("password123"), "SuperAdmin", "Active"]);
+        }
+      } else {
+        const firstRow = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+        const headersMatch = headers.length === firstRow.length && firstRow.every((val, i) => val === headers[i]);
+        if (!headersMatch) {
+          if (sheet.getLastRow() <= 1) {
+            sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+            sheet.getRange(1, 1, 1, headers.length).setFontWeight("bold").setBackground("#4a90e2").setFontColor("#ffffff");
+            sheet.setFrozenRows(1);
+          } else {
+            headers.forEach(h => {
+              if (!firstRow.includes(h)) {
+                const newCol = sheet.getLastColumn() + 1;
+                const cell = sheet.getRange(1, newCol);
+                cell.setValue(h);
+                cell.setFontWeight("bold").setBackground("#4a90e2").setFontColor("#ffffff");
+                firstRow.push(h);
+
+                if (name === "Loans" && h === "BankName") {
+                  try {
+                    const bankAccounts = getSheetData_("BankAccounts");
+                    const bankMap = new Map(bankAccounts.map(b => [String(b.BankAccountId), b.BankName]));
+                    const data = sheet.getDataRange().getValues();
+                    const bankAccIdx = data[0].indexOf("BankAccountId");
+                    if (bankAccIdx !== -1) {
+                      for (let r = 1; r < data.length; r++) {
+                        const accId = String(data[r][bankAccIdx]);
+                        if (accId && bankMap.has(accId)) {
+                          sheet.getRange(r + 1, newCol).setValue(bankMap.get(accId));
+                        }
+                      }
+                    }
+                  } catch (err) {
+                    console.error("Error backfilling BankName:", err);
+                  }
+                }
+              }
+            });
+          }
         }
       }
     });
 
-    // Invalidate caches
-    invalidateAllCaches();
+    // Reconcile all bank account utilization on setup
+    try {
+      const allBankAccounts = getSheetData_("BankAccounts");
+      const activeLoans = getSheetData_("Loans").filter(l => l.LoanStatus === "Active");
+      allBankAccounts.forEach(acc => {
+        const exactUtilized = activeLoans
+          .filter(l => String(l.UserId) === String(acc.UserId) && String(l.BankAccountId) === String(acc.BankAccountId))
+          .reduce((sum, l) => sum + (parseFloat(l.LoanAmount) || 0), 0);
+        if (parseFloat(acc.UtilizedLoanAmount) !== exactUtilized) {
+          updateRow_("BankAccounts", "BankAccountId", acc.BankAccountId, { UtilizedLoanAmount: exactUtilized });
+        }
+      });
+    } catch (err) {
+      console.error("Error reconciling bank accounts:", err);
+    }
+
     return { success: true, data: "Sheets initialized successfully" };
   } catch (e) {
     return { success: false, error: e.message };
   }
 }
 
-function authenticateAdmin(username, password) {
+// ─── SECURITY UTILITIES ───
+
+/**
+ * Computes a SHA-256 hex digest of a string value.
+ * Used for password hashing (one-way) and session token generation.
+ */
+function hashValue_(value) {
+  const bytes = Utilities.computeDigest(
+    Utilities.DigestAlgorithm.SHA_256,
+    String(value),
+    Utilities.Charset.UTF_8
+  );
+  return bytes.map(b => ('0' + (b & 0xFF).toString(16)).slice(-2)).join('');
+}
+
+/**
+ * Brute-force protection: allows max 5 login attempts per username per 15 minutes.
+ * Throws an error string if the rate limit is exceeded.
+ */
+function checkLoginRateLimit_(username) {
+  const key = 'LOGIN_ATTEMPTS_' + String(username).toLowerCase();
+  const props = PropertiesService.getScriptProperties();
+  const raw = props.getProperty(key);
+  let data = raw ? JSON.parse(raw) : { count: 0, firstAttempt: Date.now() };
+
+  const WINDOW_MS = 15 * 60 * 1000; // 15 minutes
+  const MAX_ATTEMPTS = 5;
+
+  // Reset window if it has expired
+  if (Date.now() - data.firstAttempt > WINDOW_MS) {
+    data = { count: 0, firstAttempt: Date.now() };
+  }
+
+  data.count++;
+  props.setProperty(key, JSON.stringify(data));
+
+  if (data.count > MAX_ATTEMPTS) {
+    const waitMins = Math.ceil((WINDOW_MS - (Date.now() - data.firstAttempt)) / 60000);
+    throw new Error('Too many failed login attempts. Please try again in ' + waitMins + ' minute(s).');
+  }
+}
+
+/**
+ * Clears the login attempt counter for a username after a successful login.
+ */
+function resetLoginRateLimit_(username) {
   try {
-    const admins = getSheetData("Admins").filter(a => a.Status === "Active");
-    const admin = admins.find(a => String(a.Username) === String(username) && String(a.Password) === String(password));
-    if (admin) {
-      return { success: true, data: { username: admin.Username, role: admin.Role } };
+    PropertiesService.getScriptProperties()
+      .deleteProperty('LOGIN_ATTEMPTS_' + String(username).toLowerCase());
+  } catch (e) { /* ignore */ }
+}
+
+/**
+ * Generates a secure session token, stores it in PropertiesService with an 8-hour TTL.
+ * Returns the token string.
+ */
+function createSessionToken_(username, role) {
+  const raw = username + ':' + Date.now() + ':' + Utilities.getUuid() + Utilities.getUuid();
+  const token = hashValue_(raw);
+  const expiry = Date.now() + (8 * 60 * 60 * 1000); // 8 hours
+
+  PropertiesService.getScriptProperties()
+    .setProperty('SESSION_' + token, JSON.stringify({ username, role, expiry }));
+
+  return token;
+}
+
+/**
+ * Validates a session token. Returns the session object { username, role } if valid,
+ * or null if missing, expired, or invalid.
+ */
+function validateSessionToken_(token) {
+  if (!token) return null;
+  try {
+    const props = PropertiesService.getScriptProperties();
+    const raw = props.getProperty('SESSION_' + token);
+    if (!raw) return null;
+    const session = JSON.parse(raw);
+    if (Date.now() > session.expiry) {
+      props.deleteProperty('SESSION_' + token);
+      return null;
     }
-    return { success: false, error: "Invalid username or password." };
+    return session;
+  } catch (e) {
+    return null;
+  }
+}
+
+/**
+ * Invalidates a session token on the server side (secure logout).
+ */
+function logoutAdmin(token) {
+  try {
+    if (token) {
+      PropertiesService.getScriptProperties().deleteProperty('SESSION_' + token);
+    }
+    return { success: true };
   } catch (e) {
     return { success: false, error: e.message };
   }
 }
 
-// ─── DATABASE CRUD HELPERS ───
+// ─── ADMIN USER MANAGEMENT ───
 
-function getSheetData(sheetName) {
+/**
+ * Resolves the caller from a server-validated session token ONLY.
+ * Client-supplied roles or usernames are never trusted: an invalid or missing
+ * token yields an empty identity ({ role: "", username: "" }).
+ */
+function resolveCaller_(token) {
+  const session = (typeof token === "string" && token) ? validateSessionToken_(token) : null;
+  return session
+    ? { role: session.role || "", username: session.username || "" }
+    : { role: "", username: "" };
+}
+
+/**
+ * Guard for functions meant to be run manually from the Apps Script editor
+ * (setupSheets, migrations, tests). Those names are public because the editor
+ * cannot run "_"-suffixed functions, but a web-app visitor is not the script
+ * owner, so getActiveUser() differs from getEffectiveUser() and the call is refused.
+ */
+function assertOwner_() {
+  const active = Session.getActiveUser().getEmail();
+  const owner = Session.getEffectiveUser().getEmail();
+  if (!active || !owner || active !== owner) {
+    throw new Error("Forbidden. This function can only be run by the script owner from the Apps Script editor.");
+  }
+}
+
+// ─── AUTHENTICATED RPC ENTRY POINT ───
+
+// Every function the UI may call, keyed by the name the UI passes to rpc().
+// Only this table (plus doGet/doPost/authenticateAdmin/logoutAdmin) is reachable
+// from the browser; all other functions end in "_" and are private to the script.
+const RPC_ACTIONS_ = {
+  getInitialSyncData: getInitialSyncData_,
+  getDashboardData: getDashboardData_,
+  getGoldRates: getGoldRates_,
+  getUsers: getUsers_,
+  addUser: addUser_,
+  updateUser: updateUser_,
+  deleteUser: deleteUser_,
+  deleteUserPhoto: deleteUserPhoto_,
+  getBankAccounts: getBankAccounts_,
+  addBankAccount: addBankAccount_,
+  updateBankAccount: updateBankAccount_,
+  deleteBankAccount: deleteBankAccount_,
+  deleteBankAccountPassbook: deleteBankAccountPassbook_,
+  getOrnaments: getOrnaments_,
+  getAvailableOrnaments: getAvailableOrnaments_,
+  addOrnament: addOrnament_,
+  updateOrnament: updateOrnament_,
+  deleteOrnament: deleteOrnament_,
+  deleteOrnamentImage: deleteOrnamentImage_,
+  getLoans: getLoans_,
+  getLoanDetails: getLoanDetails_,
+  getActiveLoansForClosure: getActiveLoansForClosure_,
+  addLoan: addLoan_,
+  updateLoan: updateLoan_,
+  closeAndReleaseLoan: closeAndReleaseLoan_,
+  getPayments: getPayments_,
+  addPayment: addPayment_,
+  getAdminUsers: getAdminUsers_,
+  addAdminUser: addAdminUser_,
+  updateAdminUser: updateAdminUser_,
+  changePassword: changePassword_,
+  deleteAdminLoginUser: deleteAdminLoginUser_
+};
+
+// Actions the read-only "User" role may call. Everything else needs SuperAdmin.
+// (Admin-user actions also enforce their own finer-grained rules internally.)
+const USER_ROLE_ACTIONS_ = [
+  "getInitialSyncData", "getDashboardData", "getGoldRates",
+  "getUsers", "getBankAccounts", "getOrnaments", "getAvailableOrnaments",
+  "getLoans", "getLoanDetails", "getActiveLoansForClosure", "getPayments",
+  "getAdminUsers", "changePassword", "updateAdminUser"
+];
+
+/**
+ * Single authenticated entry point for the web UI:
+ *   google.script.run.rpc(token, "getUsers", [args...])
+ * Validates the server-side session, enforces the role, then dispatches.
+ * Failures return { success:false, code:401|403, error } so the UI can react.
+ */
+function rpc(token, action, args) {
+  try {
+    const session = validateSessionToken_(token);
+    if (!session) {
+      return { success: false, code: 401, error: "Unauthorized. Session expired or invalid. Please log in again." };
+    }
+    if (!Object.prototype.hasOwnProperty.call(RPC_ACTIONS_, action)) {
+      return { success: false, error: "Unknown action: " + action };
+    }
+    if (session.role !== "SuperAdmin" && !USER_ROLE_ACTIONS_.includes(action)) {
+      return { success: false, code: 403, error: "Access denied. You have view-only access. Contact your SuperAdmin to make changes." };
+    }
+    return RPC_ACTIONS_[action].apply(null, Array.isArray(args) ? args : []);
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+}
+
+/**
+ * Returns all admin login users.
+ * Passwords are stripped before returning. Accessible to any authenticated user.
+ */
+function getAdminUsers_(token) {
+  try {
+    const caller = resolveCaller_(token);
+    if (!caller.username && !caller.role) {
+      return { success: false, error: "Authentication required." };
+    }
+    const admins = getSheetData_("Admins")
+      .filter(a => a.Status !== "Deleted")
+      .map(a => ({
+        AdminId: a.AdminId,
+        Username: a.Username,
+        Role: a.Role,
+        Status: a.Status
+      }));
+    return { success: true, data: admins };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+}
+
+/**
+ * Creates a new admin login user with "User" role by default.
+ * SuperAdmin can also create another SuperAdmin if requested.
+ * Validates uniqueness and hashes the password.
+ */
+function addAdminUser_(userData, token) {
+  try {
+    const caller = resolveCaller_(token);
+    if (caller.role !== "SuperAdmin") {
+      return { success: false, error: "Access denied. SuperAdmin only." };
+    }
+    if (!userData || !userData.username || !userData.password) {
+      return { success: false, error: "Username and password are required." };
+    }
+
+    const trimmedUsername = String(userData.username).trim();
+    if (!trimmedUsername) {
+      return { success: false, error: "Username cannot be empty." };
+    }
+
+    const existing = getSheetData_("Admins").find(
+      a => String(a.Username).toLowerCase() === trimmedUsername.toLowerCase() && a.Status !== "Deleted"
+    );
+    if (existing) {
+      return { success: false, error: "Username already exists." };
+    }
+
+    const adminId = generateId_("ADM", "Admins", "AdminId");
+    // DEFAULT ROLE IS "User" (read-only view access), unless explicitly requested as SuperAdmin
+    const role = (userData.role === "SuperAdmin") ? "SuperAdmin" : "User";
+    const record = {
+      AdminId: adminId,
+      Username: trimmedUsername,
+      Password: hashValue_(String(userData.password)),
+      Role: role,
+      Status: userData.status || "Active"
+    };
+    appendRow_("Admins", record);
+    return { success: true, data: { AdminId: adminId, Username: record.Username, Role: record.Role, Status: record.Status } };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+}
+
+/**
+ * Updates an existing admin user (status, role, or password reset).
+ * SuperAdmin can update role, status, and reset passwords for any user.
+ * Non-SuperAdmin (User role) can ONLY update their own password.
+ */
+function updateAdminUser_(adminId, updateData, _ignoredCallerUsername, token) {
+  try {
+    // Identity comes from the validated session only; the client-sent username is ignored.
+    const caller = resolveCaller_(token);
+    if (!caller.username) return { success: false, error: "Authentication required." };
+    updateData = updateData || {};
+
+    const admins = getSheetData_("Admins");
+    const target = admins.find(a => String(a.AdminId) === String(adminId) && a.Status !== "Deleted");
+    if (!target) return { success: false, error: "Admin user not found." };
+
+    const isSuper = caller.role === "SuperAdmin";
+    const isSelf = caller.username && String(target.Username).toLowerCase() === String(caller.username).toLowerCase();
+
+    // Only SuperAdmin or the user themselves can perform updates
+    if (!isSuper && !isSelf) {
+      return { success: false, error: "Access denied. You can only update your own password." };
+    }
+
+    // Non-SuperAdmin cannot change role or status
+    if (!isSuper && (updateData.role || updateData.status)) {
+      return { success: false, error: "Access denied. Only SuperAdmin can change role or status." };
+    }
+
+    // Prevent SuperAdmin from stripping their own SuperAdmin role
+    if (isSelf && isSuper && updateData.role && updateData.role !== "SuperAdmin") {
+      return { success: false, error: "You cannot change your own role." };
+    }
+
+    // Prevent a SuperAdmin from locking themselves out
+    if (isSelf && updateData.status && updateData.status !== "Active") {
+      return { success: false, error: "You cannot deactivate your own account." };
+    }
+
+    const changes = {};
+    if (isSuper && updateData.role) changes.Role = updateData.role === "SuperAdmin" ? "SuperAdmin" : "User";
+    if (isSuper && updateData.status) changes.Status = updateData.status;
+
+    const newPass = updateData.password || updateData.newPassword;
+    if (newPass && String(newPass).trim()) {
+      changes.Password = hashValue_(String(newPass).trim());
+    }
+
+    updateRow_("Admins", "AdminId", adminId, changes);
+    return { success: true, data: "Admin user updated." };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+}
+
+/**
+ * Changes password for the currently authenticated user.
+ * Can be called from Profile Modal or REST API.
+ */
+function changePassword_(newPassword, oldPassword, token) {
+  try {
+    const caller = resolveCaller_(token);
+    if (!caller.username) {
+      return { success: false, error: "Authentication required to change password." };
+    }
+    const trimmedNew = String(newPassword || "").trim();
+    if (!trimmedNew || trimmedNew.length < 4) {
+      return { success: false, error: "New password must be at least 4 characters long." };
+    }
+
+    const admins = getSheetData_("Admins");
+    const target = admins.find(
+      a => String(a.Username).toLowerCase() === String(caller.username).toLowerCase() && a.Status !== "Deleted"
+    );
+    if (!target) {
+      return { success: false, error: "User account not found." };
+    }
+
+    // The current password is mandatory, so a stolen session token alone cannot change it
+    if (!oldPassword || !String(oldPassword).trim()) {
+      return { success: false, error: "Current password is required." };
+    }
+    if (hashValue_(String(oldPassword).trim()) !== String(target.Password)) {
+      return { success: false, error: "Current password does not match." };
+    }
+
+    const newHashed = hashValue_(trimmedNew);
+    updateRow_("Admins", "AdminId", target.AdminId, { Password: newHashed });
+    return { success: true, data: "Password changed successfully." };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+}
+
+/**
+ * Soft-deletes an admin login user (sets Status = "Deleted"). SuperAdmin only.
+ * Cannot delete yourself.
+ */
+function deleteAdminLoginUser_(adminId, _ignoredCallerUsername, token) {
+  try {
+    const caller = resolveCaller_(token);
+    if (caller.role !== "SuperAdmin") {
+      return { success: false, error: "Access denied. SuperAdmin only." };
+    }
+    const admins = getSheetData_("Admins");
+    const target = admins.find(a => String(a.AdminId) === String(adminId));
+    if (!target) return { success: false, error: "Admin user not found." };
+    if (String(target.Username).toLowerCase() === String(caller.username).toLowerCase()) {
+      return { success: false, error: "You cannot delete your own account." };
+    }
+    updateRow_("Admins", "AdminId", adminId, { Status: "Deleted" });
+    return { success: true, data: "Admin user deleted." };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+}
+
+// ─── AUTHENTICATION ───
+
+function authenticateAdmin(username, password) {
+  try {
+    // Rate limiting: blocks brute force after 5 failed attempts in 15 minutes
+    checkLoginRateLimit_(username);
+
+    const admins = getSheetData_("Admins").filter(a => a.Status === "Active");
+    const hashedInput = hashValue_(String(password));
+    const admin = admins.find(a =>
+      String(a.Username) === String(username) &&
+      String(a.Password) === hashedInput
+    );
+
+    if (admin) {
+      // Successful login: clear rate limit counter and issue a session token
+      resetLoginRateLimit_(username);
+      const token = createSessionToken_(admin.Username, admin.Role);
+      return { success: true, data: { username: admin.Username, role: admin.Role, token } };
+    } else {
+      return { success: false, error: "Invalid username or password." };
+    }
+  } catch (e) {
+    // Surface rate limit errors and other failures to the client
+    return { success: false, error: e.message };
+  }
+}
+
+function doGet(e) {
+  if (e && e.parameter && e.parameter.action) {
+    return handleApiRequest_(e.parameter.action, e.parameter);
+  }
+  return HtmlService.createHtmlOutputFromFile("index")
+    .setTitle("Gold Loan Tracker")
+    .addMetaTag('viewport', 'width=device-width, initial-scale=1')
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+}
+
+function doPost(e) {
+  try {
+    let payload = {};
+    if (e && e.postData && e.postData.contents) {
+      try {
+        payload = JSON.parse(e.postData.contents);
+      } catch (parseErr) {
+        payload = e.parameter || {};
+      }
+    } else if (e && e.parameter) {
+      payload = e.parameter;
+    }
+
+    const action = payload.action || (e && e.parameter && e.parameter.action);
+    if (!action) {
+      return jsonResponse_({ success: false, error: "No action specified in request" });
+    }
+
+    return handleApiRequest_(action, payload);
+  } catch (err) {
+    return jsonResponse_({ success: false, error: err.message });
+  }
+}
+
+function handleApiRequest_(action, payload) {
+  try {
+    // ── REST token guard: all actions except login/ping require a valid session token ──
+    const PUBLIC_ACTIONS = ["ping", "testConnection", "login", "authenticateAdmin", "getGoldRates"];
+    let session = null;
+    if (!PUBLIC_ACTIONS.includes(action)) {
+      session = validateSessionToken_(payload.token);
+      if (!session) {
+        return jsonResponse_({
+          success: false,
+          error: "Unauthorized. Session expired or invalid. Please log in again.",
+          code: 401
+        });
+      }
+    }
+
+    // ── Role-based write guard: "User" role can read, view staff directory, and change their own password ──
+    const USER_ALLOWED_ACTIONS = [
+      "ping", "testConnection", "login", "authenticateAdmin", "logout",
+      "getInitialSyncData", "getSyncData", "getDashboardData", "getGoldRates",
+      "getUsers", "getBankAccounts", "getOrnaments", "getAvailableOrnaments",
+      "getLoans", "getLoanDetails", "getActiveLoansForClosure",
+      "getPayments",
+      "getAdminUsers",
+      "changePassword",
+      "updateAdminUser"
+    ];
+    if (session && session.role !== "SuperAdmin" && !USER_ALLOWED_ACTIONS.includes(action)) {
+      return jsonResponse_({
+        success: false,
+        error: "Access denied. You have view-only access. Contact your SuperAdmin to make changes.",
+        code: 403
+      });
+    }
+
+    switch (action) {
+      case "ping":
+      case "testConnection":
+        return jsonResponse_({ success: true, data: "PONG", timestamp: new Date().toISOString() });
+
+      // ── Login — accepts {"action":"login","username":"...","password":"..."} ──
+      case "login":
+      case "authenticateAdmin":
+        return jsonResponse_(authenticateAdmin(payload.username, payload.password));
+
+      // ── Logout — {"action":"logout","token":"..."} ──
+      case "logout":
+        return jsonResponse_(logoutAdmin(payload.token));
+
+      // ── Change Password (for current logged-in user) ──
+      case "changePassword":
+        return jsonResponse_(changePassword_(
+          payload.newPassword || payload.password,
+          payload.oldPassword || payload.currentPassword,
+          payload.token
+        ));
+
+      // ── Admin User Management (identity comes from the validated token only) ──
+      case "getAdminUsers":
+        return jsonResponse_(getAdminUsers_(payload.token));
+
+      case "addAdminUser":
+        return jsonResponse_(addAdminUser_(payload.userData || payload, payload.token));
+
+      case "updateAdminUser":
+        return jsonResponse_(updateAdminUser_(
+          payload.adminId || payload.AdminId,
+          payload.updateData || payload,
+          null,
+          payload.token
+        ));
+
+      case "deleteAdminLoginUser":
+        return jsonResponse_(deleteAdminLoginUser_(
+          payload.adminId || payload.AdminId,
+          null,
+          payload.token
+        ));
+
+      case "getInitialSyncData":
+      case "getSyncData":
+        return jsonResponse_(getInitialSyncData_());
+
+      case "getDashboardData":
+        return jsonResponse_(getDashboardData_());
+
+      case "getGoldRates":
+        return jsonResponse_(getGoldRates_(payload.forceRefresh === true || payload.forceRefresh === "true"));
+
+      case "getUsers":
+        return jsonResponse_(getUsers_());
+
+      case "addUser":
+        return jsonResponse_(addUser_(payload.userData || payload));
+
+      case "updateUser":
+        return jsonResponse_(updateUser_(payload.userId || payload.UserId, payload.userData || payload));
+
+      case "deleteUser":
+        return jsonResponse_(deleteUser_(payload.userId || payload.UserId));
+
+      case "deleteUserPhoto":
+        return jsonResponse_(deleteUserPhoto_(payload.userId || payload.UserId));
+
+      case "getBankAccounts":
+        return jsonResponse_(getBankAccounts_(payload.userId || payload.UserId));
+
+      case "addBankAccount":
+        return jsonResponse_(addBankAccount_(payload.accountData || payload));
+
+      case "updateBankAccount":
+        return jsonResponse_(updateBankAccount_(payload.accountId || payload.BankAccountId, payload.accountData || payload));
+
+      case "deleteBankAccount":
+        return jsonResponse_(deleteBankAccount_(payload.accountId || payload.BankAccountId));
+
+      case "deleteBankAccountPassbook":
+        return jsonResponse_(deleteBankAccountPassbook_(payload.accountId || payload.BankAccountId));
+
+      case "getOrnaments":
+        return jsonResponse_(getOrnaments_(payload.userId || payload.UserId));
+
+      case "getAvailableOrnaments":
+        return jsonResponse_(getAvailableOrnaments_());
+
+      case "addOrnament":
+        return jsonResponse_(addOrnament_(payload.ornamentData || payload));
+
+      case "updateOrnament":
+        return jsonResponse_(updateOrnament_(payload.ornamentId || payload.OrnamentId, payload.ornamentData || payload));
+
+      case "deleteOrnament":
+        return jsonResponse_(deleteOrnament_(payload.ornamentId || payload.OrnamentId));
+
+      case "deleteOrnamentImage":
+        return jsonResponse_(deleteOrnamentImage_(payload.ornamentId || payload.OrnamentId, payload.imageUrl || payload.imageUrlToRemove));
+
+      case "getLoans":
+        return jsonResponse_(getLoans_(payload.userId || payload.UserId, payload.status || payload.LoanStatus));
+
+      case "getLoanDetails":
+        return jsonResponse_(getLoanDetails_(payload.loanId || payload.LoanId));
+
+      case "getActiveLoansForClosure":
+        return jsonResponse_(getActiveLoansForClosure_());
+
+      case "addLoan":
+        return jsonResponse_(addLoan_(payload.loanData || payload));
+
+      case "updateLoan":
+        return jsonResponse_(updateLoan_(payload.loanId || payload.LoanId, payload.loanData || payload));
+
+      case "closeAndReleaseLoan":
+        return jsonResponse_(closeAndReleaseLoan_(payload.loanId || payload.LoanId, payload.closureRemarks || payload.remarks || ""));
+
+      case "getPayments":
+        return jsonResponse_(getPayments_(payload.loanId || payload.LoanId));
+
+      case "addPayment":
+        return jsonResponse_(addPayment_(payload.paymentData || payload));
+
+      default:
+        return jsonResponse_({ success: false, error: "Unknown action: " + action });
+    }
+  } catch (e) {
+    return jsonResponse_({ success: false, error: e.message });
+  }
+}
+
+
+function jsonResponse_(obj) {
+  return ContentService.createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+// ─── GENERIC CRUD HELPERS ───
+
+function getSheetData_(sheetName) {
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   const sheet = ss.getSheetByName(sheetName);
   if (!sheet) return [];
@@ -214,6 +735,7 @@ function getSheetData(sheetName) {
   if (data.length <= 1) return [];
 
   const headers = data[0];
+
   return data.slice(1).map(row => {
     const obj = {};
     headers.forEach((h, i) => {
@@ -227,12 +749,13 @@ function getSheetData(sheetName) {
   });
 }
 
-function ensureSheetHeaders(sheet, sheetName, objectKeys = []) {
+function ensureSheetHeaders_(sheet, sheetName, objectKeys = []) {
   if (!sheet) return [];
   const defaultHeaders = SHEET_HEADERS[sheetName] || [];
   let lastCol = sheet.getLastColumn();
   let currentHeaders = lastCol > 0 ? sheet.getRange(1, 1, 1, lastCol).getValues()[0].map(String) : [];
 
+  // Filter out system or temporary payload fields like 'files'
   const validKeys = objectKeys.filter(k => k && k !== "files" && typeof k === "string");
   const requiredHeaders = [...new Set([...defaultHeaders, ...validKeys])];
 
@@ -249,20 +772,20 @@ function ensureSheetHeaders(sheet, sheetName, objectKeys = []) {
   return currentHeaders;
 }
 
-function appendRow(sheetName, rowObject) {
+function appendRow_(sheetName, rowObject) {
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   const sheet = ss.getSheetByName(sheetName);
   if (!sheet) return;
-  const headers = ensureSheetHeaders(sheet, sheetName, Object.keys(rowObject || {}));
+  const headers = ensureSheetHeaders_(sheet, sheetName, Object.keys(rowObject || {}));
   const row = headers.map(h => rowObject[h] !== undefined ? rowObject[h] : "");
   sheet.appendRow(row);
 }
 
-function updateRow(sheetName, idColumn, idValue, updatedObject) {
+function updateRow_(sheetName, idColumn, idValue, updatedObject) {
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   const sheet = ss.getSheetByName(sheetName);
   if (!sheet) return false;
-  const headers = ensureSheetHeaders(sheet, sheetName, Object.keys(updatedObject || {}));
+  const headers = ensureSheetHeaders_(sheet, sheetName, Object.keys(updatedObject || {}));
   const data = sheet.getDataRange().getValues();
   if (data.length <= 1) return false;
   const idColIndex = headers.indexOf(idColumn);
@@ -280,14 +803,14 @@ function updateRow(sheetName, idColumn, idValue, updatedObject) {
   return false;
 }
 
-function deleteRow(sheetName, idColumn, idValue) {
+function deleteRow_(sheetName, idColumn, idValue) {
   const statusMap = { Users: "Status", Ornaments: "Status", Loans: "LoanStatus", BankAccounts: "Status" };
   const statusCol = statusMap[sheetName] || "Status";
-  return updateRow(sheetName, idColumn, idValue, { [statusCol]: "Deleted" });
+  return updateRow_(sheetName, idColumn, idValue, { [statusCol]: "Deleted" });
 }
 
-function generateId(prefix, sheetName, idColumn) {
-  const data = getSheetData(sheetName);
+function generateId_(prefix, sheetName, idColumn) {
+  const data = getSheetData_(sheetName);
   if (data.length === 0) return prefix + "001";
   const nums = data
     .map(r => parseInt(String(r[idColumn]).replace(prefix, ""), 10))
@@ -296,21 +819,12 @@ function generateId(prefix, sheetName, idColumn) {
   return prefix + String(next).padStart(3, "0");
 }
 
-// ─── CACHING HELPERS ───
+// ─── USER FUNCTIONS ───
 
-function invalidateAllCaches() {
+function addUser_(userData) {
   try {
-    const cache = CacheService.getScriptCache();
-    cache.removeAll(["DASHBOARD_DATA", "USERS_LIST", "ORNAMENTS_LIST", "LOANS_LIST"]);
-  } catch (e) {}
-}
-
-// ─── USERS / CUSTOMERS ───
-
-function addUser(userData) {
-  try {
-    const userId = generateId("U", "Users", "UserId");
-    const photoUrl = processDriveFiles(userData.files, "Customer_Photos")[0] || "";
+    const userId = generateId_("U", "Users", "UserId");
+    const photoUrl = processDriveFiles_(userData.files, "Customer_Photos")[0] || userData.CustomerPhoto || "";
 
     const record = {
       UserId: userId,
@@ -334,102 +848,105 @@ function addUser(userData) {
       CreatedDate: new Date().toISOString(),
       Status: "Active"
     };
-    appendRow("Users", record);
-    invalidateAllCaches();
+    appendRow_("Users", record);
     return { success: true, data: record };
   } catch (e) {
     return { success: false, error: e.message };
   }
 }
 
-function getUsers() {
+function getUsers_() {
   try {
-    const users = getSheetData("Users").filter(u => u.Status !== "Deleted");
+    const users = getSheetData_("Users").filter(u => u.Status !== "Deleted");
     return { success: true, data: users };
   } catch (e) {
     return { success: false, error: e.message };
   }
 }
 
-function updateUser(userId, userData) {
+function trashDriveFileByUrl_(url) {
+  if (!url) return;
   try {
-    if (userData.files && userData.files.length > 0) {
-      userData.CustomerPhoto = processDriveFiles(userData.files, "Customer_Photos")[0];
+    const fileIdMatch = url.match(/\/d\/([a-zA-Z0-9_-]+)/) || url.match(/id=([a-zA-Z0-9_-]+)/);
+    if (fileIdMatch && fileIdMatch[1]) {
+      DriveApp.getFileById(fileIdMatch[1]).setTrashed(true);
     }
-    delete userData.files;
+  } catch (err) {
+    console.warn("Could not trash file from Drive (" + url + "):", err);
+  }
+}
+
+function updateUser_(userId, userData) {
+  try {
+    if (userData.deleteCustomerPhoto) {
+      const existingUser = getSheetData_("Users").find(u => String(u.UserId) === String(userId));
+      if (existingUser && existingUser.CustomerPhoto) {
+        trashDriveFileByUrl_(existingUser.CustomerPhoto);
+      }
+      userData.CustomerPhoto = "";
+      delete userData.deleteCustomerPhoto;
+    }
+    if (userData.files && userData.files.length > 0) {
+      userData.CustomerPhoto = processDriveFiles_(userData.files, "Customer_Photos")[0];
+    }
+    delete userData.files; // Don't write files array to sheet
     userData.UpdatedDate = new Date().toISOString();
-    updateRow("Users", "UserId", userId, userData);
-    invalidateAllCaches();
+    updateRow_("Users", "UserId", userId, userData);
     return { success: true, data: "User updated" };
   } catch (e) {
     return { success: false, error: e.message };
   }
 }
-
-function deleteUser(userId) {
+function deleteUser_(userId) {
   try {
-    deleteRow("Users", "UserId", userId);
-    invalidateAllCaches();
+    deleteRow_("Users", "UserId", userId);
     return { success: true, data: "User deleted" };
   } catch (e) {
     return { success: false, error: e.message };
   }
 }
 
-// ─── BANK ACCOUNTS ───
-
-function calculateUserBankUtilization(userId, bankAccountId, activeLoans) {
-  const loans = activeLoans || getSheetData("Loans").filter(l => l.LoanStatus === "Active");
-  return loans
-    .filter(l => String(l.UserId) === String(userId) && String(l.BankAccountId) === String(bankAccountId))
-    .reduce((sum, l) => sum + (parseFloat(l.LoanAmount) || 0), 0);
-}
-
-function recalculateAndSyncBankUtilization(bankAccountId) {
-  if (!bankAccountId) return 0;
-  const bankAccounts = getSheetData("BankAccounts");
-  const acc = bankAccounts.find(b => String(b.BankAccountId) === String(bankAccountId));
-  if (!acc) return 0;
-  const utilized = calculateUserBankUtilization(acc.UserId, acc.BankAccountId);
-  if (parseFloat(acc.UtilizedLoanAmount) !== utilized) {
-    updateRow("BankAccounts", "BankAccountId", bankAccountId, { UtilizedLoanAmount: utilized });
-  }
-  return utilized;
-}
-
-function getBankAccounts(userId) {
+function deleteUserPhoto_(userId) {
   try {
-    let accounts = getSheetData("BankAccounts").filter(acc => acc.Status !== "Deleted");
-    if (userId) {
-      accounts = accounts.filter(acc => String(acc.UserId) === String(userId));
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    const sheet = ss.getSheetByName("Users");
+    if (!sheet) return { success: false, error: "Users sheet not found" };
+    const data = sheet.getDataRange().getValues();
+    const headers = data[0];
+    const idColIndex = headers.indexOf("UserId");
+    const photoColIndex = headers.indexOf("CustomerPhoto");
+    const updatedColIndex = headers.indexOf("UpdatedDate");
+
+    let photoUrl = "";
+    if (idColIndex !== -1 && photoColIndex !== -1) {
+      for (let i = 1; i < data.length; i++) {
+        if (String(data[i][idColIndex]) === String(userId)) {
+          photoUrl = data[i][photoColIndex] ? String(data[i][photoColIndex]) : "";
+          sheet.getRange(i + 1, photoColIndex + 1).setValue("");
+          if (updatedColIndex !== -1) {
+            sheet.getRange(i + 1, updatedColIndex + 1).setValue(new Date().toISOString());
+          }
+          break;
+        }
+      }
     }
 
-    const loans = getSheetData("Loans");
-    const activeLoans = loans.filter(l => l.LoanStatus === "Active");
+    if (photoUrl) {
+      trashDriveFileByUrl_(photoUrl);
+    }
 
-    const enriched = accounts.map(acc => {
-      const maxLoan = parseFloat(acc.MaxLoanAmount) || 0;
-      const utilized = calculateUserBankUtilization(acc.UserId, acc.BankAccountId, activeLoans);
-      const available = Math.max(0, maxLoan - utilized);
-
-      return {
-        ...acc,
-        MaxLoanAmount: maxLoan,
-        UtilizedLoanAmount: utilized,
-        AvailableLoanAmount: available
-      };
-    });
-
-    return { success: true, data: enriched };
+    return { success: true, data: "Customer photo deleted" };
   } catch (e) {
     return { success: false, error: e.message };
   }
 }
 
-function addBankAccount(accountData) {
+// ─── BANK ACCOUNT FUNCTIONS ───
+
+function addBankAccount_(accountData) {
   try {
-    const accountId = generateId("BA", "BankAccounts", "BankAccountId");
-    const passbookUrl = processDriveFiles(accountData.files, "Passbook_Images")[0] || "";
+    const accountId = generateId_("BA", "BankAccounts", "BankAccountId");
+    const passbookUrl = processDriveFiles_(accountData.files, "Passbook_Images")[0] || accountData.PassbookImage || "";
 
     const record = {
       BankAccountId: accountId,
@@ -446,45 +963,138 @@ function addBankAccount(accountData) {
       Status: "Active",
       CreatedDate: new Date().toISOString(),
       MaxLoanAmount: parseFloat(accountData.MaxLoanAmount) || 0,
-      UtilizedLoanAmount: 0
+      UtilizedLoanAmount: parseFloat(accountData.UtilizedLoanAmount) || 0
     };
-    appendRow("BankAccounts", record);
-    invalidateAllCaches();
+    appendRow_("BankAccounts", record);
     return { success: true, data: record };
   } catch (e) {
     return { success: false, error: e.message };
   }
 }
 
-function updateBankAccount(accountId, accountData) {
+function calculateUserBankUtilization_(userId, bankAccountId, activeLoans) {
+  const loans = activeLoans || getSheetData_("Loans").filter(l => l.LoanStatus === "Active");
+  return loans
+    .filter(l => String(l.UserId) === String(userId) && String(l.BankAccountId) === String(bankAccountId))
+    .reduce((sum, l) => sum + (parseFloat(l.LoanAmount) || 0), 0);
+}
+
+function recalculateAndSyncBankUtilization_(bankAccountId) {
+  if (!bankAccountId) return 0;
+  const bankAccounts = getSheetData_("BankAccounts");
+  const acc = bankAccounts.find(b => String(b.BankAccountId) === String(bankAccountId));
+  if (!acc) return 0;
+  const utilized = calculateUserBankUtilization_(acc.UserId, acc.BankAccountId);
+  if (parseFloat(acc.UtilizedLoanAmount) !== utilized) {
+    updateRow_("BankAccounts", "BankAccountId", bankAccountId, { UtilizedLoanAmount: utilized });
+  }
+  return utilized;
+}
+
+function getBankAccounts_(userId) {
   try {
+    let accounts = getSheetData_("BankAccounts").filter(acc => acc.Status !== "Deleted");
+    if (userId) {
+      accounts = accounts.filter(acc => String(acc.UserId) === String(userId));
+    }
+
+    const loans = getSheetData_("Loans");
+    const activeLoans = loans.filter(l => l.LoanStatus === "Active");
+
+    const enriched = accounts.map(acc => {
+      const maxLoan = parseFloat(acc.MaxLoanAmount) || 0;
+      const utilized = calculateUserBankUtilization_(acc.UserId, acc.BankAccountId, activeLoans);
+      const available = Math.max(0, maxLoan - utilized);
+
+      if (parseFloat(acc.UtilizedLoanAmount) !== utilized) {
+        updateRow_("BankAccounts", "BankAccountId", acc.BankAccountId, { UtilizedLoanAmount: utilized });
+      }
+
+      return {
+        ...acc,
+        MaxLoanAmount: maxLoan,
+        UtilizedLoanAmount: utilized,
+        AvailableLoanAmount: available
+      };
+    });
+
+    return { success: true, data: enriched };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+}
+
+function updateBankAccount_(accountId, accountData) {
+  try {
+    if (accountData.deletePassbookImage) {
+      const existingAcc = getSheetData_("BankAccounts").find(b => String(b.BankAccountId) === String(accountId));
+      if (existingAcc && existingAcc.PassbookImage) {
+        trashDriveFileByUrl_(existingAcc.PassbookImage);
+      }
+      accountData.PassbookImage = "";
+      delete accountData.deletePassbookImage;
+    }
     if (accountData.files && accountData.files.length > 0) {
-      accountData.PassbookImage = processDriveFiles(accountData.files, "Passbook_Images")[0];
+      accountData.PassbookImage = processDriveFiles_(accountData.files, "Passbook_Images")[0];
     }
     delete accountData.files;
     accountData.UpdatedDate = new Date().toISOString();
-    updateRow("BankAccounts", "BankAccountId", accountId, accountData);
-    recalculateAndSyncBankUtilization(accountId);
-    invalidateAllCaches();
+    updateRow_("BankAccounts", "BankAccountId", accountId, accountData);
+    recalculateAndSyncBankUtilization_(accountId);
     return { success: true, data: "Bank account updated" };
   } catch (e) {
     return { success: false, error: e.message };
   }
 }
 
-function deleteBankAccount(accountId) {
+function deleteBankAccount_(accountId) {
   try {
-    deleteRow("BankAccounts", "BankAccountId", accountId);
-    invalidateAllCaches();
+    deleteRow_("BankAccounts", "BankAccountId", accountId);
     return { success: true, data: "Bank account deleted" };
   } catch (e) {
     return { success: false, error: e.message };
   }
 }
 
-// ─── FILE STORAGE (GOOGLE DRIVE) ───
+function deleteBankAccountPassbook_(accountId) {
+  try {
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    const sheet = ss.getSheetByName("BankAccounts");
+    if (!sheet) return { success: false, error: "BankAccounts sheet not found" };
+    const data = sheet.getDataRange().getValues();
+    const headers = data[0];
+    const idColIndex = headers.indexOf("BankAccountId");
+    const photoColIndex = headers.indexOf("PassbookImage");
+    const updatedColIndex = headers.indexOf("UpdatedDate");
 
-function processDriveFiles(files, folderName) {
+    let passbookUrl = "";
+    if (idColIndex !== -1 && photoColIndex !== -1) {
+      for (let i = 1; i < data.length; i++) {
+        if (String(data[i][idColIndex]) === String(accountId)) {
+          passbookUrl = data[i][photoColIndex] ? String(data[i][photoColIndex]) : "";
+          sheet.getRange(i + 1, photoColIndex + 1).setValue("");
+          if (updatedColIndex !== -1) {
+            sheet.getRange(i + 1, updatedColIndex + 1).setValue(new Date().toISOString());
+          }
+          break;
+        }
+      }
+    }
+
+    if (passbookUrl) {
+      trashDriveFileByUrl_(passbookUrl);
+    }
+
+    return { success: true, data: "Passbook document deleted" };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+}
+
+
+// ─── FILE & ORNAMENT FUNCTIONS ───
+
+function processDriveFiles_(files, folderName) {
   let imageUrls = [];
   if (files && files.length > 0) {
     const rootFolderName = "GoldLoanApp_Uploads";
@@ -507,36 +1117,66 @@ function processDriveFiles(files, folderName) {
     for (const file of files) {
       const blob = Utilities.newBlob(Utilities.base64Decode(file.base64), file.mimeType, file.name);
       const uploadedFile = folder.createFile(blob);
-      uploadedFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+      // Use ANYONE_WITH_LINK so images can be previewed in web app iframes.
+      // Wrapped in try-catch so permission errors on personal Gmail or restricted domains never block upload.
+      try {
+        uploadedFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+      } catch (shareErr) {
+        try {
+          uploadedFile.setSharing(DriveApp.Access.DOMAIN_WITH_LINK, DriveApp.Permission.VIEW);
+        } catch (domainErr) {
+          console.warn("Could not set link sharing for file " + file.name + ":", domainErr);
+        }
+      }
       imageUrls.push(uploadedFile.getUrl());
     }
   }
   return imageUrls;
 }
 
-// ─── ORNAMENTS ───
-
-function addOrnament(ornamentData) {
+function addOrnament_(ornamentData) {
   try {
-    const ornamentId = generateId("ORN", "Ornaments", "OrnamentId");
-    let imageUrls = processDriveFiles(ornamentData.files, "Ornament_Images");
+    const ornamentId = generateId_("ORN", "Ornaments", "OrnamentId");
+    let imageUrls = processDriveFiles_(ornamentData.files, "Ornament_Images");
 
     const grossWeight = parseFloat(ornamentData.GrossWeight) || 0;
     const stoneWeight = parseFloat(ornamentData.StoneWeight) || 0;
-    const netWeight = Math.max(0, grossWeight - stoneWeight);
-    const buyingPrice = parseFloat(ornamentData.BuyingPricePerGram) || 0;
-    const currentPrice = parseFloat(ornamentData.CurrentPricePerGram) || 0;
-    const buyingCost = Math.round(netWeight * buyingPrice);
-    const marketValue = Math.round(netWeight * currentPrice);
+    let metalWeight = ornamentData.MetalWeight !== undefined && ornamentData.MetalWeight !== "" ? parseFloat(ornamentData.MetalWeight) : null;
+    let netWeight = ornamentData.NetWeight !== undefined && ornamentData.NetWeight !== "" ? parseFloat(ornamentData.NetWeight) : null;
+    if (metalWeight === null && netWeight !== null) metalWeight = netWeight;
+    if (netWeight === null && metalWeight !== null) netWeight = metalWeight;
+    if (metalWeight === null) metalWeight = Math.max(0, grossWeight - stoneWeight);
+    if (netWeight === null) netWeight = metalWeight;
+
+    const buyingPrice = parseFloat(ornamentData.BuyingPricePerGram !== undefined ? ornamentData.BuyingPricePerGram : ornamentData.BuyingPrice) || 0;
+    const currentPrice = parseFloat(ornamentData.CurrentPricePerGram !== undefined ? ornamentData.CurrentPricePerGram : ornamentData.CurrentPrice) || 0;
+    let buyingCost = parseFloat(ornamentData.BuyingCost !== undefined ? ornamentData.BuyingCost : ornamentData.TotalPrice) || 0;
+    if (!buyingCost && buyingPrice && metalWeight) {
+      buyingCost = Math.round(metalWeight * buyingPrice * 100) / 100;
+    }
+    let marketValue = parseFloat(ornamentData.MarketValue) || 0;
+    if (!marketValue && currentPrice && metalWeight) {
+      marketValue = Math.round(metalWeight * currentPrice * 100) / 100;
+    }
+    let appreciationValue = parseFloat(ornamentData.AppreciationValue);
+    if (isNaN(appreciationValue)) {
+      appreciationValue = (marketValue && buyingCost) ? Math.round((marketValue - buyingCost) * 100) / 100 : 0;
+    }
+    let appreciationPercentage = parseFloat(ornamentData.AppreciationPercentage);
+    if (isNaN(appreciationPercentage)) {
+      appreciationPercentage = (buyingCost > 0) ? Math.round(((appreciationValue / buyingCost) * 100) * 100) / 100 : 0;
+    }
 
     const record = {
       OrnamentId: ornamentId,
       UserId: ornamentData.UserId || "",
       OrnamentName: ornamentData.OrnamentName,
       OrnamentType: ornamentData.OrnamentType || "",
+      OrnamentCategory: ornamentData.OrnamentCategory || "",
+      Description: ornamentData.Description || "",
       GrossWeight: grossWeight,
       NetWeight: netWeight,
-      MetalWeight: netWeight,
+      MetalWeight: metalWeight,
       StoneWeight: stoneWeight,
       Purity: ornamentData.Purity || "22K",
       HallmarkNumber: ornamentData.HallmarkNumber || "",
@@ -545,269 +1185,740 @@ function addOrnament(ornamentData) {
       CurrentPricePerGram: currentPrice,
       BuyingCost: buyingCost,
       TotalPrice: buyingCost,
+      MakerName: ornamentData.MakerName || "",
+      EstimatedValue: parseFloat(ornamentData.EstimatedValue) || marketValue || buyingCost || 0,
       MarketValue: marketValue,
-      AppreciationValue: marketValue - buyingCost,
-      AppreciationPercentage: buyingCost > 0 ? ((marketValue - buyingCost) / buyingCost) * 100 : 0,
-      OrnamentImages: imageUrls.join(" | "),
+      AppreciationValue: appreciationValue,
+      AppreciationPercentage: appreciationPercentage,
+      OrnamentImages: imageUrls.length > 0 ? imageUrls.join(" | ") : (ornamentData.OrnamentImages || ""),
       Status: ornamentData.Status || "Available",
       Remarks: ornamentData.Remarks || ""
     };
-    appendRow("Ornaments", record);
-    invalidateAllCaches();
+    appendRow_("Ornaments", record);
     return { success: true, data: record };
   } catch (e) {
     return { success: false, error: e.message };
   }
 }
 
-function getOrnaments(userId) {
+function updateOrnament_(ornamentId, ornamentData) {
   try {
-    let ornaments = getSheetData("Ornaments").filter(o => o.Status !== "Deleted");
-    if (userId) ornaments = ornaments.filter(o => String(o.UserId) === String(userId));
-    return { success: true, data: ornaments };
-  } catch (e) {
-    return { success: false, error: e.message };
-  }
-}
+    let newImageUrls = processDriveFiles_(ornamentData.files, "Ornament_Images");
 
-function getAvailableOrnaments() {
-  try {
-    const ornaments = getSheetData("Ornaments").filter(o => o.Status === "Available" || o.Status === "Released");
-    return { success: true, data: ornaments };
-  } catch (e) {
-    return { success: false, error: e.message };
-  }
-}
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    const sheet = ss.getSheetByName("Ornaments");
+    const data = sheet.getDataRange().getValues();
+    const headers = data[0];
+    const idColIndex = headers.indexOf("OrnamentId");
+    const photoColIndex = headers.indexOf("OrnamentImages");
 
-function updateOrnament(ornamentId, ornamentData) {
-  try {
+    let combinedUrls = "";
+    if (photoColIndex !== -1) {
+      for (let i = 1; i < data.length; i++) {
+        if (String(data[i][idColIndex]) === String(ornamentId)) {
+          let existingUrls = data[i][photoColIndex] ? String(data[i][photoColIndex]) : "";
+          if (newImageUrls.length > 0) {
+            combinedUrls = existingUrls ? [existingUrls, ...newImageUrls].join(" | ") : newImageUrls.join(" | ");
+          } else if (ornamentData.OrnamentImages !== undefined) {
+            combinedUrls = ornamentData.OrnamentImages;
+          } else {
+            combinedUrls = existingUrls;
+          }
+          break;
+        }
+      }
+    }
+
     delete ornamentData.files;
-    updateRow("Ornaments", "OrnamentId", ornamentId, ornamentData);
-    invalidateAllCaches();
+    if (newImageUrls.length > 0 || combinedUrls !== undefined) {
+      ornamentData.OrnamentImages = combinedUrls;
+    }
+
+    // Parse and sync numeric fields cleanly
+    if (ornamentData.GrossWeight !== undefined) ornamentData.GrossWeight = parseFloat(ornamentData.GrossWeight) || 0;
+    if (ornamentData.StoneWeight !== undefined) ornamentData.StoneWeight = parseFloat(ornamentData.StoneWeight) || 0;
+
+    if (ornamentData.MetalWeight !== undefined) {
+      ornamentData.MetalWeight = parseFloat(ornamentData.MetalWeight) || 0;
+      ornamentData.NetWeight = ornamentData.MetalWeight;
+    } else if (ornamentData.NetWeight !== undefined) {
+      ornamentData.NetWeight = parseFloat(ornamentData.NetWeight) || 0;
+      ornamentData.MetalWeight = ornamentData.NetWeight;
+    }
+
+    if (ornamentData.BuyingPrice !== undefined && ornamentData.BuyingPricePerGram === undefined) {
+      ornamentData.BuyingPricePerGram = parseFloat(ornamentData.BuyingPrice) || 0;
+    } else if (ornamentData.BuyingPricePerGram !== undefined) {
+      ornamentData.BuyingPricePerGram = parseFloat(ornamentData.BuyingPricePerGram) || 0;
+    }
+
+    if (ornamentData.CurrentPricePerGram !== undefined) {
+      ornamentData.CurrentPricePerGram = parseFloat(ornamentData.CurrentPricePerGram) || 0;
+    }
+
+    if (ornamentData.BuyingCost !== undefined) {
+      ornamentData.BuyingCost = parseFloat(ornamentData.BuyingCost) || 0;
+      ornamentData.TotalPrice = ornamentData.BuyingCost;
+    } else if (ornamentData.TotalPrice !== undefined) {
+      ornamentData.TotalPrice = parseFloat(ornamentData.TotalPrice) || 0;
+      ornamentData.BuyingCost = ornamentData.TotalPrice;
+    }
+
+    if (ornamentData.MarketValue !== undefined) {
+      ornamentData.MarketValue = parseFloat(ornamentData.MarketValue) || 0;
+    }
+
+    if (ornamentData.AppreciationValue !== undefined) {
+      ornamentData.AppreciationValue = parseFloat(ornamentData.AppreciationValue) || 0;
+    }
+
+    if (ornamentData.AppreciationPercentage !== undefined) {
+      ornamentData.AppreciationPercentage = parseFloat(ornamentData.AppreciationPercentage) || 0;
+    }
+
+    updateRow_("Ornaments", "OrnamentId", ornamentId, ornamentData);
     return { success: true, data: "Ornament updated" };
   } catch (e) {
     return { success: false, error: e.message };
   }
 }
 
-function deleteOrnament(ornamentId) {
+function deleteOrnamentImage_(ornamentId, imageUrlToRemove) {
   try {
-    deleteRow("Ornaments", "OrnamentId", ornamentId);
-    invalidateAllCaches();
-    return { success: true, data: "Ornament deleted" };
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    const sheet = ss.getSheetByName("Ornaments");
+    const data = sheet.getDataRange().getValues();
+    const headers = data[0];
+    const idColIndex = headers.indexOf("OrnamentId");
+    const photoColIndex = headers.indexOf("OrnamentImages");
+
+    for (let i = 1; i < data.length; i++) {
+      if (String(data[i][idColIndex]) === String(ornamentId)) {
+        let currentUrls = data[i][photoColIndex] ? String(data[i][photoColIndex]).split(" | ") : [];
+        let newUrls = currentUrls.filter(url => url.trim() !== imageUrlToRemove.trim());
+        sheet.getRange(i + 1, photoColIndex + 1).setValue(newUrls.join(" | "));
+        break;
+      }
+    }
+
+    const fileIdMatch = imageUrlToRemove.match(/\/d\/(.+?)\//);
+    if (fileIdMatch && fileIdMatch[1]) {
+      DriveApp.getFileById(fileIdMatch[1]).setTrashed(true);
+    }
+
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error.toString() };
+  }
+}
+
+function deleteOrnament_(ornamentId) {
+  try {
+    const success = deleteRow_("Ornaments", "OrnamentId", ornamentId);
+    if (success) {
+      return { success: true, data: "Ornament deleted" };
+    } else {
+      return { success: false, error: `Ornament with ID ${ornamentId} not found.` };
+    }
   } catch (e) {
     return { success: false, error: e.message };
   }
 }
 
-// ─── LOANS ───
-
-function addLoan(loanData) {
+function getOrnaments_(userId) {
   try {
-    const bankAccounts = getSheetData("BankAccounts");
+    let ornaments = getSheetData_("Ornaments").filter(o => o.Status !== "Deleted");
+    if (userId) ornaments = ornaments.filter(o => String(o.UserId) === String(userId));
+    return { success: true, data: ornaments };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+}
+function getAvailableOrnaments_() {
+  try {
+    const ornaments = getSheetData_("Ornaments").filter(o => o.Status === "Available" || o.Status === "Released");
+    return { success: true, data: ornaments };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+}
+
+function updateOrnamentStatus_(ornamentId, status) {
+  try {
+    updateRow_("Ornaments", "OrnamentId", ornamentId, { Status: status });
+    return { success: true, data: "Ornament status updated" };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+}
+
+// ─── LOAN FUNCTIONS ───
+
+/**
+ * Loan period (in months) is the gap between LoanDate and DueDate — never a
+ * manually-entered number that can drift from the actual dates.
+ */
+function monthsBetweenDates_(startStr, endStr) {
+  if (!startStr || !endStr) return "";
+  const start = new Date(String(startStr).split("T")[0]);
+  const end = new Date(String(endStr).split("T")[0]);
+  if (isNaN(start.getTime()) || isNaN(end.getTime()) || end <= start) return "";
+  const diffDays = (end - start) / (1000 * 60 * 60 * 24);
+  return Math.max(1, Math.round(diffDays / 30.4375));
+}
+
+function addLoan_(loanData) {
+  try {
+    const existing = getSheetData_("Loans").find(l =>
+      String(l.LoanNumber) === String(loanData.LoanNumber) && l.LoanStatus !== "Cancelled"
+    );
+    if (existing) return { success: false, error: "Loan number already exists" };
+
+    const bankAccounts = getSheetData_("BankAccounts");
     const bankAccount = bankAccounts.find(acc => String(acc.BankAccountId) === String(loanData.BankAccountId));
     if (!bankAccount) return { success: false, error: "Selected bank account not found" };
+
+    if (String(bankAccount.UserId) !== String(loanData.UserId)) {
+      return { success: false, error: "Selected bank account does not belong to this user" };
+    }
 
     const loanAmount = parseFloat(loanData.LoanAmount) || 0;
     if (loanAmount <= 0) return { success: false, error: "Loan amount must be greater than 0" };
 
     const maxLoan = parseFloat(bankAccount.MaxLoanAmount) || 0;
-    const currentUtilized = calculateUserBankUtilization(loanData.UserId, loanData.BankAccountId);
+    const currentUtilized = calculateUserBankUtilization_(loanData.UserId, loanData.BankAccountId);
     const availableAmount = Math.max(0, maxLoan - currentUtilized);
 
     if (maxLoan > 0 && loanAmount > availableAmount) {
       return {
         success: false,
-        error: `Loan amount of ₹${loanAmount} exceeds the available limit of ₹${availableAmount} for ${bankAccount.BankName}`
+        error: `Loan amount of ₹${loanAmount} exceeds the available limit of ₹${availableAmount} for ${bankAccount.BankName} (Account ${bankAccount.AccountNumber}). Max Limit: ₹${maxLoan}, Current Utilized: ₹${currentUtilized}`
       };
     }
 
-    const loanId = generateId("L", "Loans", "LoanId");
-    const loanNumber = loanData.LoanNumber || `LN-${new Date().getFullYear()}-${loanId}`;
+    const bankName = bankAccount.BankName || (loanData.BankName || "");
+    const loanId = generateId_("L", "Loans", "LoanId");
+
+    let grossWeight = parseFloat(loanData.GrossWeight) || 0;
+    let netWeight = parseFloat(loanData.NetWeight) || 0;
+    if ((!grossWeight || !netWeight) && loanData.ornamentIds && loanData.ornamentIds.length > 0) {
+      try {
+        const allOrns = getSheetData_("Ornaments");
+        const selectedOrns = allOrns.filter(o => loanData.ornamentIds.map(String).includes(String(o.OrnamentId)));
+        if (!grossWeight) grossWeight = selectedOrns.reduce((s, o) => s + (parseFloat(o.GrossWeight) || 0), 0);
+        if (!netWeight) netWeight = selectedOrns.reduce((s, o) => {
+          const nw = (o.MetalWeight !== undefined && o.MetalWeight !== "" && o.MetalWeight !== null) ? o.MetalWeight : (o.NetWeight || 0);
+          return s + (parseFloat(nw) || 0);
+        }, 0);
+      } catch (err) {
+        console.error("Error calculating ornament weights:", err);
+      }
+    }
+
+    let dueDate = loanData.DueDate;
+    if (!dueDate && loanData.LoanDate) {
+      try {
+        const parts = String(loanData.LoanDate).split("T")[0].split("-");
+        if (parts.length === 3) {
+          const d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+          d.setFullYear(d.getFullYear() + 1);
+          d.setDate(d.getDate() - 1);
+          const y = d.getFullYear();
+          const m = String(d.getMonth() + 1).padStart(2, "0");
+          const dt = String(d.getDate()).padStart(2, "0");
+          dueDate = `${y}-${m}-${dt}`;
+        }
+      } catch (err) {
+        dueDate = loanData.DueDate || "";
+      }
+    }
+
+    const loanPeriod = monthsBetweenDates_(loanData.LoanDate, dueDate) || loanData.LoanPeriod || "";
 
     const record = {
       LoanId: loanId,
-      LoanNumber: loanNumber,
+      LoanNumber: loanData.LoanNumber,
       UserId: loanData.UserId || "",
       BankAccountId: loanData.BankAccountId || "",
-      BankName: bankAccount.BankName,
-      LoanDate: loanData.LoanDate || new Date().toISOString().split("T")[0],
+      BankName: bankName,
+      LoanDate: loanData.LoanDate,
       LoanAmount: loanAmount,
-      InterestRate: parseFloat(loanData.InterestRate) || 9.5,
+      InterestRate: parseFloat(loanData.InterestRate) || 0,
       InterestType: loanData.InterestType || "Simple",
-      LoanPeriod: loanData.LoanPeriod || "12 Months",
-      GrossWeight: parseFloat(loanData.GrossWeight) || 0,
-      NetWeight: parseFloat(loanData.NetWeight) || 0,
+      LoanPeriod: loanPeriod,
+      GrossWeight: grossWeight || "",
+      NetWeight: netWeight || "",
       ProcessingFee: parseFloat(loanData.ProcessingFee) || 0,
       DocumentCharge: parseFloat(loanData.DocumentCharge) || 0,
       InsuranceCharge: parseFloat(loanData.InsuranceCharge) || 0,
       TotalCharges: parseFloat(loanData.TotalCharges) || 0,
-      NetDisbursementAmount: parseFloat(loanData.NetDisbursementAmount) || loanAmount,
-      DueDate: loanData.DueDate || "",
+      NetDisbursementAmount: parseFloat(loanData.NetDisbursementAmount) || 0,
+      DueDate: dueDate || "",
       LoanStatus: "Active",
       Remarks: loanData.Remarks || "",
       CreatedDate: new Date().toISOString()
     };
-    appendRow("Loans", record);
+    appendRow_("Loans", record);
 
-    // Link ornaments and mark Pledged
+    // Link ornaments and update their status
     (loanData.ornamentIds || []).forEach(ornamentId => {
-      const mappingId = generateId("MAP", "LoanOrnaments", "MappingId");
-      appendRow("LoanOrnaments", { MappingId: mappingId, LoanId: loanId, OrnamentId: ornamentId, Status: "Pledged" });
-      updateRow("Ornaments", "OrnamentId", ornamentId, { Status: "Pledged" });
+      const mappingId = generateId_("MAP", "LoanOrnaments", "MappingId");
+      appendRow_("LoanOrnaments", { MappingId: mappingId, LoanId: loanId, OrnamentId: ornamentId, Status: "Pledged" });
+      updateRow_("Ornaments", "OrnamentId", ornamentId, { Status: "Pledged" });
     });
 
-    recalculateAndSyncBankUtilization(loanData.BankAccountId);
-    invalidateAllCaches();
+    // Recalculate & sync utilized amount for this user + bank
+    recalculateAndSyncBankUtilization_(loanData.BankAccountId);
+
     return { success: true, data: record };
   } catch (e) {
     return { success: false, error: e.message };
   }
 }
 
-function getLoans(userId, status) {
+function getLoans_(userId, status) {
   try {
-    let loans = getSheetData("Loans");
+    let loans = getSheetData_("Loans");
     if (userId) loans = loans.filter(l => String(l.UserId) === String(userId));
     if (status) loans = loans.filter(l => l.LoanStatus === status);
 
-    const mappings = getSheetData("LoanOrnaments");
-    const enriched = loans.map(l => {
-      const orns = mappings.filter(m => String(m.LoanId) === String(l.LoanId)).map(m => m.OrnamentId);
-      return { ...l, ornamentIds: orns };
+    const bankAccounts = getSheetData_("BankAccounts");
+    const bankMap = new Map(bankAccounts.map(b => [String(b.BankAccountId), b.BankName]));
+
+    const loanWeightMap = new Map();
+    const loanOrnMap = new Map();
+    try {
+      const mappings = getSheetData_("LoanOrnaments").filter(m => m.Status === "Pledged" || m.Status === "Released");
+      const ornaments = getSheetData_("Ornaments");
+      const ornMap = new Map(ornaments.map(o => [String(o.OrnamentId), o]));
+      mappings.forEach(m => {
+        const orn = ornMap.get(String(m.OrnamentId));
+        if (orn) {
+          const curr = loanWeightMap.get(String(m.LoanId)) || { gross: 0, net: 0 };
+          curr.gross += (parseFloat(orn.GrossWeight) || 0);
+          const nw = (orn.MetalWeight !== undefined && orn.MetalWeight !== "" && orn.MetalWeight !== null) ? orn.MetalWeight : (orn.NetWeight || 0);
+          curr.net += (parseFloat(nw) || 0);
+          loanWeightMap.set(String(m.LoanId), curr);
+        }
+        const ornList = loanOrnMap.get(String(m.LoanId)) || [];
+        ornList.push(String(m.OrnamentId));
+        loanOrnMap.set(String(m.LoanId), ornList);
+      });
+    } catch (err) {
+      console.error("Error computing loan weights in getLoans:", err);
+    }
+
+    loans = loans.map(l => {
+      const computed = loanWeightMap.get(String(l.LoanId)) || { gross: 0, net: 0 };
+      const gross = (l.GrossWeight !== undefined && l.GrossWeight !== null && l.GrossWeight !== "" && parseFloat(l.GrossWeight) > 0)
+        ? l.GrossWeight
+        : (computed.gross > 0 ? parseFloat(computed.gross.toFixed(3)) : "");
+      const net = (l.NetWeight !== undefined && l.NetWeight !== null && l.NetWeight !== "" && parseFloat(l.NetWeight) > 0)
+        ? l.NetWeight
+        : (computed.net > 0 ? parseFloat(computed.net.toFixed(3)) : "");
+
+      return {
+        ...l,
+        GrossWeight: gross,
+        NetWeight: net,
+        BankName: l.BankName || bankMap.get(String(l.BankAccountId)) || "",
+        ornamentIds: loanOrnMap.get(String(l.LoanId)) || []
+      };
     });
 
-    return { success: true, data: enriched };
+    return { success: true, data: loans };
   } catch (e) {
     return { success: false, error: e.message };
   }
 }
 
-function updateLoan(loanId, loanData) {
+function updateLoanStatus_(loanId, status) {
   try {
-    updateRow("Loans", "LoanId", loanId, loanData);
-    invalidateAllCaches();
-    return { success: true, data: "Loan updated" };
+    const loan = getSheetData_("Loans").find(l => String(l.LoanId) === String(loanId));
+    updateRow_("Loans", "LoanId", loanId, { LoanStatus: status, UpdatedDate: new Date().toISOString() });
+    if (loan && loan.BankAccountId) {
+      recalculateAndSyncBankUtilization_(loan.BankAccountId);
+    }
+    return { success: true, data: "Loan status updated" };
   } catch (e) {
     return { success: false, error: e.message };
   }
 }
 
-function getLoanDetails(loanId) {
+function updateLoan_(loanId, loanData) {
   try {
-    const loans = getSheetData("Loans");
-    const loan = loans.find(l => String(l.LoanId) === String(loanId));
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    const loans = getSheetData_("Loans");
+    const existingLoan = loans.find(l => String(l.LoanId) === String(loanId));
+    if (!existingLoan) return { success: false, error: "Loan not found" };
+
+    // Check duplicate loan number if changed
+    if (loanData.LoanNumber && String(loanData.LoanNumber) !== String(existingLoan.LoanNumber)) {
+      const duplicate = loans.find(l =>
+        String(l.LoanNumber) === String(loanData.LoanNumber) &&
+        String(l.LoanId) !== String(loanId) &&
+        l.LoanStatus !== "Cancelled"
+      );
+      if (duplicate) return { success: false, error: "Loan number already exists" };
+    }
+
+    const oldBankAccountId = existingLoan.BankAccountId;
+    const newBankAccountId = loanData.BankAccountId || oldBankAccountId;
+    const oldLoanAmount = parseFloat(existingLoan.LoanAmount) || 0;
+    const newLoanAmount = parseFloat(loanData.LoanAmount) || 0;
+    const isLoanActive = existingLoan.LoanStatus === "Active";
+
+    const bankAccounts = getSheetData_("BankAccounts");
+    const newAcc = bankAccounts.find(a => String(a.BankAccountId) === String(newBankAccountId));
+    const bankName = newAcc ? newAcc.BankName : (loanData.BankName || existingLoan.BankName || "");
+
+    const targetUserId = loanData.UserId || existingLoan.UserId;
+    if (isLoanActive && newAcc) {
+      const maxLoan = parseFloat(newAcc.MaxLoanAmount) || 0;
+      if (maxLoan > 0) {
+        const activeLoans = getSheetData_("Loans").filter(l => l.LoanStatus === "Active");
+        const otherUtilized = activeLoans
+          .filter(l => String(l.LoanId) !== String(loanId) &&
+            String(l.UserId) === String(targetUserId) &&
+            String(l.BankAccountId) === String(newBankAccountId))
+          .reduce((sum, l) => sum + (parseFloat(l.LoanAmount) || 0), 0);
+        const available = Math.max(0, maxLoan - otherUtilized);
+        if (newLoanAmount > available) {
+          return {
+            success: false,
+            error: `Updated loan amount of ₹${newLoanAmount} exceeds available limit of ₹${available} for ${newAcc.BankName} (Account ${newAcc.AccountNumber}). Max Limit: ₹${maxLoan}, Already Utilized: ₹${otherUtilized}`
+          };
+        }
+      }
+    }
+
+    // Update Ornaments and LoanOrnaments mappings if loan is Active
+    if (isLoanActive && loanData.ornamentIds) {
+      const allMappings = getSheetData_("LoanOrnaments");
+      const currentMappings = allMappings.filter(m => String(m.LoanId) === String(loanId) && m.Status === "Pledged");
+      const currentOrnamentIds = currentMappings.map(m => String(m.OrnamentId));
+      const newOrnamentIds = (loanData.ornamentIds || []).map(String);
+
+      // Ornaments to unpledge
+      const ornamentsToRemove = currentOrnamentIds.filter(id => !newOrnamentIds.includes(id));
+      // Ornaments to newly pledge
+      const ornamentsToAdd = newOrnamentIds.filter(id => !currentOrnamentIds.includes(id));
+
+      if (ornamentsToRemove.length > 0) {
+        const mappingSheet = ss.getSheetByName("LoanOrnaments");
+        if (mappingSheet) {
+          const mappingData = mappingSheet.getDataRange().getValues();
+          const headers = SHEET_HEADERS["LoanOrnaments"];
+          const loanIdCol = headers.indexOf("LoanId");
+          const ornIdCol = headers.indexOf("OrnamentId");
+          const statusCol = headers.indexOf("Status");
+
+          for (let i = mappingData.length - 1; i >= 1; i--) {
+            const rowLoanId = String(mappingData[i][loanIdCol]);
+            const rowOrnId = String(mappingData[i][ornIdCol]);
+            const rowStatus = String(mappingData[i][statusCol]);
+            if (rowLoanId === String(loanId) && ornamentsToRemove.includes(rowOrnId) && rowStatus === "Pledged") {
+              mappingSheet.deleteRow(i + 1);
+            }
+          }
+        }
+
+        ornamentsToRemove.forEach(ornId => {
+          updateRow_("Ornaments", "OrnamentId", ornId, {
+            Status: "Available",
+            ReleaseDate: "",
+            ReleasedLoanId: ""
+          });
+        });
+      }
+
+      ornamentsToAdd.forEach(ornId => {
+        const mappingId = generateId_("MAP", "LoanOrnaments", "MappingId");
+        appendRow_("LoanOrnaments", { MappingId: mappingId, LoanId: loanId, OrnamentId: ornId, Status: "Pledged" });
+        updateRow_("Ornaments", "OrnamentId", ornId, { Status: "Pledged" });
+      });
+    }
+
+    let grossWeight = loanData.GrossWeight !== undefined && loanData.GrossWeight !== "" ? (parseFloat(loanData.GrossWeight) || 0) : (existingLoan.GrossWeight !== undefined ? (parseFloat(existingLoan.GrossWeight) || 0) : 0);
+    let netWeight = loanData.NetWeight !== undefined && loanData.NetWeight !== "" ? (parseFloat(loanData.NetWeight) || 0) : (existingLoan.NetWeight !== undefined ? (parseFloat(existingLoan.NetWeight) || 0) : 0);
+    if ((!grossWeight || !netWeight) && loanData.ornamentIds && loanData.ornamentIds.length > 0) {
+      try {
+        const allOrns = getSheetData_("Ornaments");
+        const selectedOrns = allOrns.filter(o => loanData.ornamentIds.map(String).includes(String(o.OrnamentId)));
+        if (!grossWeight) grossWeight = selectedOrns.reduce((s, o) => s + (parseFloat(o.GrossWeight) || 0), 0);
+        if (!netWeight) netWeight = selectedOrns.reduce((s, o) => {
+          const nw = (o.MetalWeight !== undefined && o.MetalWeight !== "" && o.MetalWeight !== null) ? o.MetalWeight : (o.NetWeight || 0);
+          return s + (parseFloat(nw) || 0);
+        }, 0);
+      } catch (err) {
+        console.error("Error calculating ornament weights in updateLoan:", err);
+      }
+    }
+
+    // Update Loan Record
+    const newLoanDate = loanData.LoanDate || existingLoan.LoanDate;
+    const newDueDate = loanData.DueDate || existingLoan.DueDate;
+    const updateRecord = {
+      LoanNumber: loanData.LoanNumber || existingLoan.LoanNumber,
+      UserId: loanData.UserId || existingLoan.UserId,
+      BankAccountId: newBankAccountId,
+      BankName: bankName,
+      LoanDate: newLoanDate,
+      LoanAmount: newLoanAmount,
+      InterestRate: parseFloat(loanData.InterestRate) || 0,
+      InterestType: loanData.InterestType || "Simple",
+      LoanPeriod: monthsBetweenDates_(newLoanDate, newDueDate) || loanData.LoanPeriod || existingLoan.LoanPeriod || "",
+      GrossWeight: grossWeight > 0 ? parseFloat(grossWeight.toFixed(3)) : (existingLoan.GrossWeight || ""),
+      NetWeight: netWeight > 0 ? parseFloat(netWeight.toFixed(3)) : (existingLoan.NetWeight || ""),
+      ProcessingFee: parseFloat(loanData.ProcessingFee) || 0,
+      DocumentCharge: parseFloat(loanData.DocumentCharge) || 0,
+      InsuranceCharge: parseFloat(loanData.InsuranceCharge) || 0,
+      TotalCharges: parseFloat(loanData.TotalCharges) || 0,
+      NetDisbursementAmount: parseFloat(loanData.NetDisbursementAmount) || 0,
+      DueDate: newDueDate,
+      Remarks: loanData.Remarks !== undefined ? loanData.Remarks : existingLoan.Remarks,
+      UpdatedDate: new Date().toISOString()
+    };
+
+    updateRow_("Loans", "LoanId", loanId, updateRecord);
+
+    if (isLoanActive) {
+      recalculateAndSyncBankUtilization_(newBankAccountId);
+      if (String(oldBankAccountId) !== String(newBankAccountId)) {
+        recalculateAndSyncBankUtilization_(oldBankAccountId);
+      }
+    }
+
+    return { success: true, data: { ...existingLoan, ...updateRecord } };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+}
+
+function getLoanDetails_(loanId) {
+  try {
+    const loan = getSheetData_("Loans").find(l => String(l.LoanId) === String(loanId));
     if (!loan) return { success: false, error: "Loan not found" };
 
-    const mappings = getSheetData("LoanOrnaments").filter(m => String(m.LoanId) === String(loanId));
-    const ornamentIds = mappings.map(m => m.OrnamentId);
-    const ornaments = getSheetData("Ornaments").filter(o => ornamentIds.includes(o.OrnamentId));
-    const payments = getSheetData("Payments").filter(p => String(p.LoanId) === String(loanId));
+    const bankAccount = loan.BankAccountId ? getSheetData_("BankAccounts").find(b => String(b.BankAccountId) === String(loan.BankAccountId)) : null;
+    if (bankAccount && !loan.BankName) {
+      loan.BankName = bankAccount.BankName;
+    }
 
-    return {
-      success: true,
-      data: { loan, ornaments, payments }
-    };
+    const mappings = getSheetData_("LoanOrnaments").filter(
+      m => String(m.LoanId) === String(loanId)
+    );
+    const allOrnaments = getSheetData_("Ornaments");
+    const ornaments = mappings.map(m => {
+      const orn = allOrnaments.find(o => String(o.OrnamentId) === String(m.OrnamentId));
+      return { ...m, ...orn };
+    });
+
+    const pledgedGross = ornaments.reduce((sum, o) => sum + (parseFloat(o.GrossWeight) || 0), 0);
+    const pledgedNet = ornaments.reduce((sum, o) => {
+      const nw = (o.MetalWeight !== undefined && o.MetalWeight !== "" && o.MetalWeight !== null) ? o.MetalWeight : (o.NetWeight || 0);
+      return sum + (parseFloat(nw) || 0);
+    }, 0);
+
+    if (loan.GrossWeight === undefined || loan.GrossWeight === null || loan.GrossWeight === "" || parseFloat(loan.GrossWeight) === 0) {
+      if (pledgedGross > 0) loan.GrossWeight = parseFloat(pledgedGross.toFixed(3));
+    }
+    if (loan.NetWeight === undefined || loan.NetWeight === null || loan.NetWeight === "" || parseFloat(loan.NetWeight) === 0) {
+      if (pledgedNet > 0) loan.NetWeight = parseFloat(pledgedNet.toFixed(3));
+    }
+
+    const payments = getSheetData_("Payments").filter(p => String(p.LoanId) === String(loanId));
+    const releases = getSheetData_("Releases").filter(r => String(r.LoanId) === String(loanId));
+
+    return { success: true, data: { loan, bankAccount, ornaments, payments, releases } };
   } catch (e) {
     return { success: false, error: e.message };
   }
 }
 
-// ─── PAYMENTS ───
-
-function addPayment(paymentData) {
+function closeAndReleaseLoan_(loanId, closureRemarks) {
   try {
-    const paymentId = generateId("PAY", "Payments", "PaymentId");
+    const loanToClose = getSheetData_("Loans").find(l => l.LoanId === loanId);
+
+    const currentDate = new Date().toISOString();
+    updateRow_("Loans", "LoanId", loanId, {
+      LoanStatus: "Closed",
+      UpdatedDate: currentDate,
+      ClosedDate: currentDate,
+      ClosureRemarks: closureRemarks
+    });
+
+    const mappings = getSheetData_("LoanOrnaments").filter(
+      m => String(m.LoanId) === String(loanId) && m.Status === "Pledged"
+    );
+
+    mappings.forEach(m => {
+      // Update the mapping table
+      updateRow_("LoanOrnaments", "MappingId", m.MappingId, { Status: "Released" });
+
+      // Update the ornament itself
+      updateRow_("Ornaments", "OrnamentId", m.OrnamentId, {
+        Status: "Available",
+        ReleaseDate: currentDate,
+        ReleasedLoanId: loanId
+      });
+    });
+    // Recalculate & sync utilized amount for the bank account
+    if (loanToClose && loanToClose.BankAccountId) {
+      recalculateAndSyncBankUtilization_(loanToClose.BankAccountId);
+    }
+    return { success: true, data: "Loan closed and ornaments released successfully" };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+}
+
+function getActiveLoansForClosure_() {
+  try {
+    const loans = getSheetData_("Loans").filter(l => l.LoanStatus === 'Active');
+    const users = getSheetData_("Users");
+    const ornaments = getSheetData_("Ornaments");
+    const mappings = getSheetData_("LoanOrnaments");
+    const bankAccounts = getSheetData_("BankAccounts");
+
+    const userMap = new Map(users.map(u => [u.UserId, u]));
+    const ornamentMap = new Map(ornaments.map(o => [o.OrnamentId, o]));
+    const bankMap = new Map(bankAccounts.map(b => [String(b.BankAccountId).trim(), b.BankName]));
+
+    const results = loans.map(loan => {
+      const user = userMap.get(loan.UserId) || {};
+      const linkedMappings = mappings.filter(m => m.LoanId === loan.LoanId);
+      const linkedOrnamentNames = linkedMappings
+        .map(m => ornamentMap.get(m.OrnamentId))
+        .filter(Boolean)
+        .map(o => o.OrnamentName);
+
+      return {
+        ...loan,
+        BankName: loan.BankName || bankMap.get(String(loan.BankAccountId || '').trim()) || '—',
+        customerName: user.FullName || 'N/A',
+        mobileNumber: user.MobileNumber || 'N/A',
+        linkedOrnaments: linkedOrnamentNames.join(', ')
+      };
+    });
+    return { success: true, data: results };
+  } catch (e) { return { success: false, error: e.message }; }
+}
+
+// ─── PAYMENT FUNCTIONS ───
+
+function addPayment_(paymentData) {
+  try {
+    const paymentId = generateId_("PAY", "Payments", "PaymentId");
     const record = {
       PaymentId: paymentId,
       LoanId: paymentData.LoanId,
-      PaymentDate: paymentData.PaymentDate || new Date().toISOString().split("T")[0],
-      PaymentType: paymentData.PaymentType || "Interest",
+      PaymentDate: paymentData.PaymentDate,
+      PaymentType: paymentData.PaymentType || "Partial",
       PrincipalAmount: parseFloat(paymentData.PrincipalAmount) || 0,
       InterestAmount: parseFloat(paymentData.InterestAmount) || 0,
       PenaltyAmount: parseFloat(paymentData.PenaltyAmount) || 0,
       TotalPaidAmount: parseFloat(paymentData.TotalPaidAmount) || 0,
-      PaymentMethod: paymentData.PaymentMethod || "UPI",
+      PaymentMethod: paymentData.PaymentMethod || "Cash",
       TransactionReference: paymentData.TransactionReference || "",
       Remarks: paymentData.Remarks || "",
       CreatedDate: new Date().toISOString()
     };
-    appendRow("Payments", record);
-    invalidateAllCaches();
+    appendRow_("Payments", record);
     return { success: true, data: record };
   } catch (e) {
     return { success: false, error: e.message };
   }
 }
 
-// ─── CLOSURE & RELEASES ───
-
-function closeAndReleaseLoan(data) {
+function getPayments_(loanId) {
   try {
-    const loanId = data.loanId || data.LoanId;
-    updateRow("Loans", "LoanId", loanId, {
-      LoanStatus: "Closed",
-      ClosedDate: new Date().toISOString(),
-      ClosureRemarks: data.remarks || "Settled via Mobile App"
-    });
-
-    // Mark ornaments as Available
-    const mappings = getSheetData("LoanOrnaments").filter(m => String(m.LoanId) === String(loanId));
-    mappings.forEach(m => {
-      updateRow("Ornaments", "OrnamentId", m.OrnamentId, { Status: "Available" });
-      updateRow("LoanOrnaments", "MappingId", m.MappingId, { Status: "Released" });
-    });
-
-    invalidateAllCaches();
-    return { success: true, data: "Loan closed and ornaments released" };
+    let payments = getSheetData_("Payments");
+    if (loanId) {
+      payments = payments.filter(p => String(p.LoanId) === String(loanId));
+    }
+    return { success: true, data: payments };
   } catch (e) {
     return { success: false, error: e.message };
   }
 }
 
-function releaseOrnaments(releaseData) {
+// ─── RELEASE FUNCTIONS ───
+
+function releaseOrnaments_(releaseData) {
   try {
-    const proofUrl = processDriveFiles(releaseData.files, "Delivery_Proofs")[0] || "";
+    const proofUrl = processDriveFiles_(releaseData.files, "Delivery_Proofs")[0] || "";
 
     (releaseData.ornamentIds || []).forEach(ornamentId => {
-      const releaseId = generateId("REL", "Releases", "ReleaseId");
+      const releaseId = generateId_("REL", "Releases", "ReleaseId");
       const record = {
         ReleaseId: releaseId,
         LoanId: releaseData.LoanId,
         OrnamentId: ornamentId,
         ReleaseDate: releaseData.ReleaseDate,
         ReleasedBy: releaseData.ReleasedBy || "",
+        CustomerSignature: "", // Placeholder for signature data if captured
         DeliveryProofImage: proofUrl,
         Remarks: releaseData.Remarks || ""
       };
-      appendRow("Releases", record);
-      updateRow("Ornaments", "OrnamentId", ornamentId, { Status: "Available" });
+      appendRow_("Releases", record);
+
+      // Update ornament status to Available
+      updateRow_("Ornaments", "OrnamentId", ornamentId, { Status: "Available" });
+
+      // Update mapping status
+      const mappings = getSheetData_("LoanOrnaments");
+      const mappingToUpdate = mappings.find(m => String(m.LoanId) === String(releaseData.LoanId) && String(m.OrnamentId) === String(ornamentId));
+      if (mappingToUpdate) {
+        updateRow_("LoanOrnaments", "MappingId", mappingToUpdate.MappingId, { Status: "Released" });
+      }
     });
 
-    invalidateAllCaches();
-    return { success: true, data: "Ornaments released" };
+    return { success: true, data: "Ornaments released successfully" };
   } catch (e) {
     return { success: false, error: e.message };
   }
 }
 
-// ─── DASHBOARD & GOLD RATES ───
+// ─── UNIFIED SYNC FUNCTION ───
 
-function getDashboardData() {
+function getInitialSyncData_() {
   try {
-    const cache = CacheService.getScriptCache();
-    const cached = cache.get("DASHBOARD_DATA");
-    if (cached) {
-      return { success: true, data: JSON.parse(cached), isCached: true };
-    }
+    const usersRes = getUsers_();
+    const bankAccountsRes = getBankAccounts_();
+    const ornamentsRes = getOrnaments_();
+    const loansRes = getLoans_();
+    const paymentsRes = getPayments_();
+    const goldRatesRes = getGoldRates_(false);
 
-    const users = getSheetData("Users").filter(u => u.Status === "Active");
-    const bankAccounts = getSheetData("BankAccounts").filter(b => b.Status === "Active");
-    const ornaments = getSheetData("Ornaments").filter(o => o.Status !== "Deleted");
+    return {
+      success: true,
+      data: {
+        users: (usersRes && usersRes.data) || [],
+        bankAccounts: (bankAccountsRes && bankAccountsRes.data) || [],
+        ornaments: (ornamentsRes && ornamentsRes.data) || [],
+        loans: (loansRes && loansRes.data) || [],
+        payments: (paymentsRes && paymentsRes.data) || [],
+        goldRates: (goldRatesRes && goldRatesRes.data) || null,
+        timestamp: new Date().toISOString()
+      }
+    };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+}
+
+// ─── DASHBOARD FUNCTIONS ───
+
+function getDashboardData_() {
+  try {
+    const users = getSheetData_("Users").filter(u => u.Status === "Active");
+    const bankAccounts = getSheetData_("BankAccounts").filter(b => b.Status === "Active");
+    const ornaments = getSheetData_("Ornaments").filter(o => o.Status !== "Deleted");
     const pledgedOrnaments = ornaments.filter(o => o.Status === "Pledged");
+    const pledgedOrnamentsCount = pledgedOrnaments.length;
     const pledgedGrams = pledgedOrnaments.reduce((sum, o) => sum + (parseFloat(o.GrossWeight) || 0), 0);
-
-    const loans = getSheetData("Loans");
+    const loans = getSheetData_("Loans");
     const activeLoans = loans.filter(l => l.LoanStatus === "Active");
     const closedLoans = loans.filter(l => l.LoanStatus === "Closed");
     const totalLoanAmount = activeLoans.reduce((sum, l) => sum + (parseFloat(l.LoanAmount) || 0), 0);
@@ -815,46 +1926,63 @@ function getDashboardData() {
     const totalEligibleLoanAmount = bankAccounts.reduce((sum, b) => sum + (parseFloat(b.MaxLoanAmount) || 0), 0);
     const totalAvailableLoanAmount = bankAccounts.reduce((sum, b) => {
       const maxL = parseFloat(b.MaxLoanAmount) || 0;
-      const util = calculateUserBankUtilization(b.UserId, b.BankAccountId, activeLoans);
+      const util = calculateUserBankUtilization_(b.UserId, b.BankAccountId, activeLoans);
       return sum + Math.max(0, maxL - util);
     }, 0);
 
+    // Calculate total gold weight and buying gold value from all ornaments
     let totalGoldWeight = 0;
     let totalBuyingGoldValue = 0;
     ornaments.forEach(o => {
-      const net = parseFloat(o.NetWeight) || (parseFloat(o.GrossWeight) || 0);
-      const rate = parseFloat(o.BuyingPricePerGram) || 0;
-      totalGoldWeight += net;
-      totalBuyingGoldValue += (rate > 0 ? (rate * net) : (parseFloat(o.BuyingCost) || 0));
+      const metal = parseFloat(o.MetalWeight);
+      const net = parseFloat(o.NetWeight);
+      const gross = parseFloat(o.GrossWeight) || 0;
+      const stone = parseFloat(o.StoneWeight) || 0;
+      const wt = (!isNaN(metal) && metal > 0) ? metal : ((!isNaN(net) && net > 0) ? net : Math.max(0, gross - stone));
+
+      const rate = parseFloat(o.BuyingPricePerGram !== undefined && o.BuyingPricePerGram !== null && o.BuyingPricePerGram !== "" ? o.BuyingPricePerGram : (o.BuyingPrice || o["Buying price/grm"])) || 0;
+      const buyVal = (rate > 0 && wt > 0) ? (rate * wt) : (parseFloat(o.TotalPrice) || 0);
+
+      totalGoldWeight += wt;
+      totalBuyingGoldValue += buyVal;
     });
 
-    const payments = getSheetData("Payments");
+    const payments = getSheetData_("Payments");
     const recentTransactions = payments.slice(-5).reverse();
 
-    const data = {
-      totalUsers: users.length,
-      totalBankAccounts: bankAccounts.length,
-      totalOrnaments: ornaments.length,
-      pledgedOrnamentsCount: pledgedOrnaments.length,
-      pledgedGrams,
-      activeLoans: activeLoans.length,
-      closedLoans: closedLoans.length,
-      totalLoanAmount,
-      totalEligibleLoanAmount,
-      totalAvailableLoanAmount,
-      totalGoldWeight,
-      totalBuyingGoldValue,
-      recentTransactions
+    return {
+      success: true,
+      data: {
+        totalUsers: users.length,
+        totalBankAccounts: bankAccounts.length,
+        totalOrnaments: ornaments.length,
+        pledgedOrnamentsCount,
+        pledgedGrams,
+        activeLoans: activeLoans.length,
+        closedLoans: closedLoans.length,
+        totalLoanAmount,
+        totalEligibleLoanAmount,
+        totalAvailableLoanAmount,
+        totalGoldWeight,
+        totalBuyingGoldValue,
+        recentTransactions
+      }
     };
-
-    cache.put("DASHBOARD_DATA", JSON.stringify(data), 300); // 5 mins cache
-    return { success: true, data };
   } catch (e) {
     return { success: false, error: e.message };
   }
 }
 
-function getGoldRates(forceRefresh) {
+// ─── LIVE GOLD RATE TRACKER (GOODRETURNS BANGALORE) ───
+
+/**
+ * Fetches and parses real-time gold rates for Bangalore from GoodReturns.in.
+ * Features 30-minute caching via CacheService and persistent fallback via PropertiesService.
+ *
+ * @param {boolean} [forceRefresh=false] Whether to bypass CacheService
+ * @returns {Object} JSON result with rates for 24K, 22K, 18K gold per gram and daily changes
+ */
+function getGoldRates_(forceRefresh) {
   try {
     const cache = CacheService.getScriptCache();
     const CACHE_KEY = "GOLD_RATES_BANGALORE_V1";
@@ -899,7 +2027,7 @@ function getGoldRates(forceRefresh) {
     }
 
     const html = response.getContentText();
-    const ratesData = parseGoldRatesHtml(html);
+    const ratesData = parseGoldRatesHtml_(html);
 
     if (!ratesData || !ratesData.gold24k || !ratesData.gold22k || !ratesData.gold18k) {
       throw new Error("Unable to extract complete gold rate data from page content.");
@@ -973,7 +2101,14 @@ function getGoldRates(forceRefresh) {
   }
 }
 
-function parseGoldRatesHtml(html) {
+/**
+ * Robust, multi-strategy HTML parser for GoodReturns gold rates.
+ * Parses 1-gram rates and daily changes for 24K, 22K, and 18K gold.
+ *
+ * @param {string} html Raw webpage HTML
+ * @returns {Object|null} Extracted rates object
+ */
+function parseGoldRatesHtml_(html) {
   try {
     if (!html || typeof html !== "string") {
       return null;
@@ -1152,4 +2287,117 @@ function parseGoldRatesHtml(html) {
     console.error("parseGoldRatesHtml error:", err);
     return null;
   }
+}
+
+/**
+ * One-Click Authorization & Test Function
+ * Run this function once from the Apps Script IDE toolbar to grant the
+ * 'https://www.googleapis.com/auth/script.external_request' permission.
+ */
+function testGoldRates() {
+  assertOwner_();
+  console.log("Testing getGoldRates_()...");
+  const result = getGoldRates_(true);
+  console.log("Result:", JSON.stringify(result, null, 2));
+  return result;
+}
+
+// ─── ONE-TIME SECURITY MIGRATION ───
+
+/**
+ * IMPORTANT: Run this function ONCE from the Apps Script IDE after deploying
+ * this security update. It hashes all existing plaintext passwords in the
+ * Admins sheet so that existing admins can still log in.
+ *
+ * Safe to run multiple times — it detects already-hashed passwords (64-char hex)
+ * and skips them.
+ */
+function migrateAdminPasswordsToHashed() {
+  assertOwner_();
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = ss.getSheetByName("Admins");
+  if (!sheet) {
+    console.error("Admins sheet not found.");
+    return;
+  }
+
+  const data = sheet.getDataRange().getValues();
+  if (data.length <= 1) {
+    console.log("No admin records to migrate.");
+    return;
+  }
+
+  const headers = data[0];
+  const passwordCol = headers.indexOf("Password");
+  if (passwordCol === -1) {
+    console.error("Password column not found in Admins sheet.");
+    return;
+  }
+
+  let migrated = 0;
+  let skipped = 0;
+
+  for (let i = 1; i < data.length; i++) {
+    const currentPassword = String(data[i][passwordCol]);
+    // A SHA-256 hash is exactly 64 lowercase hex characters — skip if already hashed
+    const isAlreadyHashed = /^[0-9a-f]{64}$/.test(currentPassword);
+
+    if (isAlreadyHashed) {
+      skipped++;
+      console.log(`Row ${i + 1}: Already hashed — skipped.`);
+    } else {
+      const hashed = hashValue_(currentPassword);
+      sheet.getRange(i + 1, passwordCol + 1).setValue(hashed);
+      migrated++;
+      console.log(`Row ${i + 1}: Password migrated to hash.`);
+    }
+  }
+
+  console.log(`Migration complete. Migrated: ${migrated}, Skipped (already hashed): ${skipped}`);
+}
+
+// ─── ONE-TIME ORNAMENT STATUS MIGRATION ───
+
+/**
+ * IMPORTANT: Run this function ONCE from the Apps Script IDE to fix historical
+ * ornament rows. Loan closure used to mark released ornaments as "Released"
+ * instead of "Available" (which is what the partial-release flow always used).
+ * This updates every Ornaments row currently marked "Released" to "Available",
+ * matching the now-unified behavior in closeAndReleaseLoan_.
+ *
+ * Safe to run multiple times — it only touches rows whose Status is "Released".
+ */
+function migrateReleasedOrnamentsToAvailable() {
+  assertOwner_();
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = ss.getSheetByName("Ornaments");
+  if (!sheet) {
+    console.error("Ornaments sheet not found.");
+    return;
+  }
+
+  const data = sheet.getDataRange().getValues();
+  if (data.length <= 1) {
+    console.log("No ornament records to migrate.");
+    return;
+  }
+
+  const headers = data[0];
+  const statusCol = headers.indexOf("Status");
+  if (statusCol === -1) {
+    console.error("Status column not found in Ornaments sheet.");
+    return;
+  }
+
+  let migrated = 0;
+
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][statusCol]) === "Released") {
+      sheet.getRange(i + 1, statusCol + 1).setValue("Available");
+      migrated++;
+      console.log(`Row ${i + 1}: Status changed from Released to Available.`);
+    }
+  }
+
+  console.log(`Migration complete. Ornaments updated: ${migrated}.`);
 }

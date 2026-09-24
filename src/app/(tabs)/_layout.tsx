@@ -1,22 +1,28 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { 
-  View, Text, StyleSheet, TouchableOpacity, 
-  ScrollView, Animated, Easing, useWindowDimensions, Platform, StatusBar as RNStatusBar,
-  Image, ActivityIndicator 
-} from 'react-native';
-import { Tabs, useRouter, usePathname } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Colors } from '../../constants/theme';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { useAppStore } from '../../services/store';
-import { Env } from '../../config/env';
-import { SidebarProvider, useSidebar } from '../../context/SidebarContext';
-import { SidebarTrigger } from '../../components/SidebarTrigger';
-import { useTheme } from '../../context/ThemeContext';
-import { ThemeColors } from '../../constants/theme';
-import { ThemeToggleBtn } from '../../components/ThemeToggleBtn';
-import { useAuth } from '../../context/AuthContext';
+import { Tabs, usePathname, useRouter } from 'expo-router';
+import React, { useEffect, useRef, useState } from 'react';
+import {
+  ActivityIndicator,
+  Animated, Easing,
+  Image,
+  Platform, StatusBar as RNStatusBar,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  useWindowDimensions,
+  View
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ProfileModal } from '../../components/ProfileModal';
+import { SidebarTrigger } from '../../components/SidebarTrigger';
+import { ThemeToggleBtn } from '../../components/ThemeToggleBtn';
+import { Env } from '../../config/env';
+import { Colors, ThemeColors } from '../../constants/theme';
+import { useAuth } from '../../context/AuthContext';
+import { SidebarProvider, useSidebar } from '../../context/SidebarContext';
+import { useTheme } from '../../context/ThemeContext';
+import { useAppStore } from '../../services/store';
 
 interface NavItem {
   name: string;

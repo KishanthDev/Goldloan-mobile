@@ -67,25 +67,25 @@ function RootLayoutInner() {
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="login" options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen
-          name="customers/new"
-          options={{ presentation: 'modal', headerShown: false }}
+        <Stack.Screen 
+          name="customers/new" 
+          options={{ presentation: 'modal', headerShown: false }} 
         />
-        <Stack.Screen
-          name="customers/[id]"
-          options={{ headerShown: false }}
+        <Stack.Screen 
+          name="customers/[id]" 
+          options={{ headerShown: false }} 
         />
         <Stack.Screen
           name="loans/new"
-          options={{ presentation: 'modal', headerShown: false }}
+          options={{ presentation: 'modal', headerShown: false }} 
         />
-        <Stack.Screen
-          name="loans/[id]"
-          options={{ headerShown: false }}
+        <Stack.Screen 
+          name="loans/[id]" 
+          options={{ headerShown: false }} 
         />
-        <Stack.Screen
-          name="loans/closure"
-          options={{ presentation: 'modal', headerShown: false }}
+        <Stack.Screen 
+          name="loans/closure" 
+          options={{ presentation: 'modal', headerShown: false }} 
         />
       </Stack>
     </>

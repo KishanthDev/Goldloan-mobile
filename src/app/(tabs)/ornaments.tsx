@@ -50,7 +50,7 @@ export default function OrnamentsScreen() {
   // List State
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeFilter, setActiveFilter] = useState<'All' | 'Available' | 'Pledged' | 'Released'>('All');
+  const [activeFilter, setActiveFilter] = useState<'All' | 'Available' | 'Pledged'>('All');
   const [sortOption, setSortOption] = useState('Newest First');
   const [sortModalVisible, setSortModalVisible] = useState(false);
 
@@ -76,7 +76,7 @@ export default function OrnamentsScreen() {
     BuyingPricePerGram: String(store.goldRates?.gold22k?.rate1g || ''),
     Description: '',
     Remarks: '',
-    Status: 'Available' as 'Available' | 'Pledged' | 'Released',
+    Status: 'Available' as 'Available' | 'Pledged',
   });
   const [formImages, setFormImages] = useState<string[]>([]);
   const [pickerModal, setPickerModal] = useState<{
@@ -106,7 +106,6 @@ export default function OrnamentsScreen() {
   // Filter counts
   const availableCount = useMemo(() => store.ornaments.filter(o => o.Status === 'Available').length, [store.ornaments]);
   const pledgedCount = useMemo(() => store.ornaments.filter(o => o.Status === 'Pledged').length, [store.ornaments]);
-  const releasedCount = useMemo(() => store.ornaments.filter(o => o.Status === 'Released').length, [store.ornaments]);
   const totalCount = store.ornaments.length;
 
   // Filtered Ornaments
@@ -225,7 +224,7 @@ export default function OrnamentsScreen() {
       BuyingPricePerGram: String(orn.BuyingPricePerGram || '5800'),
       Description: orn.Description || '',
       Remarks: orn.Remarks || '',
-      Status: orn.Status === 'Pledged' ? 'Pledged' : (orn.Status === 'Released' ? 'Released' : 'Available'),
+      Status: orn.Status === 'Pledged' ? 'Pledged' : 'Available',
     });
     setViewMode('edit');
   };
@@ -1186,7 +1185,7 @@ export default function OrnamentsScreen() {
                   <Text style={styles.inputLabel}>Status</Text>
                   <TouchableOpacity
                     style={styles.dropdownInput}
-                    onPress={() => openDropdown('Status', 'Select Status', ['Available', 'Pledged', 'Released'])}
+                    onPress={() => openDropdown('Status', 'Select Status', ['Available', 'Pledged'])}
                   >
                     <Text style={styles.dropdownValue}>{form.Status}</Text>
                     <Ionicons name="chevron-down" size={16} color="#64748b" />
@@ -1338,15 +1337,6 @@ export default function OrnamentsScreen() {
             >
               <Text style={[styles.filterPillText, activeFilter === 'Pledged' && styles.filterPillTextActive]}>
                 Pledged ({pledgedCount})
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.filterPill, activeFilter === 'Released' && styles.filterPillActive]}
-              onPress={() => setActiveFilter('Released')}
-            >
-              <Text style={[styles.filterPillText, activeFilter === 'Released' && styles.filterPillTextActive]}>
-                Released ({releasedCount})
               </Text>
             </TouchableOpacity>
           </ScrollView>
@@ -2051,7 +2041,10 @@ const getStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    paddingBottom: 12,
     marginBottom: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: isDark ? '#1e293b' : '#e2e8f0',
   },
   cardHeaderLeft: {
     flexDirection: 'row',
@@ -2084,7 +2077,7 @@ const getStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
   weightGrid: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingTop: 4,
+    paddingTop: 0,
   },
   weightCol: { flex: 1, alignItems: 'flex-start' },
   weightLabel: { fontSize: 11, color: isDark ? '#94a3b8' : '#64748b', marginBottom: 4 },
