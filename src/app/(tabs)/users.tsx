@@ -1,4 +1,4 @@
-import { Ionicons, MaterialIcons } from '@expo/vector-icons';
+import { Ionicons, MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
@@ -10,14 +10,17 @@ import {
   Linking,
   Platform,
   RefreshControl,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
+  useWindowDimensions,
   View
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { BankCard } from '../../components/BankCard';
+import { LoanCard } from '../../components/LoanCard';
 import { ConfirmModal } from '../../components/ConfirmModal';
 import { OptionPickerModal } from '../../components/ornaments/OptionPickerModal';
 import { UserOptionsMenu, UserOptionsMenuHandle } from '../../components/users/UserOptionsMenu';
@@ -34,7 +37,7 @@ import {
   formatPhoneNumber,
   INDIAN_STATES,
   OCCUPATION_OPTIONS,
-  USER_SORT_OPTIONS,
+  USER_SORT_OPTIONS
 } from '../../mock/userMockExtras';
 import { getDriveImageUrl } from '../../services/api';
 import { useAppStore } from '../../services/store';
@@ -74,7 +77,9 @@ function getAvatarColor(name: string) {
 export default function UsersScreen() {
   const router = useRouter();
   const { colors, isDark } = useTheme();
-  const styles = getStyles(colors, isDark);
+  const { width: windowWidth } = useWindowDimensions();
+  const isSmall = windowWidth < 460;
+  const styles = getStyles(colors, isDark, isSmall);
   const store = useAppStore();
   const toast = useToast();
   const { isSuperAdmin } = useAuth();
@@ -92,6 +97,8 @@ export default function UsersScreen() {
 
   // Details State
   const [activeTab, setActiveTab] = useState<'Profile' | 'Bank Accounts' | 'Loans'>('Profile');
+  const [showAadhaar, setShowAadhaar] = useState(false);
+  const [showPAN, setShowPAN] = useState(false);
   const optionsMenuRef = useRef<UserOptionsMenuHandle>(null);
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
 
@@ -246,6 +253,8 @@ export default function UsersScreen() {
   const handleCardPress = (user: User) => {
     setSelectedUser(user);
     setActiveTab('Profile');
+    setShowAadhaar(false);
+    setShowPAN(false);
     setViewMode('details');
   };
 
@@ -470,6 +479,8 @@ export default function UsersScreen() {
       BankName: b.BankName || '—',
       AccountType: b.AccountType || '—',
       BranchName: b.BranchName || '—',
+      City: b.City || '',
+      PassbookImage: b.PassbookImage || '',
       AccountNumber: b.AccountNumber || '—',
       IFSCCode: b.IFSCCode || '—',
       AccountHolderName: b.AccountHolderName || selectedUser.FullName,
@@ -487,9 +498,15 @@ export default function UsersScreen() {
     // app yet, so it's the one value still derived rather than real — flagged "(mock)" in the UI.
     const userLoans = store.loans.filter(l => l.UserId === selectedUser.UserId);
     const displayLoans: ExtraUserLoan[] = userLoans.map(l => {
-      const ornCount = (l.ornamentIds || []).length;
+      const loanOrns = store.ornaments.filter(o => (l.ornamentIds || []).includes(o.OrnamentId));
+      let firstPhoto = loanOrns.find(o => o.OrnamentImages)?.OrnamentImages?.split('|')?.[0]?.trim() || '';
+      if (!firstPhoto && store.ornaments.length > 0) {
+        firstPhoto = store.ornaments.find(o => o.OrnamentImages)?.OrnamentImages?.split('|')?.[0]?.trim() || '';
+      }
+      const ornCount = (l.ornamentIds || []).length || loanOrns.length;
       const isOverdue = l.LoanStatus === 'Overdue';
       const dueBadge = calculateDueBadge(l.DueDate, l.LoanStatus);
+      const totalWeight = (l.NetWeight || l.GrossWeight) || loanOrns.reduce((sum, o) => sum + (o.NetWeight || o.GrossWeight || 0), 0);
 
       return {
         LoanId: l.LoanId,
@@ -502,8 +519,10 @@ export default function UsersScreen() {
         DueBadgeText: dueBadge.text,
         DueBadgeType: dueBadge.type,
         OrnamentsCount: ornCount,
-        TotalWeightGrams: l.NetWeight || l.GrossWeight || 0,
-        InterestRateText: `${l.InterestRate || 0}% p.a. (${l.InterestType || '—'})`,
+        TotalWeightGrams: totalWeight,
+        InterestRateText: `${l.InterestRate || 0}% p.a.`,
+        InterestType: l.InterestType || 'Simple',
+        OrnamentImageUri: firstPhoto,
       };
     });
 
@@ -591,33 +610,39 @@ export default function UsersScreen() {
             </View>
           </View>
 
-          {/* Segmented Tab Control: Profile | Bank Accounts | Loans */}
+          {/* Tab Switcher: Profile | Bank Accounts | Loans */}
           <View style={styles.tabsSegmentContainer}>
             <TouchableOpacity
-              style={[styles.tabSegmentBtn, activeTab === 'Profile' && styles.tabSegmentBtnActive]}
+              style={styles.tabSegmentBtn}
               onPress={() => setActiveTab('Profile')}
+              activeOpacity={0.7}
             >
               <Text style={[styles.tabSegmentText, activeTab === 'Profile' && styles.tabSegmentTextActive]}>
                 Profile
               </Text>
+              {activeTab === 'Profile' && <View style={styles.activeTabIndicator} />}
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.tabSegmentBtn, activeTab === 'Bank Accounts' && styles.tabSegmentBtnActive]}
+              style={styles.tabSegmentBtn}
               onPress={() => setActiveTab('Bank Accounts')}
+              activeOpacity={0.7}
             >
               <Text style={[styles.tabSegmentText, activeTab === 'Bank Accounts' && styles.tabSegmentTextActive]}>
                 Bank Accounts
               </Text>
+              {activeTab === 'Bank Accounts' && <View style={styles.activeTabIndicator} />}
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.tabSegmentBtn, activeTab === 'Loans' && styles.tabSegmentBtnActive]}
+              style={styles.tabSegmentBtn}
               onPress={() => setActiveTab('Loans')}
+              activeOpacity={0.7}
             >
               <Text style={[styles.tabSegmentText, activeTab === 'Loans' && styles.tabSegmentTextActive]}>
                 Loans
               </Text>
+              {activeTab === 'Loans' && <View style={styles.activeTabIndicator} />}
             </TouchableOpacity>
           </View>
 
@@ -625,134 +650,217 @@ export default function UsersScreen() {
           {activeTab === 'Profile' && (
             <View style={styles.tabContentArea}>
               {/* Section 1: Personal Information */}
-              <View style={styles.card}>
-                <View style={styles.cardHeader}>
-                  <View style={styles.cardHeaderLeft}>
-                    <View style={styles.iconBox}>
-                      <Ionicons name="person-outline" size={18} color="#0284c7" />
-                    </View>
-                    <Text style={styles.cardTitle}>Personal Information</Text>
+              <View style={styles.profileSection}>
+                <View style={styles.profileHeadingRow}>
+                  <View style={styles.profileIconBox}>
+                    <Ionicons name="person-outline" size={17} color="#0284c7" />
                   </View>
+                  <Text style={styles.profileSectionTitle}>Personal Information</Text>
                 </View>
+                <View style={styles.profileDivider} />
 
-                <View style={styles.keyValList}>
-                  <View style={styles.keyValRow}>
-                    <Text style={styles.keyText}>Full Name</Text>
-                    <Text style={styles.valText}>{selectedUser.FullName}</Text>
+                <View style={styles.profileRowsList}>
+                  <View style={styles.profileRow}>
+                    <Text style={styles.profileRowLabel}>Full Name</Text>
+                    <View style={styles.profileRowValueContainer}>
+                      <Text style={styles.profileRowValueText}>{selectedUser.FullName}</Text>
+                    </View>
                   </View>
 
-                  <View style={styles.keyValRow}>
-                    <Text style={styles.keyText}>Father / Husband Name</Text>
-                    <Text style={styles.valText}>{selectedUser.FatherHusbandName || '—'}</Text>
+                  <View style={styles.profileRow}>
+                    <Text style={styles.profileRowLabel}>Father / Husband Name</Text>
+                    <View style={styles.profileRowValueContainer}>
+                      <Text style={styles.profileRowValueText}>{selectedUser.FatherHusbandName || '—'}</Text>
+                    </View>
                   </View>
 
-                  <View style={styles.keyValRow}>
-                    <Text style={styles.keyText}>Customer Code</Text>
-                    <Text style={styles.valText}>{selectedUser.CustomerCode || selectedUser.UserId}</Text>
+                  <View style={styles.profileRow}>
+                    <Text style={styles.profileRowLabel}>Customer Code</Text>
+                    <View style={styles.profileRowValueContainer}>
+                      <Text style={styles.profileRowValueText}>{selectedUser.CustomerCode || selectedUser.UserId}</Text>
+                    </View>
                   </View>
 
-                  <View style={styles.keyValRow}>
-                    <Text style={styles.keyText}>Mobile Number</Text>
-                    <Text style={styles.valText}>{formatPhoneNumber(selectedUser.MobileNumber)}</Text>
+                  <View style={styles.profileRow}>
+                    <Text style={styles.profileRowLabel}>Mobile Number</Text>
+                    <View style={styles.profileRowValueContainer}>
+                      <Text style={styles.profileRowValueText}>{formatPhoneNumber(selectedUser.MobileNumber)}</Text>
+                    </View>
                   </View>
 
-                  <View style={styles.keyValRow}>
-                    <Text style={styles.keyText}>Alternate Mobile Number</Text>
-                    <Text style={styles.valText}>
-                      {selectedUser.AlternateMobileNumber ? formatPhoneNumber(selectedUser.AlternateMobileNumber) : '—'}
-                    </Text>
+                  <View style={styles.profileRow}>
+                    <Text style={styles.profileRowLabel}>Alternate Mobile Number</Text>
+                    <View style={styles.profileRowValueContainer}>
+                      <Text style={styles.profileRowValueText}>
+                        {selectedUser.AlternateMobileNumber ? formatPhoneNumber(selectedUser.AlternateMobileNumber) : '—'}
+                      </Text>
+                    </View>
                   </View>
 
-                  <View style={styles.keyValRow}>
-                    <Text style={styles.keyText}>Email Address</Text>
-                    <Text style={styles.valText}>{selectedUser.Email || '—'}</Text>
+                  <View style={styles.profileRow}>
+                    <Text style={styles.profileRowLabel}>Email Address</Text>
+                    <View style={styles.profileRowValueContainer}>
+                      <Text style={styles.profileRowValueText}>{selectedUser.Email || '—'}</Text>
+                    </View>
                   </View>
 
-                  <View style={styles.keyValRow}>
-                    <Text style={styles.keyText}>Date of Birth</Text>
-                    <Text style={styles.valText}>
-                      {selectedUser.DateOfBirth
-                        ? `${selectedUser.DateOfBirth}${calculateAge(selectedUser.DateOfBirth)}`
-                        : '—'}
-                    </Text>
+                  <View style={styles.profileRow}>
+                    <Text style={styles.profileRowLabel}>Date of Birth</Text>
+                    <View style={styles.profileRowValueContainer}>
+                      <Text style={styles.profileRowValueText}>
+                        {selectedUser.DateOfBirth
+                          ? `${selectedUser.DateOfBirth}${calculateAge(selectedUser.DateOfBirth)}`
+                          : '—'}
+                      </Text>
+                    </View>
                   </View>
 
-                  <View style={styles.keyValRow}>
-                    <Text style={styles.keyText}>Gender</Text>
-                    <Text style={styles.valText}>{selectedUser.Gender || 'Male'}</Text>
+                  <View style={styles.profileRow}>
+                    <Text style={styles.profileRowLabel}>Gender</Text>
+                    <View style={styles.profileRowValueContainer}>
+                      <Text style={styles.profileRowValueText}>{selectedUser.Gender || 'Male'}</Text>
+                    </View>
                   </View>
 
-                  <View style={styles.keyValRow}>
-                    <Text style={styles.keyText}>Occupation</Text>
-                    <Text style={styles.valText}>{selectedUser.Occupation || '—'}</Text>
+                  <View style={styles.profileRow}>
+                    <Text style={styles.profileRowLabel}>Occupation</Text>
+                    <View style={styles.profileRowValueContainer}>
+                      <Text style={styles.profileRowValueText}>{selectedUser.Occupation || '—'}</Text>
+                    </View>
                   </View>
 
-                  <View style={[styles.keyValRow, { borderBottomWidth: 0 }]}>
-                    <Text style={styles.keyText}>Status</Text>
-                    <UserStatusBadge status={selectedUser.Status} isDark={isDark} variant="badge" />
+                  <View style={styles.profileRow}>
+                    <Text style={styles.profileRowLabel}>Status</Text>
+                    <View style={styles.profileRowValueContainer}>
+                      <View style={styles.profileStatusRow}>
+                        <View
+                          style={[
+                            styles.profileStatusDot,
+                            { backgroundColor: selectedUser.Status === 'Active' ? '#10b981' : '#64748b' },
+                          ]}
+                        />
+                        <Text style={styles.profileRowValueText}>{selectedUser.Status || 'Active'}</Text>
+                      </View>
+                    </View>
                   </View>
                 </View>
               </View>
 
               {/* Section 2: KYC Information */}
-              <View style={styles.card}>
-                <View style={styles.cardHeader}>
-                  <View style={styles.cardHeaderLeft}>
-                    <View style={styles.iconBox}>
-                      <Ionicons name="shield-checkmark-outline" size={18} color="#0284c7" />
+              {(() => {
+                const aadhaarRaw = selectedUser.AadhaarNumber != null ? String(selectedUser.AadhaarNumber).replace(/\s+/g, '') : '';
+                const unmaskedAadhaar = aadhaarRaw ? aadhaarRaw.replace(/(\d{4})/g, '$1 ').trim() : '—';
+                const maskedAadhaar = formatMaskedAadhaar(selectedUser.AadhaarNumber);
+
+                const panRaw = selectedUser.PANNumber != null ? String(selectedUser.PANNumber).toUpperCase().trim() : '';
+                const maskedPan = formatMaskedPAN(selectedUser.PANNumber);
+                const unmaskedPan = panRaw || '—';
+
+                return (
+                  <View style={styles.profileSection}>
+                    <View style={styles.profileHeadingRow}>
+                      <View style={styles.profileIconBox}>
+                        <Ionicons name="shield-checkmark-outline" size={17} color="#0284c7" />
+                      </View>
+                      <Text style={styles.profileSectionTitle}>KYC Information</Text>
                     </View>
-                    <Text style={styles.cardTitle}>KYC Information</Text>
-                  </View>
-                </View>
+                    <View style={styles.profileDivider} />
 
-                <View style={styles.keyValList}>
-                  <View style={styles.keyValRow}>
-                    <Text style={styles.keyText}>Aadhaar Number</Text>
-                    <Text style={styles.valText}>{formatMaskedAadhaar(selectedUser.AadhaarNumber)}</Text>
-                  </View>
+                    <View style={styles.profileRowsList}>
+                      <View style={styles.profileRow}>
+                        <Text style={styles.profileRowLabel}>Aadhaar Number</Text>
+                        <View style={styles.profileRowValueContainer}>
+                          <Text style={styles.profileRowValueText}>
+                            {showAadhaar ? unmaskedAadhaar : maskedAadhaar}
+                          </Text>
+                          {aadhaarRaw ? (
+                            <TouchableOpacity
+                              style={styles.privacyEyeBtn}
+                              onPress={() => setShowAadhaar(!showAadhaar)}
+                              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                              accessibilityLabel={showAadhaar ? 'Hide Aadhaar number' : 'Show Aadhaar number'}
+                            >
+                              <Ionicons
+                                name={showAadhaar ? 'eye-off-outline' : 'eye-outline'}
+                                size={18}
+                                color={isDark ? '#94a3b8' : '#64748b'}
+                              />
+                            </TouchableOpacity>
+                          ) : null}
+                        </View>
+                      </View>
 
-                  <View style={[styles.keyValRow, { borderBottomWidth: 0 }]}>
-                    <Text style={styles.keyText}>PAN Number</Text>
-                    <Text style={styles.valText}>{formatMaskedPAN(selectedUser.PANNumber)}</Text>
+                      <View style={styles.profileRow}>
+                        <Text style={styles.profileRowLabel}>PAN Number</Text>
+                        <View style={styles.profileRowValueContainer}>
+                          <Text style={styles.profileRowValueText}>
+                            {showPAN ? unmaskedPan : maskedPan}
+                          </Text>
+                          {panRaw ? (
+                            <TouchableOpacity
+                              style={styles.privacyEyeBtn}
+                              onPress={() => setShowPAN(!showPAN)}
+                              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                              accessibilityLabel={showPAN ? 'Hide PAN number' : 'Show PAN number'}
+                            >
+                              <Ionicons
+                                name={showPAN ? 'eye-off-outline' : 'eye-outline'}
+                                size={18}
+                                color={isDark ? '#94a3b8' : '#64748b'}
+                              />
+                            </TouchableOpacity>
+                          ) : null}
+                        </View>
+                      </View>
+                    </View>
                   </View>
-                </View>
-              </View>
+                );
+              })()}
 
               {/* Section 3: Address */}
-              <View style={styles.card}>
-                <View style={styles.cardHeader}>
-                  <View style={styles.cardHeaderLeft}>
-                    <View style={styles.iconBox}>
-                      <Ionicons name="location-outline" size={18} color="#0284c7" />
-                    </View>
-                    <Text style={styles.cardTitle}>Address</Text>
+              <View style={styles.profileSection}>
+                <View style={styles.profileHeadingRow}>
+                  <View style={styles.profileIconBox}>
+                    <Ionicons name="location-outline" size={17} color="#0284c7" />
                   </View>
+                  <Text style={styles.profileSectionTitle}>Address</Text>
                 </View>
+                <View style={styles.profileDivider} />
 
-                <View style={styles.keyValList}>
-                  <View style={styles.keyValRow}>
-                    <Text style={styles.keyText}>Address Line 1</Text>
-                    <Text style={styles.valText}>{selectedUser.AddressLine1 || '—'}</Text>
+                <View style={styles.profileRowsList}>
+                  <View style={styles.profileRow}>
+                    <Text style={styles.profileRowLabel}>Address Line 1</Text>
+                    <View style={styles.profileRowValueContainer}>
+                      <Text style={styles.profileRowValueText}>{selectedUser.AddressLine1 || '—'}</Text>
+                    </View>
                   </View>
 
-                  <View style={styles.keyValRow}>
-                    <Text style={styles.keyText}>Address Line 2</Text>
-                    <Text style={styles.valText}>{selectedUser.AddressLine2 || '—'}</Text>
+                  <View style={styles.profileRow}>
+                    <Text style={styles.profileRowLabel}>Address Line 2</Text>
+                    <View style={styles.profileRowValueContainer}>
+                      <Text style={styles.profileRowValueText}>{selectedUser.AddressLine2 || '—'}</Text>
+                    </View>
                   </View>
 
-                  <View style={styles.keyValRow}>
-                    <Text style={styles.keyText}>City</Text>
-                    <Text style={styles.valText}>{selectedUser.City || '—'}</Text>
+                  <View style={styles.profileRow}>
+                    <Text style={styles.profileRowLabel}>City</Text>
+                    <View style={styles.profileRowValueContainer}>
+                      <Text style={styles.profileRowValueText}>{selectedUser.City || '—'}</Text>
+                    </View>
                   </View>
 
-                  <View style={styles.keyValRow}>
-                    <Text style={styles.keyText}>State</Text>
-                    <Text style={styles.valText}>{selectedUser.State || '—'}</Text>
+                  <View style={styles.profileRow}>
+                    <Text style={styles.profileRowLabel}>State</Text>
+                    <View style={styles.profileRowValueContainer}>
+                      <Text style={styles.profileRowValueText}>{selectedUser.State || '—'}</Text>
+                    </View>
                   </View>
 
-                  <View style={[styles.keyValRow, { borderBottomWidth: 0 }]}>
-                    <Text style={styles.keyText}>Pincode</Text>
-                    <Text style={styles.valText}>{selectedUser.Pincode || '—'}</Text>
+                  <View style={styles.profileRow}>
+                    <Text style={styles.profileRowLabel}>Pincode</Text>
+                    <View style={styles.profileRowValueContainer}>
+                      <Text style={styles.profileRowValueText}>{selectedUser.Pincode || '—'}</Text>
+                    </View>
                   </View>
                 </View>
               </View>
@@ -763,12 +871,18 @@ export default function UsersScreen() {
           {activeTab === 'Bank Accounts' && (
             <View style={styles.tabContentArea}>
               <View style={styles.sectionHeaderRow}>
+                <MaterialCommunityIcons
+                  name="bank"
+                  size={20}
+                  color={isDark ? '#f8fafc' : '#0d172a'}
+                  style={{ marginRight: 8 }}
+                />
                 <Text style={styles.sectionHeaderTitle}>Bank Accounts ({displayBanks.length})</Text>
               </View>
 
               {displayBanks.length === 0 && (
                 <View style={{ paddingVertical: 24, alignItems: 'center' }}>
-                  <Ionicons name="business-outline" size={28} color={isDark ? '#475569' : '#cbd5e1'} />
+                  <MaterialCommunityIcons name="bank-outline" size={28} color={isDark ? '#475569' : '#cbd5e1'} />
                   <Text style={{ marginTop: 8, fontSize: 13, color: isDark ? '#94a3b8' : '#64748b' }}>
                     No bank accounts on file
                   </Text>
@@ -776,83 +890,10 @@ export default function UsersScreen() {
               )}
 
               {displayBanks.map((acc, idx) => (
-                <View key={acc.BankAccountId || idx} style={styles.bankCard}>
-                  {/* Bank Card Header */}
-                  <View style={styles.bankCardHeader}>
-                    <View style={styles.bankNameCol}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                        <Ionicons name="business" size={20} color="#0284c7" />
-                        <Text style={styles.bankNameTitle}>{acc.BankName}</Text>
-                      </View>
-                      <Text style={styles.bankAccountType}>{acc.AccountType}</Text>
-                      <Text style={styles.bankBranchText}>{acc.BranchName}</Text>
-                    </View>
-                    <UserStatusBadge status={acc.Status} isDark={isDark} variant="badge" />
-                  </View>
-
-                  {/* Bank Account Details */}
-                  <View style={styles.bankInfoGrid}>
-                    <View style={styles.bankInfoItem}>
-                      <Text style={styles.bankInfoLabel}>Account Number</Text>
-                      <Text style={styles.bankInfoValue}>{acc.AccountNumber}</Text>
-                    </View>
-
-                    <View style={styles.bankInfoItem}>
-                      <Text style={styles.bankInfoLabel}>IFSC Code</Text>
-                      <Text style={styles.bankInfoValue}>{acc.IFSCCode}</Text>
-                    </View>
-
-                    <View style={styles.bankInfoItem}>
-                      <Text style={styles.bankInfoLabel}>Account Holder</Text>
-                      <Text style={styles.bankInfoValue}>{acc.AccountHolderName}</Text>
-                    </View>
-
-                    <View style={styles.bankInfoItem}>
-                      <Text style={styles.bankInfoLabel}>UPI ID</Text>
-                      <Text style={styles.bankInfoValue}>{acc.UPI_ID}</Text>
-                    </View>
-                  </View>
-
-                  {/* Utilization / Limits Box */}
-                  <View style={styles.bankLimitBox}>
-                    <View style={styles.bankLimitAmountRow}>
-                      <Text style={styles.bankUtilizedBigText}>
-                        ₹ {acc.UtilizedLoanAmount.toLocaleString('en-IN')}
-                      </Text>
-                      <Text style={styles.bankPercentText}>{acc.UtilizationPercentage}% utilized</Text>
-                    </View>
-
-                    {/* Progress Bar */}
-                    <View style={styles.progressBarBg}>
-                      <View
-                        style={[
-                          styles.progressBarFill,
-                          { width: `${Math.min(100, Math.max(5, acc.UtilizationPercentage))}%` },
-                        ]}
-                      />
-                    </View>
-
-                    {/* 3 Metric Columns */}
-                    <View style={styles.limitColumnsRow}>
-                      <View style={styles.limitCol}>
-                        <Text style={styles.limitColLabel}>Max Loan Amount</Text>
-                        <Text style={styles.limitColVal}>₹ {acc.MaxLoanAmount.toLocaleString('en-IN')}</Text>
-                      </View>
-
-                      <View style={styles.limitCol}>
-                        <Text style={styles.limitColLabel}>Utilized Amount</Text>
-                        <Text style={styles.limitColVal}>₹ {acc.UtilizedLoanAmount.toLocaleString('en-IN')}</Text>
-                      </View>
-
-                      <View style={styles.limitCol}>
-                        <Text style={styles.limitColLabel}>Available Limit</Text>
-                        <Text style={[styles.limitColVal, { color: '#16a34a' }]}>
-                          ₹ {acc.AvailableLoanAmount.toLocaleString('en-IN')}
-                        </Text>
-                      </View>
-                    </View>
-                  </View>
-                </View>
+                <BankCard
+                  key={acc.BankAccountId || idx}
+                  account={acc}
+                />
               ))}
             </View>
           )}
@@ -861,6 +902,12 @@ export default function UsersScreen() {
           {activeTab === 'Loans' && (
             <View style={styles.tabContentArea}>
               <View style={styles.sectionHeaderRow}>
+                <Ionicons
+                  name="document-text-outline"
+                  size={20}
+                  color={isDark ? '#f8fafc' : '#0d172a'}
+                  style={{ marginRight: 8 }}
+                />
                 <Text style={styles.sectionHeaderTitle}>Loans ({displayLoans.length})</Text>
               </View>
 
@@ -873,108 +920,28 @@ export default function UsersScreen() {
                 </View>
               )}
 
-              {displayLoans.map((loan, idx) => {
-                const isOverdue = loan.Status === 'Overdue';
-                return (
-                  <View key={loan.LoanId || idx} style={styles.loanCard}>
-                    {/* Loan Card Header */}
-                    <View style={styles.loanCardHeader}>
-                      <View>
-                        <Text style={styles.loanNumberTitle}>{loan.LoanNumber}</Text>
-                        <Text style={styles.loanDateText}>{loan.LoanDate}</Text>
-                      </View>
-                      <View
-                        style={[
-                          styles.loanStatusBadge,
-                          { backgroundColor: isOverdue ? 'rgba(239, 68, 68, 0.12)' : 'rgba(34, 197, 94, 0.12)' },
-                        ]}
-                      >
-                        <View
-                          style={[
-                            styles.loanStatusDot,
-                            { backgroundColor: isOverdue ? '#ef4444' : '#16a34a' },
-                          ]}
-                        />
-                        <Text
-                          style={[
-                            styles.loanStatusText,
-                            { color: isOverdue ? '#ef4444' : '#16a34a' },
-                          ]}
-                        >
-                          {loan.Status}
-                        </Text>
-                      </View>
-                    </View>
-
-                    {/* 3 Metric Columns: Loan Amount | Outstanding | Due Date */}
-                    <View style={styles.loanMetricsRow}>
-                      <View style={styles.loanMetricCol}>
-                        <Text style={styles.loanMetricLabel}>Loan Amount</Text>
-                        <Text style={styles.loanMetricVal}>₹ {loan.LoanAmount.toLocaleString('en-IN')}</Text>
-                      </View>
-
-                      <View style={styles.loanMetricCol}>
-                        <Text style={styles.loanMetricLabel}>Outstanding (mock)</Text>
-                        <Text style={styles.loanMetricVal}>₹ {loan.OutstandingAmount.toLocaleString('en-IN')}</Text>
-                      </View>
-
-                      <View style={styles.loanMetricCol}>
-                        <Text style={styles.loanMetricLabel}>Due Date</Text>
-                        <Text style={styles.loanMetricVal}>{loan.DueDate}</Text>
-                        <View
-                          style={[
-                            styles.duePillBadge,
-                            { backgroundColor: isOverdue ? 'rgba(239, 68, 68, 0.1)' : 'rgba(2, 132, 199, 0.1)' },
-                          ]}
-                        >
-                          <Text
-                            style={[
-                              styles.duePillText,
-                              { color: isOverdue ? '#dc2626' : '#0284c7' },
-                            ]}
-                          >
-                            {loan.DueBadgeText}
-                          </Text>
-                        </View>
-                      </View>
-                    </View>
-
-                    {/* Pledged Ornaments Banner */}
-                    <View style={styles.loanOrnamentsBanner}>
-                      <View style={styles.ornThumbRow}>
-                        <View style={styles.ornThumbBox}>
-                          <Ionicons name="sparkles" size={14} color="#f59e0b" />
-                          {loan.OrnamentsCount > 1 && (
-                            <View style={styles.ornCountMiniBadge}>
-                              <Text style={styles.ornCountMiniBadgeText}>+{loan.OrnamentsCount - 1}</Text>
-                            </View>
-                          )}
-                        </View>
-                        <Text style={styles.ornCountText}>{loan.OrnamentsCount} ornaments</Text>
-                      </View>
-
-                      <Text style={styles.ornWeightText}>{loan.TotalWeightGrams.toFixed(3)} g</Text>
-
-                      <View style={styles.interestRateTag}>
-                        <Text style={styles.interestRateText}>% {loan.InterestRateText}</Text>
-                      </View>
-                    </View>
-
-                    {/* Action Button: View Loan */}
-                    <TouchableOpacity
-                      style={styles.viewLoanBtn}
-                      onPress={() => router.push('/(tabs)/loans')}
-                      activeOpacity={0.8}
-                    >
-                      <Text style={styles.viewLoanBtnText}>View Loan</Text>
-                      <Ionicons name="chevron-forward" size={14} color="#0284c7" />
-                    </TouchableOpacity>
-                  </View>
-                );
-              })}
+              {displayLoans.map((loan, idx) => (
+                <LoanCard
+                  key={loan.LoanId || idx}
+                  loan={loan}
+                  onViewLoan={() => router.push(`/loans/${loan.LoanId}` as any)}
+                />
+              ))}
             </View>
           )}
         </ScrollView>
+
+        {/* Floating Action Button for Adding Loan */}
+        {activeTab === 'Loans' && (
+          <TouchableOpacity
+            style={styles.loanFabBtn}
+            onPress={() => router.push('/loans/new' as any)}
+            activeOpacity={0.85}
+            accessibilityLabel="Add New Loan"
+          >
+            <Ionicons name="add" size={28} color="#ffffff" />
+          </TouchableOpacity>
+        )}
 
         {/* Delete Confirmation Modal */}
         <ConfirmModal
@@ -1598,7 +1565,7 @@ export default function UsersScreen() {
   );
 }
 
-const getStyles = (colors: ThemeColors, isDark: boolean) =>
+const getStyles = (colors: ThemeColors, isDark: boolean, isSmall: boolean = false) =>
   StyleSheet.create({
     safeArea: {
       flex: 1,
@@ -1613,7 +1580,7 @@ const getStyles = (colors: ThemeColors, isDark: boolean) =>
       backgroundColor: isDark ? '#090d16' : '#ffffff',
     },
     content: {
-      paddingHorizontal: 16,
+      paddingHorizontal: isSmall ? 12 : 16,
       paddingTop: 16,
       paddingBottom: 40,
       maxWidth: 680,
@@ -1621,7 +1588,7 @@ const getStyles = (colors: ThemeColors, isDark: boolean) =>
       alignSelf: 'center',
     },
     detailScrollContent: {
-      paddingHorizontal: 16,
+      paddingHorizontal: isSmall ? 12 : 16,
       paddingTop: 14,
       paddingBottom: 60,
       maxWidth: 680,
@@ -2051,40 +2018,112 @@ const getStyles = (colors: ThemeColors, isDark: boolean) =>
       color: '#16a34a',
     },
 
-    // Tabs Segment Switcher
+    // Tabs Underline Switcher
     tabsSegmentContainer: {
       flexDirection: 'row',
-      backgroundColor: isDark ? '#0f172a' : '#f1f5f9',
-      borderRadius: 14,
-      padding: 4,
+      borderBottomWidth: 1,
+      borderBottomColor: isDark ? '#1e293b' : '#e2e8f0',
       marginBottom: 16,
+      paddingHorizontal: 4,
     },
     tabSegmentBtn: {
       flex: 1,
-      paddingVertical: 10,
+      paddingVertical: 12,
       alignItems: 'center',
       justifyContent: 'center',
-      borderRadius: 10,
+      position: 'relative',
     },
-    tabSegmentBtnActive: {
-      backgroundColor: isDark ? '#1e293b' : '#ffffff',
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 1 },
-      shadowOpacity: 0.08,
-      shadowRadius: 3,
-      elevation: 2,
-    },
+    tabSegmentBtnActive: {},
     tabSegmentText: {
-      fontSize: 13,
-      fontWeight: '600',
+      fontSize: 13.5,
+      fontWeight: '500',
       color: isDark ? '#94a3b8' : '#64748b',
     },
     tabSegmentTextActive: {
       color: '#0284c7',
       fontWeight: '700',
     },
+    activeTabIndicator: {
+      position: 'absolute',
+      bottom: -1,
+      left: 10,
+      right: 10,
+      height: 3,
+      backgroundColor: '#0284c7',
+      borderTopLeftRadius: 3,
+      borderTopRightRadius: 3,
+    },
     tabContentArea: {
-      gap: 14,
+      gap: 16,
+    },
+
+    // Profile Flat Sections (No card, heading with underline and content below)
+    profileSection: {
+      marginBottom: 24,
+    },
+    profileHeadingRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    profileIconBox: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      backgroundColor: isDark ? 'rgba(2, 132, 199, 0.15)' : '#e0f2fe',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    profileSectionTitle: {
+      fontSize: 16,
+      fontWeight: '800',
+      color: isDark ? '#f8fafc' : '#0f172a',
+      marginLeft: 10,
+    },
+    profileDivider: {
+      borderBottomWidth: 1,
+      borderBottomColor: isDark ? '#1e293b' : '#e5e7eb',
+      marginTop: 10,
+      marginBottom: 14,
+    },
+    profileRowsList: {
+      gap: 6,
+    },
+    profileRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      minHeight: 28,
+      paddingVertical: 4,
+    },
+    profileRowLabel: {
+      width: 170,
+      fontSize: 13.5,
+      fontWeight: '500',
+      color: isDark ? '#94a3b8' : '#64748b',
+    },
+    profileRowValueContainer: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    profileRowValueText: {
+      fontSize: 13.5,
+      fontWeight: '600',
+      color: isDark ? '#f8fafc' : '#0f172a',
+    },
+    privacyEyeBtn: {
+      padding: 4,
+      marginLeft: 8,
+    },
+    profileStatusRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    profileStatusDot: {
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+      marginRight: 6,
     },
 
     // Common Cards & Key-Value Lists
@@ -2150,7 +2189,9 @@ const getStyles = (colors: ThemeColors, isDark: boolean) =>
 
     // Bank Accounts Tab Styles
     sectionHeaderRow: {
-      marginBottom: 6,
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 12,
     },
     sectionHeaderTitle: {
       fontSize: 16,
@@ -2419,6 +2460,31 @@ const getStyles = (colors: ThemeColors, isDark: boolean) =>
       fontSize: 13,
       fontWeight: '700',
       color: '#0284c7',
+    },
+    loanFabBtn: {
+      position: 'absolute',
+      bottom: 24,
+      right: 24,
+      width: 56,
+      height: 56,
+      borderRadius: 28,
+      backgroundColor: '#0284c7',
+      alignItems: 'center',
+      justifyContent: 'center',
+      ...Platform.select({
+        ios: {
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 4 },
+          shadowOpacity: 0.3,
+          shadowRadius: 8,
+        },
+        android: {
+          elevation: 6,
+        },
+        web: {
+          boxShadow: '0 4px 14px rgba(2, 132, 199, 0.45)',
+        } as any,
+      }),
     },
 
     // Add / Edit Screen Styles
