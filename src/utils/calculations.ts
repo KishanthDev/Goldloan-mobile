@@ -90,14 +90,79 @@ export function getUserLastActive(user: Pick<User, 'UpdatedDate' | 'CreatedDate'
     return '';
 }
 
+/**
+ * Safely parses any date string (ISO, YYYY-MM-DD, DD/MM/YYYY, DD-MM-YYYY, or timestamp)
+ * extracting calendar day, month, and year independent of timezone shifts.
+ */
+export function parseDateString(dateStr?: string): { day: number; month: number; year: number } | null {
+    if (!dateStr || typeof dateStr !== 'string' || dateStr.trim() === '' || dateStr === '—') {
+        return null;
+    }
+    const clean = dateStr.trim();
+
+    // 1. DD/MM/YYYY or DD-MM-YYYY (e.g. 14/03/1990 or 14-03-1990)
+    const ddmmyyyy = clean.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+    if (ddmmyyyy) {
+        const day = parseInt(ddmmyyyy[1], 10);
+        const month = parseInt(ddmmyyyy[2], 10);
+        const year = parseInt(ddmmyyyy[3], 10);
+        if (month >= 1 && month <= 12 && day >= 1 && day <= 31 && year > 1900) {
+            return { day, month, year };
+        }
+    }
+
+    // 2. YYYY-MM-DD (e.g. 1990-03-14 or 1990-03-14T00:00:00.000Z)
+    // Extract calendar numbers directly from the date prefix to prevent timezone shifting
+    const yyyymmdd = clean.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
+    if (yyyymmdd) {
+        const year = parseInt(yyyymmdd[1], 10);
+        const month = parseInt(yyyymmdd[2], 10);
+        const day = parseInt(yyyymmdd[3], 10);
+        if (month >= 1 && month <= 12 && day >= 1 && day <= 31 && year > 1900) {
+            return { day, month, year };
+        }
+    }
+
+    // 3. Fallback: JS Date parse (e.g. "Wed Mar 14 1990 ...")
+    const d = new Date(clean);
+    if (!isNaN(d.getTime())) {
+        return {
+            day: d.getDate(),
+            month: d.getMonth() + 1,
+            year: d.getFullYear(),
+        };
+    }
+
+    return null;
+}
+
+/** Formats a date string cleanly as e.g. "14 Mar 1990", stripping any timezone/time. */
+export function formatDisplayDOB(dateStr?: string): string {
+    const parsed = parseDateString(dateStr);
+    if (!parsed) {
+        // Strip any timezone / time part if it couldn't be parsed
+        return (dateStr || '—').split('T')[0].split(' ')[0] || '—';
+    }
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return `${parsed.day} ${months[parsed.month - 1]} ${parsed.year}`;
+}
+
+/** Formats date into DD/MM/YYYY for input editing fields, removing time/timezone */
+export function formatInputDOB(dateStr?: string): string {
+    const parsed = parseDateString(dateStr);
+    if (!parsed) return dateStr || '';
+    const dd = String(parsed.day).padStart(2, '0');
+    const mm = String(parsed.month).padStart(2, '0');
+    return `${dd}/${mm}/${parsed.year}`;
+}
+
 /** Human age string e.g. " (35 years)"; '' for a missing or invalid date. */
 export function calculateAge(dob?: string): string {
-    if (!dob) return '';
-    const birthDate = new Date(dob);
-    if (isNaN(birthDate.getTime())) return '';
+    const parsed = parseDateString(dob);
+    if (!parsed) return '';
     const today = new Date();
-    let age = today.getFullYear() - birthDate.getFullYear();
-    const m = today.getMonth() - birthDate.getMonth();
-    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) age--;
+    let age = today.getFullYear() - parsed.year;
+    const m = (today.getMonth() + 1) - parsed.month;
+    if (m < 0 || (m === 0 && today.getDate() < parsed.day)) age--;
     return age > 0 ? ` (${age} years)` : '';
 }
