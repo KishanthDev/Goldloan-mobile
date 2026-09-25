@@ -52,6 +52,7 @@ import {
 
 // Avatar initial colors for visual consistency
 const AVATAR_COLORS = [
+  { bg: '#e6f8ee', text: '#07ba80' }, // Mint (matching design)
   { bg: '#e0f2fe', text: '#0284c7' }, // Sky
   { bg: '#fef3c7', text: '#d97706' }, // Amber
   { bg: '#dcfce7', text: '#16a34a' }, // Green
@@ -1471,51 +1472,89 @@ export default function UsersScreen() {
                 onPress={() => handleCardPress(user)}
                 activeOpacity={0.7}
               >
-                {/* Left: Avatar */}
-                <View style={styles.cardLeftCol}>
-                  <View style={styles.avatarContainer}>
-                    {directPhoto || user.CustomerPhoto ? (
-                      <Image
-                        source={{ uri: directPhoto || user.CustomerPhoto }}
-                        style={styles.avatarImage}
-                        contentFit="cover"
+                {/* Top Section: Left (Avatar + Name & Code) | Right (Status Pill) */}
+                <View style={styles.cardTopRow}>
+                  <View style={styles.cardTopLeft}>
+                    <View style={styles.avatarContainer}>
+                      {directPhoto || user.CustomerPhoto ? (
+                        <Image
+                          source={{ uri: directPhoto || user.CustomerPhoto }}
+                          style={styles.avatarImage}
+                          contentFit="cover"
+                        />
+                      ) : (
+                        <View style={[styles.avatarInitialsBox, { backgroundColor: avatarTone.bg }]}>
+                          <Text style={[styles.avatarInitialsText, { color: avatarTone.text }]}>{initials}</Text>
+                        </View>
+                      )}
+                    </View>
+
+                    <View style={styles.cardIdentityCol}>
+                      <Text style={styles.listCardTitle} numberOfLines={1}>{user.FullName}</Text>
+                      <Text style={styles.cardIdText}>{user.CustomerCode || user.UserId}</Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.cardTopRight}>
+                    <UserStatusBadge status={user.Status} isDark={isDark} variant="badge" showDot={false} />
+                  </View>
+                </View>
+
+                {/* Bottom Section: Left (Phone & Last Active) | Right (Loans & Gold Weight + Chevron) */}
+                <View style={styles.cardBottomRow}>
+                  <View style={styles.cardBottomLeftCol}>
+                    <View style={styles.cardInfoRow}>
+                      <Ionicons
+                        name="call-outline"
+                        size={15}
+                        color={isDark ? '#cbd5e1' : '#334155'}
+                        style={styles.cardInfoIcon}
                       />
-                    ) : (
-                      <View style={[styles.avatarInitialsBox, { backgroundColor: avatarTone.bg }]}>
-                        <Text style={[styles.avatarInitialsText, { color: avatarTone.text }]}>{initials}</Text>
+                      <Text style={styles.cardPhoneText}>{formatPhoneNumber(user.MobileNumber)}</Text>
+                    </View>
+
+                    <View style={styles.cardInfoRow}>
+                      <Ionicons
+                        name="calendar-outline"
+                        size={15}
+                        color={isDark ? '#94a3b8' : '#64748b'}
+                        style={styles.cardInfoIcon}
+                      />
+                      <Text style={styles.cardLastActiveText}>
+                        {lastActive || 'Last active: —'}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.cardBottomRightCol}>
+                    <View style={styles.cardStatsCol}>
+                      <View style={styles.cardStatRow}>
+                        <MaterialIcons
+                          name="chrome-reader-mode"
+                          size={15}
+                          color={isDark ? '#cbd5e1' : '#475467'}
+                          style={styles.cardStatIcon}
+                        />
+                        <Text style={styles.cardStatText}>{stats.loanCount} Loans</Text>
                       </View>
-                    )}
-                  </View>
-                </View>
 
-                {/* Middle: Details */}
-                <View style={styles.cardCenterCol}>
-                  <View style={styles.cardHeaderRow}>
-                    <Text style={styles.listCardTitle} numberOfLines={1}>{user.FullName}</Text>
-                    <UserStatusBadge status={user.Status} isDark={isDark} variant="badge" />
-                  </View>
-
-                  <Text style={styles.cardIdText}>{user.CustomerCode || user.UserId}</Text>
-                  <Text style={styles.cardPhoneText}>{formatPhoneNumber(user.MobileNumber)}</Text>
-                  {lastActive ? <Text style={styles.cardLastActiveText}>{lastActive}</Text> : null}
-
-                  {/* Bottom Stats Row: Loans count & Gold weight */}
-                  <View style={styles.cardStatsRow}>
-                    <View style={styles.statGroup}>
-                      <Ionicons name="document-text-outline" size={14} color="#0284c7" style={{ marginRight: 4 }} />
-                      <Text style={styles.statWeightText}>{stats.loanCount} Loans</Text>
+                      <View style={styles.cardStatRow}>
+                        <Image
+                          source={require('../../../assets/images/gold_bars.png')}
+                          style={styles.goldBarIcon}
+                          contentFit="contain"
+                        />
+                        <Text style={styles.cardStatText}>{stats.goldWeight.toFixed(1)} g</Text>
+                      </View>
                     </View>
 
-                    <View style={styles.statGroup}>
-                      <Ionicons name="scale-outline" size={14} color="#f59e0b" style={{ marginRight: 4 }} />
-                      <Text style={styles.statWeightText}>{stats.goldWeight.toFixed(1)} g</Text>
-                    </View>
+                    <Ionicons
+                      name="chevron-forward"
+                      size={18}
+                      color={isDark ? '#f8fafc' : '#0f172a'}
+                      style={styles.cardChevronIcon}
+                    />
                   </View>
-                </View>
-
-                {/* Right: Chevron */}
-                <View style={styles.cardRightCol}>
-                  <Ionicons name="chevron-forward" size={18} color={isDark ? '#64748b' : '#94a3b8'} />
                 </View>
               </TouchableOpacity>
             );
@@ -1785,28 +1824,35 @@ const getStyles = (colors: ThemeColors, isDark: boolean) =>
       gap: 12,
     },
     listCard: {
-      flexDirection: 'row',
-      alignItems: 'center',
       backgroundColor: isDark ? '#0f172a' : '#ffffff',
       borderRadius: 18,
       borderWidth: 1,
-      borderColor: isDark ? '#1e293b' : '#f1f5f9',
-      padding: 12,
+      borderColor: isDark ? '#1e293b' : '#e8ecf4',
+      paddingHorizontal: 16,
+      paddingVertical: 14,
       shadowColor: '#000',
       shadowOffset: { width: 0, height: 1 },
-      shadowOpacity: isDark ? 0.2 : 0.05,
+      shadowOpacity: isDark ? 0.2 : 0.04,
       shadowRadius: 4,
-      elevation: 2,
+      elevation: 1.5,
     },
-    cardLeftCol: {
+    cardTopRow: {
+      flexDirection: 'row',
       alignItems: 'center',
-      marginRight: 12,
+      justifyContent: 'space-between',
+    },
+    cardTopLeft: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      flex: 1,
+      marginRight: 10,
     },
     avatarContainer: {
-      width: 54,
-      height: 54,
-      borderRadius: 27,
+      width: 44,
+      height: 44,
+      borderRadius: 22,
       overflow: 'hidden',
+      marginRight: 12,
     },
     avatarImage: {
       width: '100%',
@@ -1815,62 +1861,89 @@ const getStyles = (colors: ThemeColors, isDark: boolean) =>
     avatarInitialsBox: {
       width: '100%',
       height: '100%',
-      borderRadius: 27,
+      borderRadius: 22,
       alignItems: 'center',
       justifyContent: 'center',
     },
     avatarInitialsText: {
-      fontSize: 18,
+      fontSize: 16,
       fontWeight: '700',
     },
-    cardCenterCol: {
+    cardIdentityCol: {
+      justifyContent: 'center',
       flex: 1,
-      gap: 2,
-    },
-    cardHeaderRow: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      marginBottom: 2,
     },
     listCardTitle: {
-      fontSize: 15,
-      fontWeight: '700',
+      fontSize: 16,
+      fontWeight: '800',
       color: isDark ? '#f8fafc' : '#0f172a',
-      flex: 1,
-      marginRight: 8,
+      letterSpacing: -0.2,
+      marginBottom: 3,
     },
     cardIdText: {
-      fontSize: 11.5,
-      fontWeight: '600',
-      color: '#0284c7',
+      fontSize: 12.5,
+      fontWeight: '500',
+      color: isDark ? '#94a3b8' : '#64748b',
+    },
+    cardTopRight: {
+      alignSelf: 'flex-start',
+    },
+    cardBottomRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginTop: 14,
+    },
+    cardBottomLeftCol: {
+      gap: 7,
+      flex: 1,
+      justifyContent: 'center',
+    },
+    cardInfoRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    cardInfoIcon: {
+      marginRight: 7,
     },
     cardPhoneText: {
-      fontSize: 12.5,
-      color: isDark ? '#cbd5e1' : '#334155',
+      fontSize: 13,
+      fontWeight: '600',
+      color: isDark ? '#e2e8f0' : '#1e293b',
     },
     cardLastActiveText: {
-      fontSize: 11,
-      color: isDark ? '#94a3b8' : '#64748b',
-      marginBottom: 4,
-    },
-    cardStatsRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 14,
-      marginTop: 2,
-    },
-    statGroup: {
-      flexDirection: 'row',
-      alignItems: 'center',
-    },
-    statWeightText: {
       fontSize: 12,
-      fontWeight: '600',
-      color: isDark ? '#cbd5e1' : '#475569',
+      fontWeight: '400',
+      color: isDark ? '#94a3b8' : '#64748b',
     },
-    cardRightCol: {
-      paddingLeft: 8,
+    cardBottomRightCol: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'flex-end',
+    },
+    cardStatsCol: {
+      gap: 7,
+      alignItems: 'flex-start',
+    },
+    cardStatRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    cardStatIcon: {
+      marginRight: 6,
+    },
+    goldBarIcon: {
+      width: 17,
+      height: 13,
+      marginRight: 6,
+    },
+    cardStatText: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: isDark ? '#f8fafc' : '#1e293b',
+    },
+    cardChevronIcon: {
+      marginLeft: 14,
     },
 
     // Hero Card in Customer Details
