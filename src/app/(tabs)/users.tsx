@@ -1,4 +1,4 @@
-import { Ionicons, MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
@@ -20,9 +20,9 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { BankCard } from '../../components/BankCard';
-import { LoanCard } from '../../components/LoanCard';
 import { ConfirmModal } from '../../components/ConfirmModal';
 import { DatePickerModal } from '../../components/DatePickerModal';
+import { LoanCard } from '../../components/LoanCard';
 import { OptionPickerModal } from '../../components/ornaments/OptionPickerModal';
 import { UserOptionsMenu, UserOptionsMenuHandle } from '../../components/users/UserOptionsMenu';
 import { UserStatusBadge } from '../../components/users/UserStatusBadge';
@@ -1670,7 +1670,7 @@ const getStyles = (colors: ThemeColors, isDark: boolean, isSmall: boolean = fals
     content: {
       paddingHorizontal: isSmall ? 12 : 16,
       paddingTop: 16,
-      paddingBottom: 40,
+      paddingBottom: 16,
       maxWidth: 680,
       width: '100%',
       alignSelf: 'center',
@@ -2811,7 +2811,7 @@ const getStyles = (colors: ThemeColors, isDark: boolean, isSmall: boolean = fals
       alignItems: 'center',
       justifyContent: 'center',
       marginTop: 6,
-      marginBottom: 30,
+      marginBottom: 0,
       shadowColor: '#0284c7',
       shadowOffset: { width: 0, height: 4 },
       shadowOpacity: 0.3,
