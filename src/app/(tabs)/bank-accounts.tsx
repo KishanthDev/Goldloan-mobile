@@ -2,16 +2,16 @@ import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useState } from 'react';
 import {
-    Alert,
-    Modal,
-    Platform, RefreshControl,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  Alert,
+  Modal,
+  Platform, RefreshControl,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import { Badge } from '../../components/Badge';
 import { BankCard } from '../../components/BankCard';
@@ -19,7 +19,6 @@ import { ConfirmModal } from '../../components/ConfirmModal';
 import { Column, DataTable } from '../../components/DataTable';
 import { FilePayload, ImagePickerField } from '../../components/ImagePickerField';
 import { ImageViewModal } from '../../components/ImageViewModal';
-import { MobileCard } from '../../components/MobileCard';
 import { ThemeColors } from '../../constants/theme';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';

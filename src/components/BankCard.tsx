@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
+import { useState } from 'react';
 import {
   Modal,
   Platform,
@@ -15,9 +15,9 @@ import {
 } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
 import { useToast } from '../context/ToastContext';
+import { ExtraUserBankAccount } from '../mock/userMockExtras';
 import { getDriveImageUrl } from '../services/api';
 import { BankAccount } from '../types';
-import { ExtraUserBankAccount } from '../mock/userMockExtras';
 
 export interface BankCardProps {
   account: BankAccount | ExtraUserBankAccount;

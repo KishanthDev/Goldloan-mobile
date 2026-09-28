@@ -1,16 +1,23 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { 
-  View, Text, StyleSheet, ScrollView, TouchableOpacity, 
-  ActivityIndicator, TextInput, Alert, SafeAreaView 
-} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Colors, ThemeColors } from '../../constants/theme';
-import { useTheme } from '../../context/ThemeContext';
-import { useAppStore } from '../../services/store';
-import { User, BankAccount, Ornament, Loan } from '../../types';
+import { useCallback, useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert, SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
+} from 'react-native';
+import { UserIcon } from '@/components/Icon';
 import { Badge } from '../../components/Badge';
 import { BankCard } from '../../components/BankCard';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { ThemeColors } from '../../constants/theme';
+import { useTheme } from '../../context/ThemeContext';
+import { useAppStore } from '../../services/store';
+import { BankAccount, Loan, Ornament, User } from '../../types';
 
 export default function CustomerDetailScreen() {
   const { colors, isDark } = useTheme();
@@ -107,7 +114,7 @@ export default function CustomerDetailScreen() {
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.iconBtn}>
-          <Ionicons name="arrow-back" size={22} color={colors.textPrimary} />
+          <UserIcon name="arrow-left-long" size={22} color={colors.textPrimary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Customer Profile</Text>
         <View style={{ width: 32 }} />
@@ -131,18 +138,18 @@ export default function CustomerDetailScreen() {
             </View>
             {user.Email ? (
               <View style={styles.infoRow}>
-                <Ionicons name="mail" size={14} color={colors.textSecondary} />
+                <UserIcon name="mail" size={14} color={colors.textSecondary} />
                 <Text style={styles.infoText}>{user.Email}</Text>
               </View>
             ) : null}
             {user.AddressLine1 ? (
               <View style={styles.infoRow}>
-                <Ionicons name="location" size={14} color={colors.textSecondary} />
+                <UserIcon name="location" size={14} color={colors.textSecondary} />
                 <Text style={styles.infoText}>{user.AddressLine1}, {user.City} {user.Pincode}</Text>
               </View>
             ) : null}
             <View style={styles.infoRow}>
-              <Ionicons name="card" size={14} color={colors.textSecondary} />
+              <UserIcon name="id-card" size={14} color={colors.textSecondary} />
               <Text style={styles.infoText}>Aadhaar: {user.AadhaarNumber || 'N/A'} • PAN: {user.PANNumber || 'N/A'}</Text>
             </View>
           </View>
@@ -152,7 +159,7 @@ export default function CustomerDetailScreen() {
         <View style={styles.sectionCard}>
           <View style={styles.sectionHeaderRow}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <MaterialCommunityIcons name="bank" size={20} color={colors.textPrimary} />
+              <UserIcon name="bank" size={20} color={colors.textPrimary} />
               <Text style={styles.sectionTitle}>Bank Accounts ({bankAccounts.length})</Text>
             </View>
             <TouchableOpacity onPress={() => setShowAddBank(!showAddBank)}>
