@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useMemo, useState } from 'react';
+import { useRouter } from 'expo-router';
 import {
   Alert,
   Modal,
@@ -20,6 +21,7 @@ import { useAppStore } from '../../services/store';
 import { Loan } from '../../types';
 
 export default function LoansScreen() {
+  const router = useRouter();
   const { colors, isDark } = useTheme();
   const styles = getStyles(colors, isDark);
   const store = useAppStore();
@@ -221,7 +223,7 @@ export default function LoansScreen() {
 
   const openDetailModal = (l: Loan) => {
     setSelectedLoan(l);
-    setDetailModalVisible(true);
+    router.push(`/loans/${l.LoanId}` as any);
   };
 
   const openPayModal = (l: Loan) => {

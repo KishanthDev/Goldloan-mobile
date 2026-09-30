@@ -23,7 +23,7 @@ export default function UsersScreen() {
   const store = useAppStore();
   const toast = useToast();
   const router = useRouter();
-  const { action } = useLocalSearchParams<{ action?: string }>();
+  const { action, userId } = useLocalSearchParams<{ action?: string; userId?: string }>();
 
   // View mode: 'list' | 'details' | 'add' | 'edit'
   const [viewMode, setViewMode] = useState<'list' | 'details' | 'add' | 'edit'>('list');
@@ -148,6 +148,25 @@ export default function UsersScreen() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [action]);
+
+  // Deep link or navigation to a specific customer's details
+  useEffect(() => {
+    if (userId) {
+      const found = store.users.find(
+        (u) =>
+          String(u.UserId) === String(userId) ||
+          (u.CustomerCode && String(u.CustomerCode).toLowerCase() === String(userId).toLowerCase())
+      );
+      if (found) {
+        setSelectedUser(found);
+        setActiveTab('Profile');
+        setShowAadhaar(false);
+        setShowPAN(false);
+        setViewMode('details');
+        router.setParams({ userId: undefined } as any);
+      }
+    }
+  }, [userId, store.users]);
 
   // Open Edit Screen
   const handleEditPress = (user: User) => {
