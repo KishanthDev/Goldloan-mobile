@@ -14,8 +14,8 @@ import {
   View
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ProfileModal } from '../../components/ProfileModal';
 import { MobileMenuModal } from '../../components/MobileMenuModal';
+import { ProfileModal } from '../../components/ProfileModal';
 import { SidebarTrigger } from '../../components/SidebarTrigger';
 import { ThemeToggleBtn } from '../../components/ThemeToggleBtn';
 import { Env } from '../../config/env';
@@ -379,7 +379,7 @@ function TabLayoutInner() {
         {/* ─── TAB SCREENS CONTENT ─── */}
         <View style={styles.screensWrapper}>
           {/* ─── GLOBAL SHARED TOP NAVIGATION BAR ─── */}
-          {!isDesktop && currentTabKey === 'loans' ? null : (
+          {!isDesktop && ['loans', 'users', 'ornaments'].includes(currentTabKey) ? null : (
             <View style={[styles.topBar, isDesktop && styles.topBarDesktop]}>
             {isDesktop ? (
               /* Desktop: Sidebar Trigger + Page Title & Subtitle */

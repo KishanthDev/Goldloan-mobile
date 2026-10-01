@@ -1,15 +1,14 @@
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import React from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
 import { useTheme } from '../../context/ThemeContext';
 import { Loan, Payment, User } from '../../types';
 import { getLoansStyles } from './loansStyles';
 import {
-  calculateOutstanding,
-  formatAmountLakh,
-  formatLoanDate,
-  formatLoanPhone,
-  getLoanStatusInfo,
+    calculateOutstanding,
+    formatAmountLakh,
+    formatLoanDate,
+    formatLoanPhone,
+    getLoanStatusInfo,
 } from './loanUtils';
 
 export interface LoanCardItemProps {

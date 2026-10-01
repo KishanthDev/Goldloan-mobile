@@ -149,23 +149,18 @@ export default function UsersScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [action]);
 
-  // Deep link or navigation to a specific customer's details
+  // Entered via a link to a specific customer (e.g. from Loan Details): open that customer's details.
   useEffect(() => {
-    if (userId) {
-      const found = store.users.find(
-        (u) =>
-          String(u.UserId) === String(userId) ||
-          (u.CustomerCode && String(u.CustomerCode).toLowerCase() === String(userId).toLowerCase())
-      );
-      if (found) {
-        setSelectedUser(found);
-        setActiveTab('Profile');
-        setShowAadhaar(false);
-        setShowPAN(false);
-        setViewMode('details');
-        router.setParams({ userId: undefined } as any);
-      }
-    }
+    if (!userId) return;
+    const target = store.users.find(
+      (u) =>
+        String(u.UserId) === String(userId) ||
+        (u.CustomerCode && String(u.CustomerCode).toLowerCase() === String(userId).toLowerCase())
+    );
+    if (!target) return; // users may still be loading; effect re-runs when they arrive
+    handleCardPress(target);
+    router.setParams({ userId: undefined } as any);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, store.users]);
 
   // Open Edit Screen

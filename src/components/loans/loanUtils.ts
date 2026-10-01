@@ -1,4 +1,4 @@
-import { Loan, Payment, User } from '../../types';
+import { Loan, Payment } from '../../types';
 
 /**
  * Format currency amount into Lakhs (e.g. ₹1.80 L) if >= 1,00,000,

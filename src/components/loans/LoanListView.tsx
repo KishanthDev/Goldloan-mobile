@@ -1,13 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Dispatch, SetStateAction, useMemo, useState } from 'react';
 import {
-  FlatList,
-  RefreshControl,
-  ScrollView,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    FlatList,
+    RefreshControl,
+    ScrollView,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    useWindowDimensions,
+    View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../../context/ThemeContext';
@@ -53,7 +54,8 @@ export function LoanListView({
   onPayPress,
 }: LoanListViewProps) {
   const { colors, isDark } = useTheme();
-  const styles = getLoansStyles(colors, isDark);
+  const { height } = useWindowDimensions();
+  const styles = getLoansStyles(colors, isDark, false, height < 700);
 
   const [menuLoan, setMenuLoan] = useState<Loan | null>(null);
 
@@ -111,12 +113,12 @@ export function LoanListView({
       if (!query) return true;
 
       const borrower = userMap.get(l.UserId);
-      const borrowerName = String(borrower?.FullName || '').toLowerCase();
-      const borrowerPhone = String(borrower?.MobileNumber || borrower?.AlternateMobileNumber || '').toLowerCase();
-      const loanNo = String(l.LoanNumber || '').toLowerCase();
-      const loanId = String(l.LoanId || '').toLowerCase();
-      const bank = String(l.BankName || '').toLowerCase();
-      const amountStr = String(l.LoanAmount || '');
+      const borrowerName = (borrower?.FullName || '').toLowerCase();
+      const borrowerPhone = (borrower?.MobileNumber || borrower?.AlternateMobileNumber || '').toLowerCase();
+      const loanNo = (l.LoanNumber || '').toLowerCase();
+      const loanId = (l.LoanId || '').toLowerCase();
+      const bank = (l.BankName || '').toLowerCase();
+      const amountStr = (l.LoanAmount || '').toString();
 
       return (
         loanNo.includes(query) ||
@@ -133,7 +135,6 @@ export function LoanListView({
     { label: 'All', value: 'All', count: allCount },
     { label: 'Active', value: 'Active', count: activeCount },
     { label: 'Overdue', value: 'Overdue', count: overdueCount },
-    ...(closedCount > 0 ? [{ label: 'Closed', value: 'Closed' as LoanFilterType, count: closedCount }] : []),
   ];
 
   const borrowerForMenu = menuLoan ? userMap.get(menuLoan.UserId) : null;
@@ -272,8 +273,8 @@ export function LoanListView({
                 {searchQuery
                   ? `No loans matching "${searchQuery}"`
                   : activeFilter !== 'All'
-                    ? `No ${activeFilter.toLowerCase()} loans in this category`
-                    : 'Start by originating your first gold loan.'}
+                  ? `No ${activeFilter.toLowerCase()} loans in this category`
+                  : 'Start by originating your first gold loan.'}
               </Text>
             </View>
           }
